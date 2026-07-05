@@ -15,7 +15,8 @@
     "@wealthos/domain": "*",
     "superjson": "^2.2.0",
     "zod": "^4.4.0",
-    "@wealthos/db": "*"
+    "@wealthos/db": "*",
+    "@wealthos/ingestion": "*"
   },
   "devDependencies": {
     "@wealthos/config": "*",

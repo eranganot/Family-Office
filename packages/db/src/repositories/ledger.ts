@@ -66,6 +66,47 @@ async function attachLatestValuations(
   return results;
 }
 
+/** Transaction-scoped creation — the single source of truth used by manual entry AND imports. */
+export async function createItemInTx(
+  tx: Prisma.TransactionClient,
+  householdId: string,
+  base: CreateLedgerItemBase,
+  initialValuation?: AddValuationInput | undefined,
+  detail?: ((tx: Prisma.TransactionClient, itemId: string) => Promise<void>) | undefined,
+): Promise<{ itemId: string; valuationId: string | undefined }> {
+  const item = await tx.ledgerItem.create({
+    data: {
+      householdId,
+      kind: base.kind,
+      name: base.name,
+      currency: base.currency,
+      notes: base.notes ?? null,
+      ownershipShares: {
+        create: base.ownership.map((o) => ({
+          familyMemberId: o.familyMemberId,
+          sharePct: o.sharePct,
+        })),
+      },
+    },
+  });
+  let valuationId: string | undefined;
+  if (initialValuation) {
+    const v = await tx.valuation.create({
+      data: {
+        ledgerItemId: item.id,
+        asOf: initialValuation.asOf,
+        value: initialValuation.value,
+        currency: initialValuation.currency,
+        source: initialValuation.source,
+        confidence: initialValuation.confidence,
+      },
+    });
+    valuationId = v.id;
+  }
+  if (detail) await detail(tx, item.id);
+  return { itemId: item.id, valuationId };
+}
+
 export const ledgerRepo = {
   async list(
     db: PrismaClient,
@@ -104,35 +145,8 @@ export const ledgerRepo = {
     detail?: ((tx: Prisma.TransactionClient, itemId: string) => Promise<void>) | undefined,
   ): Promise<string> {
     return db.$transaction(async (tx) => {
-      const item = await tx.ledgerItem.create({
-        data: {
-          householdId,
-          kind: base.kind,
-          name: base.name,
-          currency: base.currency,
-          notes: base.notes ?? null,
-          ownershipShares: {
-            create: base.ownership.map((o) => ({
-              familyMemberId: o.familyMemberId,
-              sharePct: o.sharePct,
-            })),
-          },
-        },
-      });
-      if (initialValuation) {
-        await tx.valuation.create({
-          data: {
-            ledgerItemId: item.id,
-            asOf: initialValuation.asOf,
-            value: initialValuation.value,
-            currency: initialValuation.currency,
-            source: initialValuation.source,
-            confidence: initialValuation.confidence,
-          },
-        });
-      }
-      if (detail) await detail(tx, item.id);
-      return item.id;
+      const { itemId } = await createItemInTx(tx, householdId, base, initialValuation, detail);
+      return itemId;
     });
   },
 
