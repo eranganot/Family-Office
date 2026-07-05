@@ -12,7 +12,9 @@
     "@wealthos/domain": "*",
     "next": "^16.2.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "next-intl": "^4.13.0",
+    "@wealthos/i18n": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
