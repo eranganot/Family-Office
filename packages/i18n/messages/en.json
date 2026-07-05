@@ -12,7 +12,8 @@
     "switchLocale": "עברית",
     "documents": "Documents",
     "verification": "Verification",
-    "registry": "Registry"
+    "registry": "Registry",
+    "goals": "Goals"
   },
   "phase": {
     "label": "Current phase",
@@ -328,5 +329,52 @@
     "reviewed": "Owner-reviewed",
     "pendingReview": "PENDING OWNER REVIEW",
     "sources": "Sources"
+  },
+  "goals": {
+    "title": "Goals",
+    "add": "Add goal",
+    "name": "Name",
+    "type": "Type",
+    "priority": "Priority (1 = highest)",
+    "targetDate": "Target date",
+    "requiredFunding": "Required funding",
+    "riskTolerance": "Acceptable risk",
+    "LOW": "Low",
+    "MEDIUM": "Medium",
+    "HIGH": "High",
+    "dependsOn": "Depends on",
+    "achieve": "Mark achieved",
+    "abandon": "Abandon",
+    "gapReport": "Funding gap report",
+    "gapHint": "Verified assets only, consolidated to ILS. Priority-ordered allocation: LIQUID pool for all goals; RETIREMENT pool reserved for retirement goals. Real return assumption",
+    "pools": "Available pools",
+    "liquid": "Liquid",
+    "retirementPool": "Retirement",
+    "excludedUnverified": "unverified items excluded",
+    "allocated": "Allocated now",
+    "projected": "Projected at target",
+    "required": "Required",
+    "gap": "Gap",
+    "monthlySaving": "Required monthly saving",
+    "years": "years",
+    "notComputable": {
+      "NO_TARGET_DATE": "No target date set",
+      "NO_REQUIRED_FUNDING": "No required funding set",
+      "TARGET_IN_PAST": "Target date is in the past"
+    },
+    "empty": "No goals yet. The strategy engine optimizes against your goals — define them.",
+    "types": {
+      "EMERGENCY_FUND": "Emergency fund",
+      "RETIREMENT": "Retirement",
+      "CHILDREN_EDUCATION": "Children's education",
+      "PROPERTY_PURCHASE": "Property purchase",
+      "INVESTMENT_PROPERTY": "Investment property",
+      "FINANCIAL_INDEPENDENCE": "Financial independence",
+      "LIFESTYLE": "Lifestyle",
+      "LEGACY": "Legacy",
+      "INHERITANCE": "Inheritance",
+      "PHILANTHROPY": "Philanthropy",
+      "OTHER": "Other"
+    }
   }
 }
