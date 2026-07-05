@@ -4,7 +4,19 @@
 
 ## Current state (2026-07-05)
 
-- **Milestone: M1 COMPLETE — pending deploy verification and owner approval for M2.**
+- **Milestone: M2 COMPLETE — pending deploy verification and owner approval for M3.**
+- M2 delivered: adapter framework (versioned RawDataPayload, registry, Israeli normalization
+  utils), deterministic LedgerFactory (canonical vs suspense, never guesses — 8 failure modes
+  tested), content-addressed immutable document store on a Railway volume (created via API,
+  mounted /data), atomic import orchestration with per-field provenance + re-import matching
+  (externalRef+institution → valuation append, no dupes), Israeli account-summary CSV adapter
+  (Hebrew header synonyms + product-type lexicon), synthetic fixture corpus (hishtalmut/bank/
+  Mislaka-style CSVs + GENERATED visual-order Hebrew pension PDF), IL pension PDF adapter
+  (pdfjs text matrix + empirical RTL repair: pdf.js renders visual-order PDFs as full char
+  reversal — fixture-verified), bilingual import UI (upload → ownership → report → suspense
+  list), and real-PostgreSQL integration tests + CI postgres service (clears M1 debt).
+- Key M2 discovery: pdf.js bidi turns visual-order Hebrew PDFs into exact full-line char
+  reversal (digits included) — the RTL repair is built and tested around that empirical fact.
 - M1 delivered: boundary lint (verified catching violations), initial DB migration applied to
   Railway PG, household/member CRUD, workflow state machine (18 tests incl. exhaustive matrix),
   workflowGuard (blocking-matrix tested), full ledger (accounts w/ Israeli types, real estate,
@@ -36,15 +48,22 @@
 - Sandbox bash: 45s hard timeout per call; background processes do not survive between calls;
   run npm installs as repeated `timeout 40 npm install` slices (cache resumes).
 
-## Next up (M2, after approval)
+## Next up (M3, after approval)
 
-Ingestion framework: document store → adapter framework → ledger factory → suspense account →
-provenance → CSV adapter → synthetic Israeli fixture corpus → pension PDF adapter → import UI.
+Verification phase: verification assessor (completeness/staleness/confidence) → missing-docs
+report → review queue UI → suspense resolution UI → VERIFICATION→STRATEGY phase gate.
 
-## M1 technical debt
+## M2 technical debt
 
-- Repo integration tests (against real PG) not yet written — routers tested via mocked ctx; DB
-  layer exercised manually end-to-end. Add testcontainers or a TEST_DATABASE_URL suite in M2.
+- Adapter version-bump discipline is convention, not yet CI-enforced.
+- PDF adapter is fixture-grade: real institution PDFs will need adapter iterations (expected;
+  suspense absorbs unknowns). Mislaka XML adapter awaits real documents.
+- Import ownership defaults applied per import run; per-item ownership editing lands with M3
+  verification UI. Bituach menahalim product type intentionally unsupported → suspense.
+- fileParallelism disabled for DB-bound test suites (shared test DB).
+
+## M1 technical debt (carried)
+
 - Mortgage form supports up to 4 static track rows (no client-side dynamic rows yet).
 - Auth still env-var based (swap to DB User row planned).
 - next build skips its own TS pass; tsc --noEmit gates types via turbo/CI instead.
