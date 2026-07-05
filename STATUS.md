@@ -4,7 +4,15 @@
 
 ## Current state (2026-07-05)
 
-- **Milestone: M2 COMPLETE — pending deploy verification and owner approval for M3.**
+- **Milestone: M3 COMPLETE — pending deploy verification and owner approval for M4.**
+- M3 delivered: verification engine (per-item issues: no/stale valuation by kind-specific
+  thresholds, never-confirmed, low-confidence, rejected; household completeness+confidence
+  scores; gate logic), missing-docs report derived from ledger composition (pension/hishtalmut/
+  gemel/bank/brokerage/mortgage/106 expectations, present/stale/missing), review queue UI
+  (verify / reject-with-note / correct-value-append), suspense resolution UI (discard / link to
+  existing / create account with raw-data prefill), phase-gate UI with the only workflow
+  transition controls, and a full-flow integration test: blocked by unverified item → blocked by
+  suspense → resolve → STRATEGY reached, transitions audited.
 - M2 delivered: adapter framework (versioned RawDataPayload, registry, Israeli normalization
   utils), deterministic LedgerFactory (canonical vs suspense, never guesses — 8 failure modes
   tested), content-addressed immutable document store on a Railway volume (created via API,
@@ -48,12 +56,20 @@
 - Sandbox bash: 45s hard timeout per call; background processes do not survive between calls;
   run npm installs as repeated `timeout 40 npm install` slices (cache resumes).
 
-## Next up (M3, after approval)
+## Next up (M4, after approval)
 
-Verification phase: verification assessor (completeness/staleness/confidence) → missing-docs
-report → review queue UI → suspense resolution UI → VERIFICATION→STRATEGY phase gate.
+Registries: TaxRegistry (IL 2025+2026 matrices, cited sources, OWNER REVIEW REQUIRED before
+seeding) → AssumptionRegistry (conservative defaults + household overrides + version pinning)
+→ invalidation wiring → registry UI. Owner input needed: Q5 tax scope (docs 06).
 
-## M2 technical debt
+## M3 technical debt
+
+- Staleness thresholds + low-confidence cutoff are engine constants → move to AssumptionRegistry
+  in M4 (planned, not accidental).
+- Suspense create-from-raw covers ACCOUNT only (matches factory v1 scope).
+- Verification page loads full ledger twice (assessment + display) — fine at family scale.
+
+## M2 technical debt (carried)
 
 - Adapter version-bump discipline is convention, not yet CI-enforced.
 - PDF adapter is fixture-grade: real institution PDFs will need adapter iterations (expected;
