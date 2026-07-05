@@ -4,7 +4,15 @@
 
 ## Current state (2026-07-05)
 
-- **Milestone: M4 COMPLETE — tax matrices PENDING OWNER REVIEW, then owner approval for M5.**
+- **Milestone: M5 COMPLETE — pending deploy verification and owner approval for M6.**
+- M5 delivered: goal model (11 types, priorities, acyclic dependency validation in domain),
+  funding-gap engine (documented pool policy: LIQUID for all goals, RETIREMENT reserved for
+  retirement/FI goals; priority-ordered PV allocation; FV projection + annuity monthly-saving
+  from the goal_projection_real_return_pct assumption (3% conservative default); verified
+  ILS-converted assets only; incomputable goals reported with reasons — 7 engine tests),
+  bilingual goal UI with gap dashboard.
+- NOTE: tax matrices still PENDING OWNER REVIEW (M4) — owner approved proceeding but has not
+  yet confirmed the figures; ownerReviewed stays false.
 - M4 delivered: TaxRegistry (versioned, schema-validated, year-keyed accessor; throws on missing
   rules — engines can never guess), IL 2025+2026 matrices seeded with cited sources (income tax
   brackets incl. the March-2026 retroactive widening, credit points, capital gains, hishtalmut
@@ -65,11 +73,12 @@
 - Sandbox bash: 45s hard timeout per call; background processes do not survive between calls;
   run npm installs as repeated `timeout 40 npm install` slices (cache resumes).
 
-## Next up (M5, after approval)
+## Next up (M6, after approval) — Strategy Engine v1, the core milestone
 
-Goal engine: goal model (types, priorities, acyclic dependencies) → funding-gap analysis from
-verified ledger + assumptions → bilingual goal UI. Owner input useful: household composition and
-retirement baseline (docs 06 Q2/Q6).
+Snapshot → analyzers (liquidity, concentration, currency, tax-advantaged headroom, debt) →
+recommendation model with structured rationale → rule-based generators (strategy-level only,
+product-reference validator) → priority scoring from assumption weights → data-quality gate →
+strategy UI. Owner input useful before M6: household composition + retirement ages (Q2/Q6).
 
 ## M4 notes
 
