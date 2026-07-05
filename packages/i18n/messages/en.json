@@ -293,7 +293,10 @@
       "STALE": "Stale",
       "MISSING": "Missing"
     },
-    "forItem": "for"
+    "forItem": "for",
+    "advance": "Advance to {state}",
+    "backTo": "Back to {state}",
+    "transitionError": "Transition blocked"
   },
   "suspense": {
     "title": "Resolve suspense item",
