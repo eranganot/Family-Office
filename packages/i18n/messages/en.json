@@ -11,7 +11,8 @@
     "logout": "Log out",
     "switchLocale": "עברית",
     "documents": "Documents",
-    "verification": "Verification"
+    "verification": "Verification",
+    "registry": "Registry"
   },
   "phase": {
     "label": "Current phase",
@@ -309,5 +310,23 @@
     "createTitle": "Create account from this data",
     "createHint": "Fields are prefilled from the raw data where possible. Review everything before saving.",
     "resolveList": "Open the pending list on the Documents page to pick items to resolve."
+  },
+  "registry": {
+    "title": "Registry",
+    "assumptions": "Assumptions",
+    "assumptionsHint": "Conservative system defaults. Overrides create a new version and invalidate recommendations that depended on the old value.",
+    "key": "Assumption",
+    "value": "Value",
+    "unit": "Unit",
+    "version": "Version",
+    "source": "Source",
+    "override": "Override",
+    "set": "Set",
+    "taxMatrices": "Tax matrices (Israel)",
+    "taxHint": "Versioned, source-cited regulatory data. No rate exists anywhere in code.",
+    "year": "Tax year",
+    "reviewed": "Owner-reviewed",
+    "pendingReview": "PENDING OWNER REVIEW",
+    "sources": "Sources"
   }
 }
