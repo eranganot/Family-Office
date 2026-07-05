@@ -6,8 +6,15 @@ import { Card, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { GatePanel } from "./gate-panel";
 
-export default async function VerificationPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function VerificationPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const { locale } = await params;
+  const { error } = await searchParams;
   const t = await getTranslations("verification");
   const tk = await getTranslations("kinds");
   const trpc = await serverCaller();
@@ -22,6 +29,11 @@ export default async function VerificationPage({ params }: { params: Promise<{ l
 
   return (
     <div className="flex flex-col gap-6">
+      {error ? (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {t("transitionError")}: {decodeURIComponent(error)}
+        </p>
+      ) : null}
       <div className="grid grid-cols-3 gap-4">
         <Card title={t("completeness")}>
           <p className="text-2xl font-bold">{assessment.completenessScore}%</p>

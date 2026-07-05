@@ -293,7 +293,10 @@
       "STALE": "ישן",
       "MISSING": "חסר"
     },
-    "forItem": "עבור"
+    "forItem": "עבור",
+    "advance": "מעבר ל{state}",
+    "backTo": "חזרה ל{state}",
+    "transitionError": "המעבר נחסם"
   },
   "suspense": {
     "title": "טיפול בפריט ממתין",
