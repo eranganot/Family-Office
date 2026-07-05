@@ -1,0 +1,19 @@
+{
+  "name": "@wealthos/domain",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0",
+    "zod": "^4.4.0"
+  },
+  "devDependencies": {
+    "@wealthos/config": "*",
+    "vitest": "^4.1.0"
+  }
+}
