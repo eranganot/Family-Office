@@ -13,7 +13,8 @@
     "documents": "מסמכים",
     "verification": "אימות",
     "registry": "רגיסטרי",
-    "goals": "יעדים"
+    "goals": "יעדים",
+    "strategy": "אסטרטגיה"
   },
   "phase": {
     "label": "שלב נוכחי",
@@ -376,5 +377,45 @@
       "PHILANTHROPY": "פילנתרופיה",
       "OTHER": "אחר"
     }
+  },
+  "strategy": {
+    "title": "אסטרטגיה",
+    "run": "הרצת ניתוח אסטרטגי",
+    "wrongPhase": "האסטרטגיה נעולה עד להשלמת האימות. יש לעבור לשלב האסטרטגיה בעמוד האימות.",
+    "goToVerification": "לעמוד האימות",
+    "ranSummary": "הניתוח הושלם: {created} המלצות הוצעו ({superseded} קודמות הוחלפו).",
+    "dataGap": "המנוע סירב להפיק המלצות — איכות הנתונים אינה מספקת:",
+    "empty": "אין המלצות עדיין. יש להריץ את הניתוח.",
+    "confidence": "רמת ודאות",
+    "completeness": "שלמות נתונים",
+    "priority": "עדיפות",
+    "accept": "קבלה",
+    "reject": "דחייה",
+    "decisionNote": "הערת החלטה (רשות)",
+    "status": {
+      "PROPOSED": "מוצע",
+      "ACCEPTED": "התקבל"
+    },
+    "rationale": {
+      "why": "מדוע",
+      "benefits": "יתרונות",
+      "risks": "סיכונים",
+      "tradeoffs": "פשרות",
+      "taxImplications": "השלכות מס",
+      "liquidityImplications": "השלכות נזילות",
+      "timeHorizon": "אופק זמן",
+      "sensitivity": "רגישות",
+      "alternatives": "חלופות",
+      "expectedImpact": "השפעה צפויה"
+    },
+    "horizon": {
+      "IMMEDIATE": "מיידי",
+      "SHORT": "קצר",
+      "MEDIUM": "בינוני",
+      "LONG": "ארוך"
+    },
+    "evidence": "אסמכתאות",
+    "goalsImproved": "יעדים שמשתפרים",
+    "assumptionsUsed": "הנחות בשימוש (גרסאות מקובעות)"
   }
 }
