@@ -111,7 +111,7 @@ export function project(snapshot: SnapshotPayload, params: ProjectionParams): Pr
       investable *= 1 - params.marketShock.drawdownPct / 100;
     }
 
-    let incomeMonths = 12;
+    const incomeMonths = 12;
     let incomeFactor = 1;
     if (params.incomeStopsAtYear !== null && year >= params.incomeStopsAtYear) {
       incomeFactor = 0;

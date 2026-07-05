@@ -46,6 +46,7 @@ export default async function AppLayout({
         <Link href="/verification" className="font-medium hover:underline">{t("nav.verification")}</Link>
         <Link href="/goals" className="font-medium hover:underline">{t("nav.goals")}</Link>
         <Link href="/strategy" className="font-medium hover:underline">{t("nav.strategy")}</Link>
+        <Link href="/scenarios" className="font-medium hover:underline">{t("nav.scenarios")}</Link>
         <Link href="/journal" className="font-medium hover:underline">{t("nav.journal")}</Link>
         <Link href="/household" className="font-medium hover:underline">{t("nav.household")}</Link>
         <Link href="/fx" className="font-medium hover:underline">{t("nav.fx")}</Link>
