@@ -1,0 +1,10 @@
+{
+  "name": "@wealthos/engine-strategy",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@wealthos/domain": "*", "zod": "^4.4.0" },
+  "devDependencies": { "@wealthos/config": "*", "vitest": "^4.1.0" }
+}
