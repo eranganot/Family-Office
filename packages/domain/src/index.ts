@@ -13,3 +13,5 @@ export { calculateNetWorth } from "./ledger/net-worth";
 export type { NetWorthItem, NetWorthReport, FxRateInput } from "./ledger/net-worth";
 export { RawDataPayloadSchema, RawItemSchema, RawFieldSchema } from "./ingestion/raw-payload";
 export type { RawDataPayload, RawItem, RawField } from "./ingestion/raw-payload";
+export { buildFromPayload, KNOWN_ACCOUNT_TYPES } from "./ingestion/ledger-factory";
+export type { FactoryResult, CanonicalAccountDraft, SuspenseDraft, SuspenseReason, ProvenanceField, KnownAccountType } from "./ingestion/ledger-factory";
