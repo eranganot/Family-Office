@@ -1,5 +1,6 @@
 import { accountsRouter } from "./routers/accounts";
 import { propertyRouter } from "./routers/property";
+import { flowsRouter } from "./routers/flows";
 import { healthRouter } from "./routers/health";
 import { householdRouter } from "./routers/household";
 import { ledgerRouter } from "./routers/ledger";
@@ -13,6 +14,7 @@ export const appRouter = router({
   ledger: ledgerRouter,
   accounts: accountsRouter,
   property: propertyRouter,
+  flows: flowsRouter,
 });
 
 export type AppRouter = typeof appRouter;
