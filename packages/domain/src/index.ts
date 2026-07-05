@@ -9,3 +9,5 @@ export { validateOwnershipShares } from "./ledger/ownership";
 export type { OwnershipShareInput, OwnershipValidation } from "./ledger/ownership";
 export { validateMortgageTracks, totalPrincipal } from "./ledger/mortgage";
 export type { MortgageTrackInput, MortgageValidation } from "./ledger/mortgage";
+export { calculateNetWorth } from "./ledger/net-worth";
+export type { NetWorthItem, NetWorthReport, FxRateInput } from "./ledger/net-worth";
