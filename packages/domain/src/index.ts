@@ -17,3 +17,5 @@ export { buildFromPayload, KNOWN_ACCOUNT_TYPES } from "./ingestion/ledger-factor
 export type { FactoryResult, CanonicalAccountDraft, SuspenseDraft, SuspenseReason, ProvenanceField, KnownAccountType } from "./ingestion/ledger-factory";
 export { validateGoalDependencies } from "./goals/dependencies";
 export type { GoalEdge, DependencyValidation } from "./goals/dependencies";
+export { SnapshotPayloadSchema, SnapshotItemSchema, SnapshotGoalSchema, SnapshotMemberSchema } from "./strategy/snapshot";
+export type { SnapshotPayload, SnapshotItem, SnapshotGoal, SnapshotMember } from "./strategy/snapshot";
