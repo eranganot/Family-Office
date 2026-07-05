@@ -1,0 +1,22 @@
+{
+  "name": "@wealthos/registry",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "seed": "tsx src/seed.ts"
+  },
+  "dependencies": {
+    "@wealthos/db": "*",
+    "@wealthos/domain": "*",
+    "zod": "^4.4.0"
+  },
+  "devDependencies": {
+    "@wealthos/config": "*",
+    "tsx": "^4.20.0",
+    "vitest": "^4.1.0"
+  }
+}
