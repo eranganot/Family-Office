@@ -33,9 +33,9 @@ const LINES = [
 ];
 
 const fontPath = join(
-  dirname(require.resolve("@fontsource/noto-sans-hebrew/package.json")),
-  "files",
-  "noto-sans-hebrew-hebrew-400-normal.woff",
+  dirname(require.resolve("dejavu-fonts-ttf/package.json")),
+  "ttf",
+  "DejaVuSans.ttf",
 );
 
 const doc = await PDFDocument.create();

@@ -23,21 +23,7 @@ const HEADER_SYNONYMS: Record<string, string[]> = {
   currency: ["מטבע"],
 };
 
-const ACCOUNT_TYPE_MAP: Record<string, string> = {
-  "קרן השתלמות": "KEREN_HISHTALMUT",
-  "קופת גמל": "KUPAT_GEMEL",
-  "גמל להשקעה": "GEMEL_LEHASHKAA",
-  "קרן פנסיה מקיפה": "PENSION_COMPREHENSIVE",
-  "קרן פנסיה כללית": "PENSION_GENERAL",
-  "גמל בניהול אישי": "IRA_GEMEL",
-  "IRA": "IRA_GEMEL",
-  'עו"ש': "BANK_CHECKING",
-  "עוש": "BANK_CHECKING",
-  "חשבון עובר ושב": "BANK_CHECKING",
-  "חיסכון": "BANK_SAVINGS",
-  "פיקדון": "BANK_DEPOSIT",
-  "תיק השקעות": "BROKERAGE_IL",
-};
+import { ISRAELI_PRODUCT_TYPE_MAP as ACCOUNT_TYPE_MAP } from "../il-product-types";
 
 function buildHeaderIndex(headers: string[]): Map<string, string> {
   const index = new Map<string, string>(); // canonical path -> actual header
