@@ -6,3 +6,7 @@ export type { GenerationResult } from "./generators";
 export { RationaleSchema } from "./rationale";
 export type { Rationale, RecommendationDraft } from "./rationale";
 export { validateStrategyText } from "./validator";
+export { scorePriority } from "./scoring";
+export type { PriorityWeights } from "./scoring";
+export { evaluateGate } from "./gate";
+export type { GateResult, GateThresholds, DataGapReport } from "./gate";
