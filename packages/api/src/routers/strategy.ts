@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { runStrategy } from "../services/strategy-service";
-import { protectedProcedure, router, workflowGuard } from "../trpc";
+import { router, workflowGuard } from "../trpc";
 
 /** ALL strategy procedures are built on workflowGuard("STRATEGY") — schema-driven state locking. */
 export const strategyRouter = router({
