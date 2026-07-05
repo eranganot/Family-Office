@@ -42,6 +42,7 @@ export default async function AppLayout({
       <nav className="mb-6 flex gap-4 border-b border-neutral-200 pb-3 text-sm">
         <Link href="/" className="font-medium hover:underline">{t("nav.dashboard")}</Link>
         <Link href="/mapping" className="font-medium hover:underline">{t("nav.mapping")}</Link>
+        <Link href="/documents" className="font-medium hover:underline">{t("nav.documents")}</Link>
         <Link href="/household" className="font-medium hover:underline">{t("nav.household")}</Link>
         <Link href="/fx" className="font-medium hover:underline">{t("nav.fx")}</Link>
       </nav>

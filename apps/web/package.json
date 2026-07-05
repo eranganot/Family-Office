@@ -21,7 +21,8 @@
     "@wealthos/api": "*",
     "@trpc/server": "^11.18.0",
     "superjson": "^2.2.0",
-    "@wealthos/db": "*"
+    "@wealthos/db": "*",
+    "@wealthos/ingestion": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",

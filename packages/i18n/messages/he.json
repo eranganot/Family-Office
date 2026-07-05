@@ -9,7 +9,8 @@
     "household": "משק הבית",
     "fx": "שערי מטבע",
     "logout": "התנתקות",
-    "switchLocale": "English"
+    "switchLocale": "English",
+    "documents": "מסמכים"
   },
   "phase": {
     "label": "שלב נוכחי",
@@ -32,7 +33,10 @@
     "byKind": "לפי קטגוריה",
     "byCurrency": "חשיפה מטבעית (ברוטו, במטבע המקור)",
     "excluded": "לא נכלל בסיכום",
-    "excludedReason": { "NO_VALUATION": "אין הערכת שווי", "NO_FX_RATE": "חסר שער המרה" },
+    "excludedReason": {
+      "NO_VALUATION": "אין הערכת שווי",
+      "NO_FX_RATE": "חסר שער המרה"
+    },
     "noHousehold": "מתחילים בהגדרת משק הבית.",
     "setupCta": "הגדרת משק בית"
   },
@@ -218,5 +222,41 @@
     "empty": "אין שערים עדיין. פריטים במט\"ח לא ייכללו בסיכום עד שיוגדר שער.",
     "source": "מקור"
   },
-  "home": { "welcome": "ברוכים הבאים", "emptyState": "מפת משק הבית ריקה. אבן דרך 1 מוסיפה מיפוי ידני." }
+  "home": {
+    "welcome": "ברוכים הבאים",
+    "emptyState": "מפת משק הבית ריקה. אבן דרך 1 מוסיפה מיפוי ידני."
+  },
+  "documents": {
+    "title": "מסמכים וייבוא",
+    "upload": "העלאת מסמך",
+    "file": "קובץ (PDF / CSV)",
+    "docType": "סוג מסמך",
+    "institution": "גוף מנהל (רשות)",
+    "uploadBtn": "העלאה",
+    "docs": "מסמכים שהועלו",
+    "empty": "אין מסמכים עדיין.",
+    "status": "סטטוס",
+    "runImport": "ייבוא",
+    "importOwnership": "שיוך בעלות לפריטים המיובאים (%)",
+    "report": "דוח ייבוא",
+    "created": "פריטים חדשים שנוצרו",
+    "updated": "פריטים קיימים שעודכנו (נוספה הערכת שווי)",
+    "suspense": "הועברו להמתנה (דרוש סיווג אנושי)",
+    "provenance": "שדות מקור שתועדו",
+    "warnings": "אזהרות",
+    "pendingSuspense": "פריטים בהמתנה לסיווג",
+    "suspenseNote": "פריטים שהמערכת סירבה לנחש לגביהם. ממשק הסיווג יגיע באבן הדרך של האימות.",
+    "reason": "סיבה",
+    "types": {
+      "PENSION_REPORT": "דוח שנתי - פנסיה",
+      "HISHTALMUT_STATEMENT": "דוח קרן השתלמות",
+      "GEMEL_STATEMENT": "דוח קופת גמל",
+      "BANK_STATEMENT": "דוח / סיכום בנק",
+      "BROKERAGE_STATEMENT": "דוח ברוקר",
+      "MISLAKA": "מסלקה פנסיונית",
+      "MORTGAGE_SCHEDULE": "לוח סילוקין משכנתא",
+      "TAX_106": "טופס 106",
+      "OTHER": "אחר"
+    }
+  }
 }
