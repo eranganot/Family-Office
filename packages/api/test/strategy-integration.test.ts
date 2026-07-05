@@ -135,3 +135,19 @@ d("decision journal — outcome round trip", () => {
     expect(list.some((x) => x.id === entry.id && x.recommendation.title.length > 0)).toBe(true);
   }, 60000);
 });
+
+d("scenario engine — guarded run against real PostgreSQL", () => {
+  it("runs a canned scenario, persists it with the baseline snapshot, and compares outcomes", async () => {
+    const c = caller();
+    const result = await c.scenarios.run({ type: "MARKET_CRASH", overrides: { years: 15 } });
+    expect(result.baseline.rows).toHaveLength(15);
+    expect(result.scenario.terminalNetWorth).toBeLessThan(result.baseline.terminalNetWorth);
+
+    const saved = await c.scenarios.get({ id: result.scenarioId });
+    expect(saved.baselineSnapshotId).toBeTruthy();
+    expect(saved.type).toBe("MARKET_CRASH");
+
+    const list = await c.scenarios.list();
+    expect(list.some((s) => s.id === result.scenarioId)).toBe(true);
+  }, 60000);
+});

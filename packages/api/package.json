@@ -20,7 +20,8 @@
     "@wealthos/engine-verification": "*",
     "@wealthos/registry": "*",
     "@wealthos/engine-goals": "*",
-    "@wealthos/engine-strategy": "*"
+    "@wealthos/engine-strategy": "*",
+    "@wealthos/engine-scenario": "*"
   },
   "devDependencies": {
     "@wealthos/config": "*",
