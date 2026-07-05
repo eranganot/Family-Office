@@ -15,7 +15,8 @@
     "registry": "Registry",
     "goals": "Goals",
     "strategy": "Strategy",
-    "journal": "Journal"
+    "journal": "Journal",
+    "scenarios": "Scenarios"
   },
   "phase": {
     "label": "Current phase",
@@ -435,6 +436,36 @@
       "ACCEPTED": "Accepted",
       "REJECTED": "Rejected",
       "DEFERRED": "Deferred"
+    }
+  },
+  "scenarios": {
+    "title": "Scenarios",
+    "hint": "Deterministic what-if projections in today's purchasing power (real terms), against the same verified snapshot. Locked to the Strategy phase.",
+    "run": "Run scenario",
+    "type": "Scenario",
+    "years": "Horizon (years)",
+    "baseline": "Baseline",
+    "scenario": "Scenario",
+    "netWorthAt": "Net worth at",
+    "terminal": "End of horizon",
+    "minInvestable": "Lowest investable point",
+    "depletion": "Wealth depleted in year",
+    "never": "never",
+    "goalOutcomes": "Goal outcomes",
+    "funded": "Funded",
+    "notFunded": "Not funded",
+    "notComputable": "Not computable",
+    "saved": "Saved scenarios",
+    "wrongPhase": "Scenarios are locked until the Strategy phase.",
+    "types": {
+      "RETIRE_EARLIER": "Retire earlier (income stops year 6)",
+      "RETIRE_LATER": "Retire later (income stops year 11)",
+      "JOB_LOSS": "Job loss (12 months, full)",
+      "MARKET_CRASH": "Market crash (-30% year 1)",
+      "HIGH_INFLATION": "High inflation (+3pp, hits linked debt)",
+      "MORTGAGE_REFINANCE": "Mortgage refinance (-1pp all tracks)",
+      "SAVINGS_RATE_UP": "Save ₪2,000/mo more",
+      "SAVINGS_RATE_DOWN": "Save ₪2,000/mo less"
     }
   }
 }
