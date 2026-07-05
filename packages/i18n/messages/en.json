@@ -9,7 +9,8 @@
     "household": "Household",
     "fx": "FX rates",
     "logout": "Log out",
-    "switchLocale": "עברית"
+    "switchLocale": "עברית",
+    "documents": "Documents"
   },
   "phase": {
     "label": "Current phase",
@@ -32,7 +33,10 @@
     "byKind": "By category",
     "byCurrency": "Currency exposure (gross, original currency)",
     "excluded": "Excluded from totals",
-    "excludedReason": { "NO_VALUATION": "no valuation yet", "NO_FX_RATE": "missing FX rate" },
+    "excludedReason": {
+      "NO_VALUATION": "no valuation yet",
+      "NO_FX_RATE": "missing FX rate"
+    },
     "noHousehold": "Start by setting up your household.",
     "setupCta": "Set up household"
   },
@@ -218,5 +222,41 @@
     "empty": "No rates yet. Foreign-currency items are excluded from totals until a rate exists.",
     "source": "Source"
   },
-  "home": { "welcome": "Welcome", "emptyState": "The household map is empty. Milestone 1 adds manual mapping." }
+  "home": {
+    "welcome": "Welcome",
+    "emptyState": "The household map is empty. Milestone 1 adds manual mapping."
+  },
+  "documents": {
+    "title": "Documents & import",
+    "upload": "Upload document",
+    "file": "File (PDF / CSV)",
+    "docType": "Document type",
+    "institution": "Institution (optional)",
+    "uploadBtn": "Upload",
+    "docs": "Uploaded documents",
+    "empty": "No documents yet.",
+    "status": "Status",
+    "runImport": "Import",
+    "importOwnership": "Assign ownership for imported items (%)",
+    "report": "Import report",
+    "created": "New items created",
+    "updated": "Existing items updated (valuation appended)",
+    "suspense": "Sent to suspense (needs human classification)",
+    "provenance": "Provenance fields recorded",
+    "warnings": "Warnings",
+    "pendingSuspense": "Pending suspense items",
+    "suspenseNote": "Items the system refused to guess about. Classification UI arrives in the Verification milestone.",
+    "reason": "Reason",
+    "types": {
+      "PENSION_REPORT": "Pension annual report",
+      "HISHTALMUT_STATEMENT": "Keren hishtalmut statement",
+      "GEMEL_STATEMENT": "Gemel statement",
+      "BANK_STATEMENT": "Bank statement / summary",
+      "BROKERAGE_STATEMENT": "Brokerage statement",
+      "MISLAKA": "Mislaka export",
+      "MORTGAGE_SCHEDULE": "Mortgage schedule",
+      "TAX_106": "Form 106",
+      "OTHER": "Other"
+    }
+  }
 }
