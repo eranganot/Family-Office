@@ -3,7 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
@@ -11,11 +13,15 @@
   "dependencies": {
     "@wealthos/domain": "*",
     "papaparse": "^5.5.0",
-    "zod": "^4.4.0"
+    "zod": "^4.4.0",
+    "pdfjs-dist": "^5.4.0"
   },
   "devDependencies": {
     "@types/papaparse": "^5.3.0",
     "@wealthos/config": "*",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "pdf-lib": "^1.17.1",
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@fontsource/noto-sans-hebrew": "^5.2.0"
   }
 }
