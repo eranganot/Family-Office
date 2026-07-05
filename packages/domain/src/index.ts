@@ -7,3 +7,5 @@ export { evaluateTransition, legalTargets, WorkflowStates } from "./workflow/sta
 export type { WorkflowState, TransitionFacts, TransitionResult, TransitionDenialReason } from "./workflow/state-machine";
 export { validateOwnershipShares } from "./ledger/ownership";
 export type { OwnershipShareInput, OwnershipValidation } from "./ledger/ownership";
+export { validateMortgageTracks, totalPrincipal } from "./ledger/mortgage";
+export type { MortgageTrackInput, MortgageValidation } from "./ledger/mortgage";
