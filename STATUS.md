@@ -4,7 +4,10 @@
 
 ## Current state (2026-07-05)
 
-- **Milestone: M6 COMPLETE (Strategy Engine v1 — Phase 3 live) — pending owner approval for M7.**
+- **Milestone: M7 COMPLETE (Decision Journal) — pending owner approval for M8.**
+- M7 delivered: decide() captures expected outcome + implementation date; journal router works in
+  ANY phase (recording actual outcomes is a MONITORING activity); bilingual journal history page
+  with inline actual-outcome recording; outcome round-trip integration-tested.
 - M6 delivered: versioned SnapshotPayload contract + builder (FX recorded, data-quality embedded);
   5 analyzers (liquidity/runway vs emergency target, single-asset + institution concentration,
   currency home-bias/excess, tax-advantaged structural headroom incl. fee drag, mortgage CPI mix +
@@ -85,10 +88,11 @@
 - Sandbox bash: 45s hard timeout per call; background processes do not survive between calls;
   run npm installs as repeated `timeout 40 npm install` slices (cache resumes).
 
-## Next up (M7, after approval)
+## Next up (M8, after approval)
 
-Decision journal expansion: expected-outcome capture on accept, later actual-outcome entry,
-journal history UI. (Decision rows already written since M6; M7 adds outcomes + history view.)
+Scenario Engine v1: deterministic multi-year projector (cash flow, balances, goals under
+assumption overrides) → canned scenarios (retire earlier/later, job loss, market crash, high
+inflation, refinance, savings-rate changes) → baseline-vs-scenario comparison UI.
 
 ## M4 notes
 
