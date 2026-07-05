@@ -1,0 +1,658 @@
+// ============================================================================
+// WealthOS — Prisma Schema DRAFT (for design review; not yet migrated)
+// PostgreSQL. Money = Decimal(18,4) + ISO currency code. No floats. No JSONB
+// for core financial fields; JSONB only for raw payloads, snapshots, matrices.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7: connection URL lives in prisma.config.ts (env DATABASE_URL), not here.
+}
+
+// ---------------------------------------------------------------------------
+// Core: Household, Members, Workflow state machine, Auth
+// ---------------------------------------------------------------------------
+
+enum WorkflowState {
+  MAPPING
+  VERIFICATION
+  STRATEGY
+  MONITORING
+}
+
+model Household {
+  id            String        @id @default(uuid())
+  name          String
+  baseCurrency  String        @db.Char(3) // ILS
+  workflowState WorkflowState @default(MAPPING)
+  locale        String        @default("he") // he | en
+  timezone      String        @default("Asia/Jerusalem")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  members         FamilyMember[]
+  ledgerItems     LedgerItem[]
+  documents       Document[]
+  goals           Goal[]
+  recommendations Recommendation[]
+  scenarios       Scenario[]
+  snapshots       HouseholdSnapshot[]
+  transitions     WorkflowTransition[]
+  auditEvents     AuditEvent[]
+  assumptions     Assumption[]
+  users           User[]
+}
+
+enum MemberRole {
+  ADULT
+  CHILD
+}
+
+model FamilyMember {
+  id               String     @id @default(uuid())
+  householdId      String
+  household        Household  @relation(fields: [householdId], references: [id])
+  name             String
+  role             MemberRole
+  birthDate        DateTime?  @db.Date
+  taxResidency     String     @default("IL")
+  employmentStatus String? // EMPLOYED | SELF_EMPLOYED | UNEMPLOYED | RETIRED | STUDENT | MINOR
+  archivedAt       DateTime?
+
+  ownershipShares OwnershipShare[]
+}
+
+model User {
+  id           String    @id @default(uuid())
+  householdId  String
+  household    Household @relation(fields: [householdId], references: [id])
+  email        String    @unique
+  passwordHash String // argon2id
+  createdAt    DateTime  @default(now())
+}
+
+model WorkflowTransition {
+  id          String        @id @default(uuid())
+  householdId String
+  household   Household     @relation(fields: [householdId], references: [id])
+  fromState   WorkflowState
+  toState     WorkflowState
+  reason      String
+  at          DateTime      @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Ledger: canonical financial facts (class-table inheritance)
+// LedgerItem = base row: identity, provenance, verification, ownership.
+// Exactly one detail row per item, matching `kind`. Never deleted, only closed.
+// ---------------------------------------------------------------------------
+
+enum LedgerKind {
+  ACCOUNT // bank / brokerage / pension / gemel / hishtalmut ...
+  REAL_ESTATE
+  MORTGAGE
+  LOAN
+  CASH_FLOW // income or expense stream
+  INSURANCE
+  OTHER_ASSET
+  OTHER_LIABILITY
+  SUSPENSE // unresolved — carries no detail row
+}
+
+enum ItemStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  REJECTED
+  STALE
+}
+
+model LedgerItem {
+  id              String             @id @default(uuid())
+  householdId     String
+  household       Household          @relation(fields: [householdId], references: [id])
+  kind            LedgerKind
+  name            String
+  currency        String             @db.Char(3)
+  status          ItemStatus         @default(ACTIVE)
+  verification    VerificationStatus @default(UNVERIFIED)
+  confidence      Int                @default(0) // 0-100
+  lastConfirmedAt DateTime?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  closedAt        DateTime?
+
+  ownershipShares OwnershipShare[]
+  valuations      Valuation[]
+  importedFields  ImportedField[]
+
+  accountDetail    AccountDetail?
+  realEstateDetail RealEstateDetail?
+  mortgageDetail   MortgageDetail?
+  loanDetail       LoanDetail?
+  cashFlowDetail   CashFlowDetail?
+  insuranceDetail  InsuranceDetail?
+
+  suspenseResolutions SuspenseItem[]     @relation("resolution")
+  evidenceFor         RecommendationEvidence[]
+
+  @@index([householdId, kind, status])
+}
+
+model OwnershipShare {
+  ledgerItemId   String
+  ledgerItem     LedgerItem   @relation(fields: [ledgerItemId], references: [id])
+  familyMemberId String
+  familyMember   FamilyMember @relation(fields: [familyMemberId], references: [id])
+  sharePct       Decimal      @db.Decimal(7, 4) // shares per item must sum to 100 (domain-enforced)
+
+  @@id([ledgerItemId, familyMemberId])
+}
+
+enum ValuationSource {
+  DOCUMENT_IMPORT
+  MANUAL_ENTRY
+  CALCULATED
+  CONNECTOR // future
+}
+
+model Valuation {
+  id           String          @id @default(uuid())
+  ledgerItemId String
+  ledgerItem   LedgerItem      @relation(fields: [ledgerItemId], references: [id])
+  asOf         DateTime        @db.Date
+  value        Decimal         @db.Decimal(18, 4)
+  currency     String          @db.Char(3)
+  source       ValuationSource
+  confidence   Int             @default(0)
+  documentId   String?
+  document     Document?       @relation(fields: [documentId], references: [id])
+  supersedesId String?         @unique // append-only corrections
+  createdAt    DateTime        @default(now())
+
+  importedFields ImportedField[]
+
+  @@index([ledgerItemId, asOf])
+}
+
+// --- Detail tables (1:1 with LedgerItem, matching kind) ---------------------
+
+enum AccountType {
+  BANK_CHECKING
+  BANK_SAVINGS
+  BANK_DEPOSIT // pikadon
+  BROKERAGE_IL
+  BROKERAGE_FOREIGN
+  PENSION_COMPREHENSIVE // keren pensia mekifa
+  PENSION_GENERAL // keren pensia klalit
+  KUPAT_GEMEL
+  GEMEL_LEHASHKAA
+  KEREN_HISHTALMUT
+  IRA_GEMEL // kupat gemel be'nihul ishi
+  FOREIGN_RETIREMENT // e.g. 401k/IRA
+  CASH_OTHER
+}
+
+model AccountDetail {
+  ledgerItemId       String     @id
+  ledgerItem         LedgerItem @relation(fields: [ledgerItemId], references: [id])
+  institutionId      String
+  institution        Institution @relation(fields: [institutionId], references: [id])
+  accountType        AccountType
+  accountNumberMasked String?
+  trackName          String? // maslul, e.g. "מניות", "כללי"
+  managementFeePct   Decimal?   @db.Decimal(6, 4) // dmei nihul from balance
+  depositFeePct      Decimal?   @db.Decimal(6, 4) // dmei nihul from deposits
+  employerName       String?
+  openedAt           DateTime?  @db.Date
+  liquidityClass     String? // LIQUID | RESTRICTED | LOCKED_UNTIL(date via notes)
+}
+
+model Institution {
+  id      String @id @default(uuid())
+  name    String
+  nameHe  String?
+  country String @default("IL")
+  type    String // BANK | INSURER | PENSION_COMPANY | BROKER | GOVERNMENT | OTHER
+
+  accounts  AccountDetail[]
+  documents Document[]
+
+  @@unique([name, country])
+}
+
+model RealEstateDetail {
+  ledgerItemId       String     @id
+  ledgerItem         LedgerItem @relation(fields: [ledgerItemId], references: [id])
+  address            String
+  city               String?
+  propertyType       String // APARTMENT | HOUSE | LOT | COMMERCIAL
+  isPrimaryResidence Boolean    @default(false)
+  purchaseDate       DateTime?  @db.Date
+  purchasePrice      Decimal?   @db.Decimal(18, 4)
+  purchaseCurrency   String?    @db.Char(3)
+
+  mortgages MortgageDetail[]
+}
+
+model MortgageDetail {
+  ledgerItemId   String            @id
+  ledgerItem     LedgerItem        @relation(fields: [ledgerItemId], references: [id])
+  lenderId       String?
+  linkedPropertyId String? // RealEstateDetail.ledgerItemId
+  linkedProperty RealEstateDetail? @relation(fields: [linkedPropertyId], references: [ledgerItemId])
+  originalPrincipal Decimal        @db.Decimal(18, 4)
+  startDate      DateTime          @db.Date
+
+  tracks MortgageTrack[]
+}
+
+enum MortgageTrackType {
+  PRIME
+  FIXED_LINKED // kvua tzmuda (CPI-linked)
+  FIXED_UNLINKED // kalatz
+  VARIABLE_LINKED
+  VARIABLE_UNLINKED
+  FOREIGN_CURRENCY
+}
+
+model MortgageTrack {
+  id                 String            @id @default(uuid())
+  mortgageId         String
+  mortgage           MortgageDetail    @relation(fields: [mortgageId], references: [ledgerItemId])
+  trackType          MortgageTrackType
+  principalRemaining Decimal           @db.Decimal(18, 4)
+  annualRatePct      Decimal           @db.Decimal(7, 4)
+  cpiLinked          Boolean
+  monthlyPayment     Decimal?          @db.Decimal(18, 4)
+  endDate            DateTime          @db.Date
+}
+
+model LoanDetail {
+  ledgerItemId   String     @id
+  ledgerItem     LedgerItem @relation(fields: [ledgerItemId], references: [id])
+  lenderName     String?
+  principalRemaining Decimal @db.Decimal(18, 4)
+  annualRatePct  Decimal    @db.Decimal(7, 4)
+  endDate        DateTime?  @db.Date
+  purpose        String?
+}
+
+enum CashFlowType {
+  SALARY
+  SELF_EMPLOYMENT_INCOME
+  RENTAL_INCOME
+  PENSION_INCOME
+  OTHER_INCOME
+  LIVING_EXPENSE
+  HOUSING_EXPENSE
+  EDUCATION_EXPENSE
+  INSURANCE_PREMIUM
+  LOAN_PAYMENT
+  OTHER_EXPENSE
+}
+
+enum Frequency {
+  MONTHLY
+  ANNUAL
+  ONE_TIME
+}
+
+model CashFlowDetail {
+  ledgerItemId String       @id
+  ledgerItem   LedgerItem   @relation(fields: [ledgerItemId], references: [id])
+  flowType     CashFlowType
+  direction    String // IN | OUT
+  amount       Decimal      @db.Decimal(18, 4)
+  frequency    Frequency
+  startDate    DateTime     @db.Date
+  endDate      DateTime?    @db.Date
+  isGross      Boolean      @default(true) // salary gross vs net
+}
+
+enum InsurancePolicyType {
+  LIFE
+  DISABILITY // ovdan kosher avoda
+  HEALTH
+  LONG_TERM_CARE
+  PROPERTY
+  MORTGAGE_LIFE
+  OTHER
+}
+
+model InsuranceDetail {
+  ledgerItemId   String              @id
+  ledgerItem     LedgerItem          @relation(fields: [ledgerItemId], references: [id])
+  policyType     InsurancePolicyType
+  coverageAmount Decimal?            @db.Decimal(18, 4)
+  monthlyPremium Decimal?            @db.Decimal(18, 4)
+  throughPension Boolean             @default(false)
+  insuredMemberId String?
+  endDate        DateTime?           @db.Date
+}
+
+// ---------------------------------------------------------------------------
+// Ingestion: documents, batches, provenance, suspense
+// ---------------------------------------------------------------------------
+
+enum ParseStatus {
+  UPLOADED
+  PARSED
+  PARTIALLY_PARSED
+  FAILED
+  NOT_PARSEABLE // manual-reference only
+}
+
+model Document {
+  id            String      @id @default(uuid())
+  householdId   String
+  household     Household   @relation(fields: [householdId], references: [id])
+  sha256        String      @unique
+  filename      String
+  mimeType      String
+  docType       String? // PENSION_REPORT | MISLAKA | BANK_STATEMENT | BROKERAGE_STATEMENT | MORTGAGE_SCHEDULE | TAX_106 | OTHER
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id])
+  periodStart   DateTime?   @db.Date
+  periodEnd     DateTime?   @db.Date
+  parseStatus   ParseStatus @default(UPLOADED)
+  storageKey    String // path on document volume
+  uploadedAt    DateTime    @default(now())
+
+  batches    ImportBatch[]
+  valuations Valuation[]
+}
+
+enum BatchStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model ImportBatch {
+  id             String      @id @default(uuid())
+  documentId     String?
+  document       Document?   @relation(fields: [documentId], references: [id])
+  adapterId      String // e.g. "il-pension-annual-pdf", "generic-csv", "manual"
+  adapterVersion String
+  status         BatchStatus @default(RUNNING)
+  rawPayload     Json // full RawDataPayload as emitted by the adapter (audit/replay)
+  startedAt      DateTime    @default(now())
+  finishedAt     DateTime?
+
+  importedFields ImportedField[]
+  suspenseItems  SuspenseItem[]
+}
+
+model ImportedField {
+  id               String             @id @default(uuid())
+  batchId          String
+  batch            ImportBatch        @relation(fields: [batchId], references: [id])
+  ledgerItemId     String?
+  ledgerItem       LedgerItem?        @relation(fields: [ledgerItemId], references: [id])
+  valuationId      String?
+  valuation        Valuation?         @relation(fields: [valuationId], references: [id])
+  fieldPath        String // canonical field this populated, e.g. "accountDetail.managementFeePct"
+  originalValue    String // verbatim as extracted (pre-normalization)
+  originalCurrency String?            @db.Char(3)
+  importDate       DateTime           @default(now())
+  confidence       Int
+  verification     VerificationStatus @default(UNVERIFIED)
+  lastUpdate       DateTime           @updatedAt
+}
+
+enum SuspenseStatus {
+  PENDING
+  RESOLVED
+  DISCARDED
+}
+
+model SuspenseItem {
+  id                   String         @id @default(uuid())
+  batchId              String
+  batch                ImportBatch    @relation(fields: [batchId], references: [id])
+  rawData              Json // preserved verbatim
+  reason               String // UNKNOWN_ACCOUNT_TYPE | UNMAPPABLE_FIELD | AMBIGUOUS_OWNER | ...
+  status               SuspenseStatus @default(PENDING)
+  resolvedLedgerItemId String?
+  resolvedLedgerItem   LedgerItem?    @relation("resolution", fields: [resolvedLedgerItemId], references: [id])
+  resolutionNote       String?
+  createdAt            DateTime       @default(now())
+  resolvedAt           DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Registry: versioned tax matrices + assumptions. Immutable versions.
+// ---------------------------------------------------------------------------
+
+model TaxRuleSet {
+  id          String   @id @default(uuid())
+  country     String   @default("IL")
+  taxYear     Int
+  ruleType    String // INCOME_TAX_BRACKETS | CAPITAL_GAINS | HISHTALMUT_CEILING | PENSION_DEDUCTION_CEILINGS | BITUACH_LEUMI | PURCHASE_TAX | ...
+  version     Int
+  payload     Json // the versioned configuration matrix
+  source      String // citation: law/circular/official publication
+  publishedAt DateTime @default(now())
+
+  @@unique([country, taxYear, ruleType, version])
+}
+
+model Assumption {
+  id            String    @id @default(uuid())
+  householdId   String? // null = system default; set = household override
+  household     Household? @relation(fields: [householdId], references: [id])
+  key           String // e.g. "expected_real_return_equity", "inflation_il", "priority_weights"
+  version       Int
+  value         Json
+  unit          String? // PCT | ILS | RATIO | ...
+  description   String
+  source        String // CONSERVATIVE_DEFAULT | USER | ...
+  effectiveFrom DateTime  @default(now())
+
+  recommendationPins RecommendationAssumption[]
+
+  @@unique([householdId, key, version])
+}
+
+// ---------------------------------------------------------------------------
+// Goals
+// ---------------------------------------------------------------------------
+
+enum GoalType {
+  EMERGENCY_FUND
+  RETIREMENT
+  CHILDREN_EDUCATION
+  PROPERTY_PURCHASE
+  INVESTMENT_PROPERTY
+  FINANCIAL_INDEPENDENCE
+  LIFESTYLE
+  LEGACY
+  INHERITANCE
+  PHILANTHROPY
+  OTHER
+}
+
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  ABANDONED
+}
+
+model Goal {
+  id              String     @id @default(uuid())
+  householdId     String
+  household       Household  @relation(fields: [householdId], references: [id])
+  type            GoalType
+  name            String
+  priority        Int // 1 = highest
+  targetDate      DateTime?  @db.Date
+  requiredFunding Decimal?   @db.Decimal(18, 4)
+  currency        String     @db.Char(3)
+  riskTolerance   String // LOW | MEDIUM | HIGH
+  status          GoalStatus @default(ACTIVE)
+  createdAt       DateTime   @default(now())
+
+  dependsOn    GoalDependency[] @relation("dependent")
+  dependedOnBy GoalDependency[] @relation("prerequisite")
+  impacts      RecommendationGoal[]
+}
+
+model GoalDependency {
+  goalId         String
+  goal           Goal   @relation("dependent", fields: [goalId], references: [id])
+  dependsOnGoalId String
+  dependsOnGoal  Goal   @relation("prerequisite", fields: [dependsOnGoalId], references: [id])
+
+  @@id([goalId, dependsOnGoalId])
+}
+
+// ---------------------------------------------------------------------------
+// Strategy: recommendations, explainability, decision journal
+// ---------------------------------------------------------------------------
+
+enum RecommendationStatus {
+  PROPOSED
+  ACCEPTED
+  REJECTED
+  IMPLEMENTED
+  SUPERSEDED
+  INVALIDATED // assumption/registry change
+}
+
+model Recommendation {
+  id                    String               @id @default(uuid())
+  householdId           String
+  household             Household            @relation(fields: [householdId], references: [id])
+  snapshotId            String
+  snapshot              HouseholdSnapshot    @relation(fields: [snapshotId], references: [id])
+  engineVersion         String
+  type                  String // INCREASE_RETIREMENT_ALLOCATION | REDUCE_CASH | IMPROVE_GEO_DIVERSIFICATION | ...
+  title                 String
+  titleHe               String?
+  rationale             Json // structured: { why, benefits[], risks[], tradeoffs[], taxImplications, liquidityImplications, timeHorizon, sensitivity, alternatives[], expectedImpact }
+  confidenceScore       Int // 0-100
+  dataCompletenessScore Int // 0-100
+  priorityScore         Decimal              @db.Decimal(8, 4)
+  status                RecommendationStatus @default(PROPOSED)
+  generatedAt           DateTime             @default(now())
+
+  assumptionPins RecommendationAssumption[]
+  goalImpacts    RecommendationGoal[]
+  evidence       RecommendationEvidence[]
+  journal        DecisionJournalEntry[]
+}
+
+model RecommendationAssumption {
+  recommendationId String
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id])
+  assumptionId     String
+  assumption       Assumption     @relation(fields: [assumptionId], references: [id])
+
+  @@id([recommendationId, assumptionId])
+}
+
+model RecommendationGoal {
+  recommendationId String
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id])
+  goalId           String
+  goal             Goal           @relation(fields: [goalId], references: [id])
+  impactDescription String
+
+  @@id([recommendationId, goalId])
+}
+
+model RecommendationEvidence {
+  id               String         @id @default(uuid())
+  recommendationId String
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id])
+  ledgerItemId     String?
+  ledgerItem       LedgerItem?    @relation(fields: [ledgerItemId], references: [id])
+  description      String
+}
+
+model DecisionJournalEntry {
+  id                 String         @id @default(uuid())
+  recommendationId   String
+  recommendation     Recommendation @relation(fields: [recommendationId], references: [id])
+  decision           String // ACCEPTED | REJECTED | DEFERRED
+  decidedAt          DateTime       @default(now())
+  decidedBy          String // family member name (shared login)
+  implementationDate DateTime?      @db.Date
+  expectedOutcome    String?
+  actualOutcome      String? // filled later by monitoring/user
+  notes              String?
+}
+
+// ---------------------------------------------------------------------------
+// Scenario, Snapshot, Monitoring, Audit
+// ---------------------------------------------------------------------------
+
+model Scenario {
+  id                 String    @id @default(uuid())
+  householdId        String
+  household          Household @relation(fields: [householdId], references: [id])
+  name               String
+  type               String // RETIRE_EARLIER | JOB_LOSS | MARKET_CRASH | HIGH_INFLATION | REFINANCE | ...
+  parameterOverrides Json // { assumptionKey: overrideValue }
+  resultSnapshot     Json? // computed projection results
+  baselineSnapshotId String?
+  createdAt          DateTime  @default(now())
+}
+
+enum SnapshotKind {
+  SCHEDULED
+  PRE_STRATEGY
+  MANUAL
+}
+
+model HouseholdSnapshot {
+  id            String       @id @default(uuid())
+  householdId   String
+  household     Household    @relation(fields: [householdId], references: [id])
+  kind          SnapshotKind
+  schemaVersion Int
+  payload       Json // denormalized full household graph at takenAt
+  takenAt       DateTime     @default(now())
+
+  recommendations Recommendation[]
+
+  @@index([householdId, takenAt])
+}
+
+model FxRate {
+  id     String   @id @default(uuid())
+  from   String   @db.Char(3)
+  to     String   @db.Char(3)
+  rate   Decimal  @db.Decimal(18, 8)
+  asOf   DateTime @db.Date
+  source String // BOI | MANUAL | ...
+
+  @@unique([from, to, asOf, source])
+}
+
+model AuditEvent {
+  id          String    @id @default(uuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id])
+  actor       String // user email or "system"
+  eventType   String // domain event name
+  entity      String
+  entityId    String
+  payload     Json
+  at          DateTime  @default(now())
+
+
+  @@index([householdId, at])
+}
+
+// END OF SCHEMA DRAFT

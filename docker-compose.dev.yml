@@ -1,0 +1,14 @@
+# Local development database only. Production runs on Railway PostgreSQL.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: wealthos
+      POSTGRES_PASSWORD: wealthos
+      POSTGRES_DB: wealthos
+    ports:
+      - "5432:5432"
+    volumes:
+      - wealthos-pgdata:/var/lib/postgresql/data
+volumes:
+  wealthos-pgdata:
