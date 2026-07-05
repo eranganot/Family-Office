@@ -1,0 +1,15 @@
+{
+  "name": "@wealthos/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@trpc/server": "^11.18.0",
+    "@wealthos/domain": "*",
+    "superjson": "^2.2.0",
+    "zod": "^4.4.0"
+  },
+  "devDependencies": { "@wealthos/config": "*" }
+}
