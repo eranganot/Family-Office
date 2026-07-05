@@ -1,4 +1,7 @@
 import { TRPCError } from "@trpc/server";
+import { ledgerRepo } from "@wealthos/db";
+import { computeFundingGaps, type AssetInput, type GoalInput } from "@wealthos/engine-goals";
+import { assumptionRegistry } from "@wealthos/registry";
 import { validateGoalDependencies } from "@wealthos/domain";
 import { z } from "zod";
 import { DecimalString } from "../schemas/ledger";
@@ -91,6 +94,52 @@ export const goalsRouter = router({
         return goal;
       });
     }),
+
+  /** Funding-gap report: verified assets only, ILS-converted, assumption-driven return. */
+  fundingGap: protectedProcedure.query(async ({ ctx }) => {
+    const householdId = await requireHouseholdId(ctx.db);
+    const goals = await ctx.db.goal.findMany({ where: { householdId, status: "ACTIVE" } });
+    const items = await ledgerRepo.list(ctx.db, householdId);
+
+    // Latest manual FX per pair for ILS conversion (same policy as net worth: no rate → excluded).
+    const allRates = await ctx.db.fxRate.findMany({ orderBy: { asOf: "desc" } });
+    const seen = new Set<string>();
+    const rate = new Map<string, number>();
+    for (const r of allRates) {
+      const key = `${r.from}->${r.to}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rate.set(key, Number(r.rate));
+    }
+    const toILS = (value: string, currency: string): string | null => {
+      if (currency === "ILS") return value;
+      const direct = rate.get(`${currency}->ILS`);
+      if (direct) return String(Number(value) * direct);
+      const inverse = rate.get(`ILS->${currency}`);
+      if (inverse) return String(Number(value) / inverse);
+      return null;
+    };
+
+    const assets: AssetInput[] = items.map((i) => ({
+      id: i.id,
+      kind: i.kind,
+      accountType: i.accountDetail?.accountType,
+      valueILS: i.latestValuation ? toILS(i.latestValuation.value.toString(), i.latestValuation.currency) : null,
+      verified: i.verification === "VERIFIED",
+    }));
+
+    const goalInputs: GoalInput[] = goals.map((g) => ({
+      id: g.id,
+      name: g.name,
+      type: g.type,
+      priority: g.priority,
+      targetDate: g.targetDate,
+      requiredFundingILS: g.requiredFunding ? g.requiredFunding.toString() : null,
+    }));
+
+    const realReturn = await assumptionRegistry(ctx.db).current("goal_projection_real_return_pct", householdId);
+    return computeFundingGaps(goalInputs, assets, realReturn.value as number, new Date());
+  }),
 
   setStatus: protectedProcedure
     .input(z.object({ id: z.uuid(), status: z.enum(["ACTIVE", "ACHIEVED", "ABANDONED"]) }))

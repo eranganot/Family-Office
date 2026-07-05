@@ -18,7 +18,8 @@
     "@wealthos/db": "*",
     "@wealthos/ingestion": "*",
     "@wealthos/engine-verification": "*",
-    "@wealthos/registry": "*"
+    "@wealthos/registry": "*",
+    "@wealthos/engine-goals": "*"
   },
   "devDependencies": {
     "@wealthos/config": "*",
