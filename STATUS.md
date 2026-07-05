@@ -4,7 +4,16 @@
 
 ## Current state (2026-07-05)
 
-- **Milestone: M3 COMPLETE — pending deploy verification and owner approval for M4.**
+- **Milestone: M4 COMPLETE — tax matrices PENDING OWNER REVIEW, then owner approval for M5.**
+- M4 delivered: TaxRegistry (versioned, schema-validated, year-keyed accessor; throws on missing
+  rules — engines can never guess), IL 2025+2026 matrices seeded with cited sources (income tax
+  brackets incl. the March-2026 retroactive widening, credit points, capital gains, hishtalmut
+  ceilings, pension ceilings 45a/47, bituach leumi thresholds, purchase tax), AssumptionRegistry
+  (7 conservative defaults incl. staleness thresholds + M6 priority weights; household overrides
+  create new versions), invalidation (new assumption version → pinned recommendations
+  INVALIDATED, integration-tested), bilingual registry UI with sources + review badges.
+- Bituach leumi employee RATES intentionally null (sources conflicted) — thresholds verified.
+  All matrices flagged ownerReviewed=false until Eran signs off; production DB seeded.
 - M3 delivered: verification engine (per-item issues: no/stale valuation by kind-specific
   thresholds, never-confirmed, low-confidence, rejected; household completeness+confidence
   scores; gate logic), missing-docs report derived from ledger composition (pension/hishtalmut/
@@ -56,16 +65,19 @@
 - Sandbox bash: 45s hard timeout per call; background processes do not survive between calls;
   run npm installs as repeated `timeout 40 npm install` slices (cache resumes).
 
-## Next up (M4, after approval)
+## Next up (M5, after approval)
 
-Registries: TaxRegistry (IL 2025+2026 matrices, cited sources, OWNER REVIEW REQUIRED before
-seeding) → AssumptionRegistry (conservative defaults + household overrides + version pinning)
-→ invalidation wiring → registry UI. Owner input needed: Q5 tax scope (docs 06).
+Goal engine: goal model (types, priorities, acyclic dependencies) → funding-gap analysis from
+verified ledger + assumptions → bilingual goal UI. Owner input useful: household composition and
+retirement baseline (docs 06 Q2/Q6).
+
+## M4 notes
+
+- Registry seed runs in preDeploy (idempotent, never overwrites versions).
+- Verification thresholds now read from AssumptionRegistry (M3 note resolved).
 
 ## M3 technical debt
 
-- Staleness thresholds + low-confidence cutoff are engine constants → move to AssumptionRegistry
-  in M4 (planned, not accidental).
 - Suspense create-from-raw covers ACCOUNT only (matches factory v1 scope).
 - Verification page loads full ledger twice (assessment + display) — fine at family scale.
 
