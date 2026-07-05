@@ -108,7 +108,9 @@ export default async function DocumentsPage({
           <ul className="flex flex-col gap-2 text-sm">
             {suspense.map((s) => (
               <li key={s.id} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
-                <span className="font-medium text-amber-800">{t("reason")}: {s.reason}</span>
+                <a href={`/${locale}/verification/suspense/${s.id}`} className="underline">
+                  <span className="font-medium text-amber-800">{t("reason")}: {s.reason}</span>
+                </a>
                 <span className="ms-2 text-xs text-amber-600">{s.batch.document?.filename}</span>
               </li>
             ))}

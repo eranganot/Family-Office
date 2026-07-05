@@ -294,5 +294,17 @@
       "MISSING": "Missing"
     },
     "forItem": "for"
+  },
+  "suspense": {
+    "title": "Resolve suspense item",
+    "raw": "Raw extracted data (verbatim)",
+    "source": "Source document",
+    "discard": "Discard",
+    "discardNote": "Why discard?",
+    "link": "Link to existing item",
+    "linkBtn": "Link",
+    "createTitle": "Create account from this data",
+    "createHint": "Fields are prefilled from the raw data where possible. Review everything before saving.",
+    "resolveList": "Open the pending list on the Documents page to pick items to resolve."
   }
 }
