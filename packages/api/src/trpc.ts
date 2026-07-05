@@ -8,10 +8,41 @@ const t = initTRPC.context<Context>().create({ transformer: superjson });
 export const router = t.router;
 export const publicProcedure = t.procedure;
 
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+const authMiddleware = t.middleware(({ ctx, next }) => {
   if (!ctx.session) throw new TRPCError({ code: "UNAUTHORIZED" });
   return next({ ctx: { ...ctx, session: ctx.session } });
 });
+
+/**
+ * Auditability: every successful mutation writes an AuditEvent (actor, procedure path, input).
+ * Audit failures are logged, never swallowed silently, and never roll back the mutation.
+ */
+const auditMiddleware = t.middleware(async ({ ctx, next, path, type, getRawInput }) => {
+  const result = await next();
+  if (type === "mutation" && result.ok && ctx.session) {
+    try {
+      const household = await ctx.db.household.findFirst({ select: { id: true } });
+      if (household) {
+        const rawInput = await getRawInput();
+        await ctx.db.auditEvent.create({
+          data: {
+            householdId: household.id,
+            actor: ctx.session.email,
+            eventType: path,
+            entity: path.split(".")[0] ?? "unknown",
+            entityId: "",
+            payload: JSON.parse(JSON.stringify(rawInput ?? null)),
+          },
+        });
+      }
+    } catch (e) {
+      console.error("[audit] failed to write AuditEvent for", path, e);
+    }
+  }
+  return result;
+});
+
+export const protectedProcedure = t.procedure.use(authMiddleware).use(auditMiddleware);
 
 /**
  * Schema-driven state locking: procedures wrapped with workflowGuard(state) are rejected
