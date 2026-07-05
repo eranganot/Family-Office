@@ -4,7 +4,14 @@
 
 ## Current state (2026-07-05)
 
-- **Milestone: M0 COMPLETE and DEPLOYED — awaiting owner approval to start M1.**
+- **Milestone: M1 COMPLETE — pending deploy verification and owner approval for M2.**
+- M1 delivered: boundary lint (verified catching violations), initial DB migration applied to
+  Railway PG, household/member CRUD, workflow state machine (18 tests incl. exhaustive matrix),
+  workflowGuard (blocking-matrix tested), full ledger (accounts w/ Israeli types, real estate,
+  multi-track mortgages, cash flow, insurance, loans), append-only valuations, ownership=100%%
+  invariant, audit events on every mutation (tested), conservative multi-currency net worth
+  (exclusion reporting, never guesses), manual FX rates, full bilingual he/en manual-entry UI.
+- M0 was: foundation shell (deployed + pushed).
 - **Live:** https://wealthos-web-production-c1f7.up.railway.app (health, tRPC, auth, RTL verified live).
 - Railway service `wealthos-web` (1fe5a904), Postgres provisioned, all env vars set.
   Deployed via `railway up` (project token). Empty `Family-Office` service exists — owner to
@@ -12,7 +19,7 @@
 - Design package approved; owner decisions recorded in docs/architecture/00-README.md.
 - Verified in sandbox: npm install clean, 13/13 domain tests pass, all packages typecheck,
   `next build` clean (no warnings), server smoke-tested (health, tRPC ping, auth redirect, RTL).
-- NOT yet pushed to GitHub: owner's PAT lacks Contents:Read&Write (confirmed via API probe; error 'Resource not accessible by personal access token', required permission contents=write). Waiting for fixed token.
+- GitHub: pushed (main + all branches). CI wired. PAT stored in /tmp/.git-credentials (session-only).
 - Railway: owner to connect repo + set env vars per docs/DEPLOY.md. Not deployed yet.
 
 ## Known technical debt
@@ -29,7 +36,15 @@
 - Sandbox bash: 45s hard timeout per call; background processes do not survive between calls;
   run npm installs as repeated `timeout 40 npm install` slices (cache resumes).
 
-## Next up (M1, after approval)
+## Next up (M2, after approval)
 
-feat/m1-lint-boundaries → feat/m1-household-entity → feat/m1-state-machine → feat/m1-workflow-guard
-→ ledger base + detail tables → manual-entry UI → net-worth view → audit events.
+Ingestion framework: document store → adapter framework → ledger factory → suspense account →
+provenance → CSV adapter → synthetic Israeli fixture corpus → pension PDF adapter → import UI.
+
+## M1 technical debt
+
+- Repo integration tests (against real PG) not yet written — routers tested via mocked ctx; DB
+  layer exercised manually end-to-end. Add testcontainers or a TEST_DATABASE_URL suite in M2.
+- Mortgage form supports up to 4 static track rows (no client-side dynamic rows yet).
+- Auth still env-var based (swap to DB User row planned).
+- next build skips its own TS pass; tsc --noEmit gates types via turbo/CI instead.
