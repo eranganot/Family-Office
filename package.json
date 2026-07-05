@@ -15,7 +15,8 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
-    "start": "npm run start --workspace=apps/web"
+    "start": "npm run start --workspace=apps/web",
+    "postinstall": "npm run generate --workspace=@wealthos/db --if-present"
   },
   "devDependencies": {
     "prettier": "^3.6.0",
