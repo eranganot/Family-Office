@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { classifyPool, computeFundingGaps, type AssetInput, type GoalInput } from "../src/funding-gap";
 
 const NOW = new Date("2026-01-01T00:00:00Z");
-const asset = (over: Partial<AssetInput>): AssetInput => ({
+const asset = (over: Partial<AssetInput> = {}): AssetInput => ({
   id: "a", kind: "ACCOUNT", accountType: "BANK_CHECKING", valueILS: "100000", verified: true, ...over,
 });
-const goal = (over: Partial<GoalInput>): GoalInput => ({
+const goal = (over: Partial<GoalInput> = {}): GoalInput => ({
   id: "g", name: "goal", type: "PROPERTY_PURCHASE", priority: 1,
   targetDate: new Date("2031-01-01T00:00:00Z"), requiredFundingILS: "500000", ...over,
 });
