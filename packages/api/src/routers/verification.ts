@@ -7,6 +7,7 @@ import {
   type LedgerItemDoc,
 } from "@wealthos/engine-verification";
 import { z } from "zod";
+import { assumptionRegistry } from "@wealthos/registry";
 import { protectedProcedure, router } from "../trpc";
 import { requireHouseholdId } from "./ledger";
 
@@ -27,7 +28,16 @@ export const verificationRouter = router({
       latestValuationAsOf: i.latestValuation?.asOf ?? null,
     }));
     const pendingSuspense = await ctx.db.suspenseItem.count({ where: { status: "PENDING" } });
-    const assessment = assessHousehold(projections, pendingSuspense, now);
+    // Thresholds come from the AssumptionRegistry (household overrides respected).
+    const reg = assumptionRegistry(ctx.db);
+    const [staleness, lowConfidence] = await Promise.all([
+      reg.current("staleness_days_by_kind", householdId).catch(() => null),
+      reg.current("low_confidence_threshold", householdId).catch(() => null),
+    ]);
+    const assessment = assessHousehold(projections, pendingSuspense, now, {
+      stalenessDaysByKind: (staleness?.value as Record<string, number> | undefined) ?? undefined,
+      lowConfidenceThreshold: (lowConfidence?.value as number | undefined) ?? undefined,
+    });
 
     const docItems: LedgerItemDoc[] = items.map((i) => ({
       id: i.id,

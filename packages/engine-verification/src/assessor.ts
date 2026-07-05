@@ -57,7 +57,14 @@ export const STALENESS_DAYS: Record<string, number> = {
 const VALUATION_KINDS = new Set(["ACCOUNT", "REAL_ESTATE", "MORTGAGE", "LOAN", "OTHER_ASSET", "OTHER_LIABILITY"]);
 const LOW_CONFIDENCE_THRESHOLD = 50;
 
-export function assessItem(item: ItemProjection, now: Date): ItemAssessment {
+export interface AssessorOptions {
+  stalenessDaysByKind?: Record<string, number> | undefined;
+  lowConfidenceThreshold?: number | undefined;
+}
+
+export function assessItem(item: ItemProjection, now: Date, options?: AssessorOptions): ItemAssessment {
+  const staleness = options?.stalenessDaysByKind ?? STALENESS_DAYS;
+  const lowConfidence = options?.lowConfidenceThreshold ?? LOW_CONFIDENCE_THRESHOLD;
   const issues: ItemIssue[] = [];
   if (item.verification === "REJECTED") issues.push({ type: "REJECTED" });
   if (VALUATION_KINDS.has(item.kind)) {
@@ -65,12 +72,12 @@ export function assessItem(item: ItemProjection, now: Date): ItemAssessment {
       issues.push({ type: "NO_VALUATION" });
     } else {
       const ageDays = Math.floor((now.getTime() - item.latestValuationAsOf.getTime()) / 86_400_000);
-      const thresholdDays = STALENESS_DAYS[item.kind] ?? 400;
+      const thresholdDays = staleness[item.kind] ?? 400;
       if (ageDays > thresholdDays) issues.push({ type: "STALE_VALUATION", ageDays, thresholdDays });
     }
   }
   if (item.lastConfirmedAt === null) issues.push({ type: "NEVER_CONFIRMED" });
-  if (item.confidence < LOW_CONFIDENCE_THRESHOLD) issues.push({ type: "LOW_CONFIDENCE", confidence: item.confidence });
+  if (item.confidence < lowConfidence) issues.push({ type: "LOW_CONFIDENCE", confidence: item.confidence });
 
   return {
     id: item.id,
@@ -85,8 +92,9 @@ export function assessHousehold(
   items: ItemProjection[],
   pendingSuspense: number,
   now: Date,
+  options?: AssessorOptions,
 ): HouseholdAssessment {
-  const assessments = items.map((i) => assessItem(i, now));
+  const assessments = items.map((i) => assessItem(i, now, options));
   const verifiedCount = assessments.filter((a) => a.verified).length;
   const total = assessments.length;
 

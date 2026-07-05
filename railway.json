@@ -9,6 +9,6 @@
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
-    "preDeployCommand": "npm run migrate:deploy --workspace=@wealthos/db"
+    "preDeployCommand": "npm run migrate:deploy --workspace=@wealthos/db && npm run seed --workspace=@wealthos/registry"
   }
 }

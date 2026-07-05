@@ -23,7 +23,8 @@
     "superjson": "^2.2.0",
     "@wealthos/db": "*",
     "@wealthos/ingestion": "*",
-    "@wealthos/engine-verification": "*"
+    "@wealthos/engine-verification": "*",
+    "@wealthos/registry": "*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",

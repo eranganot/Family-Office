@@ -17,7 +17,8 @@
     "zod": "^4.4.0",
     "@wealthos/db": "*",
     "@wealthos/ingestion": "*",
-    "@wealthos/engine-verification": "*"
+    "@wealthos/engine-verification": "*",
+    "@wealthos/registry": "*"
   },
   "devDependencies": {
     "@wealthos/config": "*",
