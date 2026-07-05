@@ -4,7 +4,15 @@
 
 ## Current state (2026-07-05)
 
-- **Milestone: M7 COMPLETE (Decision Journal) — pending owner approval for M8.**
+- **Milestone: M8 COMPLETE (Scenario Engine v1) — pending owner approval for M9 (final).**
+- M8 delivered: deterministic real-terms projector (annual steps; investable grows at assumption
+  return; real estate flat in real terms; mortgage straight-line amortization with CPI-linked
+  tracks responding to inflation SURPRISE; income/market shocks; goal outcomes; depletion year;
+  documented v1 simplifications incl. payments-inside-expense-flows policy) — 8 tests;
+  8 canned scenarios (retire earlier/later, job loss, market crash, high inflation, refinance,
+  savings ±) behind workflowGuard(STRATEGY), persisted with baseline snapshot id; comparison UI
+  (net-worth milestones + Δ row, lowest-investable point, depletion year, per-goal funded status
+  baseline vs scenario). Monte Carlo explicitly deferred — same projector interface.
 - M7 delivered: decide() captures expected outcome + implementation date; journal router works in
   ANY phase (recording actual outcomes is a MONITORING activity); bilingual journal history page
   with inline actual-outcome recording; outcome round-trip integration-tested.
@@ -88,11 +96,11 @@
 - Sandbox bash: 45s hard timeout per call; background processes do not survive between calls;
   run npm installs as repeated `timeout 40 npm install` slices (cache resumes).
 
-## Next up (M8, after approval)
+## Next up (M9, after approval) — FINAL v1 milestone
 
-Scenario Engine v1: deterministic multi-year projector (cash flow, balances, goals under
-assumption overrides) → canned scenarios (retire earlier/later, job loss, market crash, high
-inflation, refinance, savings-rate changes) → baseline-vs-scenario comparison UI.
+Monitoring (Phase 4): apps/worker on Railway cron (scheduled snapshots) → DriftDetector vs
+strategy baseline + staleness sweep (items → STALE) → re-evaluation flow (drift → VERIFICATION
+or STRATEGY re-run) → history UI (snapshot timeline, drift alerts, journal outcomes).
 
 ## M4 notes
 
