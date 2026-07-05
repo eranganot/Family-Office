@@ -10,14 +10,18 @@ export interface TextLine {
 
 export async function extractPdfLines(bytes: Uint8Array): Promise<TextLine[]> {
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const doc = await getDocument({ data: new Uint8Array(bytes), isEvalSupported: false }).promise;
+  const doc = await getDocument({ data: new Uint8Array(bytes) }).promise;
   const lines: TextLine[] = [];
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
     const content = await page.getTextContent();
     const positioned = content.items
-      .filter((i): i is { str: string; transform: number[] } => "str" in i && i.str.trim() !== "")
-      .map((i) => ({ text: i.str, x: i.transform[4] ?? 0, y: i.transform[5] ?? 0 }));
+      .flatMap((entry) => {
+        if (!("str" in entry)) return [];
+        const item = entry as { str: string; transform: number[] };
+        if (item.str.trim() === "") return [];
+        return [{ text: item.str, x: item.transform[4] ?? 0, y: item.transform[5] ?? 0 }];
+      });
     // group by y with tolerance
     const groups = new Map<number, { x: number; text: string }[]>();
     for (const item of positioned) {
