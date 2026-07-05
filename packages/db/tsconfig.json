@@ -1,5 +1,5 @@
 {
   "extends": "@wealthos/config/tsconfig.base.json",
   "compilerOptions": { "noEmit": true, "types": ["node"] },
-  "include": ["src", "prisma.config.ts"]
+  "include": ["src", "test", "prisma.config.ts"]
 }
