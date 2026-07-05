@@ -416,6 +416,7 @@
     },
     "evidence": "Evidence",
     "goalsImproved": "Goals improved",
-    "assumptionsUsed": "Assumptions used (pinned versions)"
+    "assumptionsUsed": "Assumptions used (pinned versions)",
+    "expectedOutcome": "Expected outcome"
   }
 }

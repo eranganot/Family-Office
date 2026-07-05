@@ -19,19 +19,30 @@ export const strategyRouter = router({
   ),
 
   decide: workflowGuard("STRATEGY")
-    .input(z.object({ id: z.uuid(), decision: z.enum(["ACCEPTED", "REJECTED"]), note: z.string().max(1000).optional() }))
+    .input(
+      z.object({
+        id: z.uuid(),
+        decision: z.enum(["ACCEPTED", "REJECTED"]),
+        note: z.string().max(1000).optional(),
+        expectedOutcome: z.string().max(1000).optional(),
+        implementationDate: z.coerce.date().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const updated = await ctx.db.recommendation.update({
         where: { id: input.id },
         data: { status: input.decision },
       });
-      // Journal every decision (M7 expands with expected/actual outcomes).
+      // The decision journal is the household's institutional memory: what was decided,
+      // why, what we expected — and later, what actually happened.
       await ctx.db.decisionJournalEntry.create({
         data: {
           recommendationId: input.id,
           decision: input.decision,
           decidedBy: ctx.session.email,
           notes: input.note ?? null,
+          expectedOutcome: input.expectedOutcome ?? null,
+          implementationDate: input.implementationDate ?? null,
         },
       });
       return updated;
