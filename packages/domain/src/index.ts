@@ -15,3 +15,5 @@ export { RawDataPayloadSchema, RawItemSchema, RawFieldSchema } from "./ingestion
 export type { RawDataPayload, RawItem, RawField } from "./ingestion/raw-payload";
 export { buildFromPayload, KNOWN_ACCOUNT_TYPES } from "./ingestion/ledger-factory";
 export type { FactoryResult, CanonicalAccountDraft, SuspenseDraft, SuspenseReason, ProvenanceField, KnownAccountType } from "./ingestion/ledger-factory";
+export { validateGoalDependencies } from "./goals/dependencies";
+export type { GoalEdge, DependencyValidation } from "./goals/dependencies";
