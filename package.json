@@ -1,0 +1,20 @@
+{
+  "name": "wealthos",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "start": "npm run start --workspace=apps/web"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.0",
+    "turbo": "^2.10.3",
+    "typescript": "^5.9.0"
+  }
+}
