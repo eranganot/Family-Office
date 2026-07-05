@@ -19,7 +19,8 @@
     "@wealthos/ingestion": "*",
     "@wealthos/engine-verification": "*",
     "@wealthos/registry": "*",
-    "@wealthos/engine-goals": "*"
+    "@wealthos/engine-goals": "*",
+    "@wealthos/engine-strategy": "*"
   },
   "devDependencies": {
     "@wealthos/config": "*",
