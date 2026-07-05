@@ -28,3 +28,10 @@ Status: **DRAFT — awaiting review and approval. No implementation has begun.**
 6. **Worker process deferred** to the milestone where parsing becomes long-running; v1 parses synchronously in the web app.
 
 <!-- END OF DOCUMENT 00 -->
+
+## Decisions revised during M0 implementation (verified against live versions)
+
+1. **Auth**: Auth.js/next-auth replaced by a first-party minimal session — argon2id (`@node-rs/argon2`) + signed httpOnly JWT cookie (`jose`). next-auth v5 never stabilized; for a single shared login, first-party is smaller and 5-year maintainable.
+2. **Prisma 7**: connection URL lives in `prisma.config.ts`; client uses the `@prisma/adapter-pg` driver adapter.
+3. **Next 16**: `proxy.ts` replaces the deprecated `middleware.ts` convention; Turbopack requires extensionless relative imports in transpiled packages.
+4. **ESLint boundary rules** (`feat/m0-lint-boundaries`) deferred to the start of M1 — ESLint 10 plugin compatibility needs its own verification pass. Recorded as M0 technical debt.

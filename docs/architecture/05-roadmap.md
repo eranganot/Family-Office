@@ -13,7 +13,6 @@ Process rules (binding):
 | Branch | Delivers |
 |---|---|
 | feat/m0-monorepo-scaffold | npm workspaces + Turborepo, tsconfig/eslint/prettier via packages/config |
-| feat/m0-lint-boundaries | eslint-plugin-boundaries rules per doc 04 dependency matrix |
 | feat/m0-prisma-init | packages/db, schema.prisma (from doc 03), first migration, local Postgres via docker-compose for dev |
 | feat/m0-domain-vos | Money, CurrencyCode, Percentage, ConfidenceScore, DateRange + property-based tests |
 | feat/m0-nextjs-shell | apps/web with App Router, Tailwind (logical properties config), health route |
@@ -29,6 +28,7 @@ Exit: empty but deployable bilingual authenticated shell; CI green.
 
 | Branch | Delivers |
 |---|---|
+| feat/m1-lint-boundaries | eslint-plugin-boundaries per doc 04 dependency matrix (moved from M0 — recorded debt) |
 | feat/m1-household-entity | Household + FamilyMember CRUD, base currency, timezone |
 | feat/m1-state-machine | WorkflowStateMachine in domain + WorkflowTransition persistence + tests for every legal/illegal transition |
 | feat/m1-workflow-guard | tRPC workflowGuard middleware + blocking-matrix test (procedures × states) |
