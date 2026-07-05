@@ -14,7 +14,10 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "next-intl": "^4.13.0",
-    "@wealthos/i18n": "*"
+    "@wealthos/i18n": "*",
+    "jose": "^6.0.0",
+    "@node-rs/argon2": "^2.0.0",
+    "zod": "^4.4.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
