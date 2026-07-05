@@ -11,3 +11,5 @@ export { validateMortgageTracks, totalPrincipal } from "./ledger/mortgage";
 export type { MortgageTrackInput, MortgageValidation } from "./ledger/mortgage";
 export { calculateNetWorth } from "./ledger/net-worth";
 export type { NetWorthItem, NetWorthReport, FxRateInput } from "./ledger/net-worth";
+export { RawDataPayloadSchema, RawItemSchema, RawFieldSchema } from "./ingestion/raw-payload";
+export type { RawDataPayload, RawItem, RawField } from "./ingestion/raw-payload";
