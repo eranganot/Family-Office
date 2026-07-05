@@ -1,0 +1,12 @@
+{
+  "name": "@wealthos/i18n",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./messages/*.json": "./messages/*.json"
+  },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "devDependencies": { "@wealthos/config": "*" }
+}

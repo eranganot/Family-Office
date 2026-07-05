@@ -1,0 +1,25 @@
+{
+  "app": {
+    "title": "WealthOS",
+    "tagline": "מערכת ההפעלה לאסטרטגיה הפיננסית של משק הבית"
+  },
+  "nav": { "logout": "התנתקות", "switchLocale": "English" },
+  "phase": {
+    "label": "שלב נוכחי",
+    "MAPPING": "מיפוי",
+    "VERIFICATION": "אימות",
+    "STRATEGY": "אסטרטגיה",
+    "MONITORING": "מעקב"
+  },
+  "login": {
+    "title": "כניסה ל-WealthOS",
+    "email": "אימייל",
+    "password": "סיסמה",
+    "submit": "כניסה",
+    "error": "אימייל או סיסמה שגויים"
+  },
+  "home": {
+    "welcome": "ברוכים הבאים",
+    "emptyState": "מפת משק הבית ריקה. אבן דרך 1 מוסיפה מיפוי ידני."
+  }
+}

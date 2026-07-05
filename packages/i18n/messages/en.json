@@ -1,0 +1,25 @@
+{
+  "app": {
+    "title": "WealthOS",
+    "tagline": "The operating system for your household's financial strategy"
+  },
+  "nav": { "logout": "Log out", "switchLocale": "עברית" },
+  "phase": {
+    "label": "Current phase",
+    "MAPPING": "Mapping",
+    "VERIFICATION": "Verification",
+    "STRATEGY": "Strategy",
+    "MONITORING": "Monitoring"
+  },
+  "login": {
+    "title": "Sign in to WealthOS",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "error": "Incorrect email or password"
+  },
+  "home": {
+    "welcome": "Welcome",
+    "emptyState": "The household map is empty. Milestone 1 adds manual mapping."
+  }
+}
