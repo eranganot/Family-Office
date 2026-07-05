@@ -65,3 +65,37 @@ function validDate(y: string, m: string, d: string): string | undefined {
   if (String(date.getUTCDate()).padStart(2, "0") !== d) return undefined; // reject 31/02
   return `${y}-${m}-${d}`;
 }
+
+/**
+ * Visual-order line transform (involution): reverse token order and reverse the
+ * characters of Hebrew tokens, leaving digit/latin tokens intact. Applying it to a
+ * visual-order line yields logical order, and vice versa.
+ */
+export function toggleVisualHebrewLine(line: string): string {
+  return line
+    .split(/(\s+)/)
+    .reverse()
+    .map((tok) => (HEBREW_RE.test(tok) ? [...tok].reverse().join("") : tok))
+    .join("");
+}
+
+/** Hebrew keywords expected in Israeli financial documents (logical order). */
+export const IL_DOC_LEXICON = [
+  "יתרת", "צבירה", "דמי", "ניהול", "מסלול", "עמית", "תאריך", "קרן", "קופת", "פנסיה",
+  "השתלמות", "גמל", "חשבון", "פוליסה", "שנתי", "דוח", "מספר", "סוג", "מוצר", "הפקדה", "השקעה",
+];
+
+/**
+ * Detect whether a line is in visual (reversed) order and repair it.
+ *
+ * Empirical finding (fixture-verified): pdf.js's bidi pass renders visual-order
+ * Hebrew PDFs as an exact FULL character reversal of the logical text — Hebrew
+ * words, digit runs, and dates all come out char-reversed. Repair is therefore a
+ * full reversal, chosen only when it scores more lexicon hits than the input.
+ */
+export function fixVisualOrderLine(line: string, lexicon: readonly string[] = IL_DOC_LEXICON): string {
+  if (!HEBREW_RE.test(line)) return line;
+  const score = (s: string) => lexicon.reduce((n, w) => (s.includes(w) ? n + 1 : n), 0);
+  const reversed = [...line].reverse().join("");
+  return score(reversed) > score(line) ? reversed : line;
+}
