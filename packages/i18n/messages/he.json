@@ -10,7 +10,8 @@
     "fx": "שערי מטבע",
     "logout": "התנתקות",
     "switchLocale": "English",
-    "documents": "מסמכים"
+    "documents": "מסמכים",
+    "verification": "אימות"
   },
   "phase": {
     "label": "שלב נוכחי",
@@ -258,5 +259,40 @@
       "TAX_106": "טופס 106",
       "OTHER": "אחר"
     }
+  },
+  "verification": {
+    "title": "אימות",
+    "gate": "שער האסטרטגיה",
+    "gateOpen": "כל הבדיקות עברו — אפשר להתקדם לשלב האסטרטגיה.",
+    "gateBlocked": "חסום עד שכל הפריטים מאומתים ואין פריטים בהמתנה.",
+    "blockers": {
+      "NO_ITEMS_MAPPED": "עוד לא מופה דבר",
+      "UNVERIFIED_ITEMS": "פריטים לא מאומתים",
+      "PENDING_SUSPENSE": "פריטים בהמתנה לסיווג"
+    },
+    "completeness": "שלמות",
+    "confidence": "רמת ודאות",
+    "verifiedOf": "מאומתים",
+    "queue": "תור בדיקה",
+    "queueEmpty": "כל הפריטים מאומתים. אין מה לבדוק.",
+    "verify": "אימות",
+    "reject": "דחייה",
+    "rejectNote": "מה לא נכון?",
+    "correct": "תיקון שווי",
+    "issues": {
+      "NO_VALUATION": "אין הערכת שווי",
+      "STALE_VALUATION": "הערכת שווי ישנה ({ageDays} ימים, סף {thresholdDays})",
+      "NEVER_CONFIRMED": "טרם אושר על ידך",
+      "LOW_CONFIDENCE": "ודאות נמוכה ({confidence})",
+      "REJECTED": "נדחה — דרוש תיקון"
+    },
+    "missingDocs": "מסמכים צפויים",
+    "missingDocsEmpty": "אין עדיין ציפיות למסמכים.",
+    "docStatus": {
+      "PRESENT": "קיים",
+      "STALE": "ישן",
+      "MISSING": "חסר"
+    },
+    "forItem": "עבור"
   }
 }

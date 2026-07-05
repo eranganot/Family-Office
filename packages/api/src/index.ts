@@ -4,6 +4,7 @@ import { flowsRouter } from "./routers/flows";
 import { networthRouter } from "./routers/networth";
 import { documentsRouter } from "./routers/documents";
 import { importsRouter } from "./routers/imports";
+import { verificationRouter } from "./routers/verification";
 import { healthRouter } from "./routers/health";
 import { householdRouter } from "./routers/household";
 import { ledgerRouter } from "./routers/ledger";
@@ -21,6 +22,7 @@ export const appRouter = router({
   networth: networthRouter,
   documents: documentsRouter,
   imports: importsRouter,
+  verification: verificationRouter,
 });
 
 export type AppRouter = typeof appRouter;

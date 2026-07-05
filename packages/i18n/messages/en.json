@@ -10,7 +10,8 @@
     "fx": "FX rates",
     "logout": "Log out",
     "switchLocale": "עברית",
-    "documents": "Documents"
+    "documents": "Documents",
+    "verification": "Verification"
   },
   "phase": {
     "label": "Current phase",
@@ -258,5 +259,40 @@
       "TAX_106": "Form 106",
       "OTHER": "Other"
     }
+  },
+  "verification": {
+    "title": "Verification",
+    "gate": "Strategy gate",
+    "gateOpen": "All checks passed — you can advance to Strategy.",
+    "gateBlocked": "Blocked until every item is verified and suspense is empty.",
+    "blockers": {
+      "NO_ITEMS_MAPPED": "Nothing mapped yet",
+      "UNVERIFIED_ITEMS": "Unverified items",
+      "PENDING_SUSPENSE": "Pending suspense items"
+    },
+    "completeness": "Completeness",
+    "confidence": "Confidence",
+    "verifiedOf": "verified",
+    "queue": "Review queue",
+    "queueEmpty": "Every item is verified. Nothing to review.",
+    "verify": "Verify",
+    "reject": "Reject",
+    "rejectNote": "What's wrong?",
+    "correct": "Correct value",
+    "issues": {
+      "NO_VALUATION": "No valuation",
+      "STALE_VALUATION": "Stale valuation ({ageDays}d, threshold {thresholdDays}d)",
+      "NEVER_CONFIRMED": "Never confirmed by you",
+      "LOW_CONFIDENCE": "Low confidence ({confidence})",
+      "REJECTED": "Rejected — needs correction"
+    },
+    "missingDocs": "Expected documents",
+    "missingDocsEmpty": "No document expectations derived yet.",
+    "docStatus": {
+      "PRESENT": "Present",
+      "STALE": "Stale",
+      "MISSING": "Missing"
+    },
+    "forItem": "for"
   }
 }
