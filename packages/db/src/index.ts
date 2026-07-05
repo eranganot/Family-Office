@@ -3,4 +3,8 @@ export { householdRepo } from "./repositories/household";
 export type { HouseholdWithMembers, BootstrapHouseholdInput, MemberInput } from "./repositories/household";
 export { ledgerRepo } from "./repositories/ledger";
 export type { LedgerItemFull, CreateLedgerItemBase, AddValuationInput, OwnershipShareRow } from "./repositories/ledger";
+export { documentsRepo } from "./repositories/documents";
+export type { CreateDocumentInput } from "./repositories/documents";
+export { DiskFileStore, fileStore, sha256Of } from "./file-store";
+export type { FileStore } from "./file-store";
 export * from "@prisma/client";
