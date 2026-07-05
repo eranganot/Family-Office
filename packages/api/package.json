@@ -16,7 +16,8 @@
     "superjson": "^2.2.0",
     "zod": "^4.4.0",
     "@wealthos/db": "*",
-    "@wealthos/ingestion": "*"
+    "@wealthos/ingestion": "*",
+    "@wealthos/engine-verification": "*"
   },
   "devDependencies": {
     "@wealthos/config": "*",
