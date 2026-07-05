@@ -4,7 +4,19 @@
 
 ## Current state (2026-07-05)
 
-- **Milestone: M5 COMPLETE — pending deploy verification and owner approval for M6.**
+- **Milestone: M6 COMPLETE (Strategy Engine v1 — Phase 3 live) — pending owner approval for M7.**
+- M6 delivered: versioned SnapshotPayload contract + builder (FX recorded, data-quality embedded);
+  5 analyzers (liquidity/runway vs emergency target, single-asset + institution concentration,
+  currency home-bias/excess, tax-advantaged structural headroom incl. fee drag, mortgage CPI mix +
+  expensive tracks) — all pure, threshold-driven from AssumptionRegistry; 11 recommendation
+  generators with FULL bilingual structured rationale (why/benefits/risks/tradeoffs/tax/liquidity/
+  horizon/sensitivity/alternatives/impact); product-reference validator (Hebrew-aware — note: \b
+  fails near Hebrew chars); priority scoring from priority_weights; data-quality gate that REFUSES
+  below completeness/confidence thresholds and returns a data-gap report; guarded run pipeline
+  (workflowGuard STRATEGY) with reproducibility pins (snapshot + engine version + assumption
+  id@version + evidence + goal links), supersede-on-rerun keeping ACCEPTED; decisions journaled;
+  strategy UI with full explainability cards. 2 end-to-end integration tests (refusal path +
+  full run/decide/rerun path).
 - M5 delivered: goal model (11 types, priorities, acyclic dependency validation in domain),
   funding-gap engine (documented pool policy: LIQUID for all goals, RETIREMENT reserved for
   retirement/FI goals; priority-ordered PV allocation; FV projection + annuity monthly-saving
@@ -73,12 +85,10 @@
 - Sandbox bash: 45s hard timeout per call; background processes do not survive between calls;
   run npm installs as repeated `timeout 40 npm install` slices (cache resumes).
 
-## Next up (M6, after approval) — Strategy Engine v1, the core milestone
+## Next up (M7, after approval)
 
-Snapshot → analyzers (liquidity, concentration, currency, tax-advantaged headroom, debt) →
-recommendation model with structured rationale → rule-based generators (strategy-level only,
-product-reference validator) → priority scoring from assumption weights → data-quality gate →
-strategy UI. Owner input useful before M6: household composition + retirement ages (Q2/Q6).
+Decision journal expansion: expected-outcome capture on accept, later actual-outcome entry,
+journal history UI. (Decision rows already written since M6; M7 adds outcomes + history view.)
 
 ## M4 notes
 
