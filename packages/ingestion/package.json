@@ -1,0 +1,21 @@
+{
+  "name": "@wealthos/ingestion",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wealthos/domain": "*",
+    "papaparse": "^5.5.0",
+    "zod": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/papaparse": "^5.3.0",
+    "@wealthos/config": "*",
+    "vitest": "^4.1.0"
+  }
+}
