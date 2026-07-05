@@ -12,7 +12,8 @@
     "switchLocale": "English",
     "documents": "מסמכים",
     "verification": "אימות",
-    "registry": "רגיסטרי"
+    "registry": "רגיסטרי",
+    "goals": "יעדים"
   },
   "phase": {
     "label": "שלב נוכחי",
@@ -328,5 +329,52 @@
     "reviewed": "אושר על ידי הבעלים",
     "pendingReview": "ממתין לאישור הבעלים",
     "sources": "מקורות"
+  },
+  "goals": {
+    "title": "יעדים",
+    "add": "הוספת יעד",
+    "name": "שם",
+    "type": "סוג",
+    "priority": "עדיפות (1 = הגבוהה ביותר)",
+    "targetDate": "תאריך יעד",
+    "requiredFunding": "מימון נדרש",
+    "riskTolerance": "סיכון מקובל",
+    "LOW": "נמוך",
+    "MEDIUM": "בינוני",
+    "HIGH": "גבוה",
+    "dependsOn": "תלוי ב",
+    "achieve": "סימון כהושג",
+    "abandon": "זניחה",
+    "gapReport": "דוח פערי מימון",
+    "gapHint": "נכסים מאומתים בלבד, במונחי ש\"ח. הקצאה לפי עדיפות: מאגר נזיל לכל היעדים; מאגר פנסיוני שמור ליעדי פרישה. הנחת תשואה ריאלית",
+    "pools": "מאגרים זמינים",
+    "liquid": "נזיל",
+    "retirementPool": "פנסיוני",
+    "excludedUnverified": "פריטים לא מאומתים לא נכללו",
+    "allocated": "הוקצה כעת",
+    "projected": "צפוי בתאריך היעד",
+    "required": "נדרש",
+    "gap": "פער",
+    "monthlySaving": "חיסכון חודשי נדרש",
+    "years": "שנים",
+    "notComputable": {
+      "NO_TARGET_DATE": "לא הוגדר תאריך יעד",
+      "NO_REQUIRED_FUNDING": "לא הוגדר מימון נדרש",
+      "TARGET_IN_PAST": "תאריך היעד בעבר"
+    },
+    "empty": "אין יעדים עדיין. מנוע האסטרטגיה מתכנן מול היעדים שלכם — הגדירו אותם.",
+    "types": {
+      "EMERGENCY_FUND": "קרן חירום",
+      "RETIREMENT": "פרישה",
+      "CHILDREN_EDUCATION": "חינוך הילדים",
+      "PROPERTY_PURCHASE": "רכישת דירה",
+      "INVESTMENT_PROPERTY": "נדל\"ן להשקעה",
+      "FINANCIAL_INDEPENDENCE": "עצמאות כלכלית",
+      "LIFESTYLE": "אורח חיים",
+      "LEGACY": "מורשת",
+      "INHERITANCE": "ירושה",
+      "PHILANTHROPY": "פילנתרופיה",
+      "OTHER": "אחר"
+    }
   }
 }
