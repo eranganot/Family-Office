@@ -5,3 +5,5 @@ export { ConfidenceScoreSchema, confidenceScore, type ConfidenceScore } from "./
 export { DateRange } from "./values/date-range";
 export { evaluateTransition, legalTargets, WorkflowStates } from "./workflow/state-machine";
 export type { WorkflowState, TransitionFacts, TransitionResult, TransitionDenialReason } from "./workflow/state-machine";
+export { validateOwnershipShares } from "./ledger/ownership";
+export type { OwnershipShareInput, OwnershipValidation } from "./ledger/ownership";
