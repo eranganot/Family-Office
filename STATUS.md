@@ -4,11 +4,15 @@
 
 ## Current state (2026-07-05)
 
-- **Milestone: M0 COMPLETE — awaiting owner approval to start M1.**
+- **Milestone: M0 COMPLETE and DEPLOYED — awaiting owner approval to start M1.**
+- **Live:** https://wealthos-web-production-c1f7.up.railway.app (health, tRPC, auth, RTL verified live).
+- Railway service `wealthos-web` (1fe5a904), Postgres provisioned, all env vars set.
+  Deployed via `railway up` (project token). Empty `Family-Office` service exists — owner to
+  either connect the GitHub repo to `wealthos-web` and delete it, or vice versa.
 - Design package approved; owner decisions recorded in docs/architecture/00-README.md.
 - Verified in sandbox: npm install clean, 13/13 domain tests pass, all packages typecheck,
   `next build` clean (no warnings), server smoke-tested (health, tRPC ping, auth redirect, RTL).
-- NOT yet pushed to GitHub (waiting for owner PAT). Remote configured: eranganot/Family-Office.
+- NOT yet pushed to GitHub: owner's PAT lacks Contents:Read&Write (confirmed via API probe; error 'Resource not accessible by personal access token', required permission contents=write). Waiting for fixed token.
 - Railway: owner to connect repo + set env vars per docs/DEPLOY.md. Not deployed yet.
 
 ## Known technical debt
