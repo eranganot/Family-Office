@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { CurrencyCodeSchema, type CurrencyCode } from "./currency-code.js";
+import { CurrencyCodeSchema, type CurrencyCode } from "./currency-code";
 
 /**
  * Money value object. Immutable. Decimal arithmetic only — never floats.

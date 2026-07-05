@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 import { describe, expect, it } from "vitest";
-import { Money } from "../src/values/money.js";
+import { Money } from "../src/values/money";
 
 describe("Money", () => {
   it("constructs from string, number, Decimal", () => {

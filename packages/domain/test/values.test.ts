@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { confidenceScore } from "../src/values/confidence-score.js";
-import { DateRange } from "../src/values/date-range.js";
-import { Percentage } from "../src/values/percentage.js";
+import { confidenceScore } from "../src/values/confidence-score";
+import { DateRange } from "../src/values/date-range";
+import { Percentage } from "../src/values/percentage";
 
 describe("Percentage", () => {
   it("accepts [0,100] and rejects outside", () => {
