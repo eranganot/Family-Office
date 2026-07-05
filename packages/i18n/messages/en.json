@@ -13,7 +13,8 @@
     "documents": "Documents",
     "verification": "Verification",
     "registry": "Registry",
-    "goals": "Goals"
+    "goals": "Goals",
+    "strategy": "Strategy"
   },
   "phase": {
     "label": "Current phase",
@@ -376,5 +377,45 @@
       "PHILANTHROPY": "Philanthropy",
       "OTHER": "Other"
     }
+  },
+  "strategy": {
+    "title": "Strategy",
+    "run": "Run strategy analysis",
+    "wrongPhase": "Strategy is locked until verification is complete. Advance to the Strategy phase on the Verification page.",
+    "goToVerification": "Go to Verification",
+    "ranSummary": "Analysis complete: {created} recommendations proposed ({superseded} previous superseded).",
+    "dataGap": "The engine refused to produce recommendations — data quality is insufficient:",
+    "empty": "No recommendations yet. Run the analysis.",
+    "confidence": "Confidence",
+    "completeness": "Data completeness",
+    "priority": "Priority",
+    "accept": "Accept",
+    "reject": "Reject",
+    "decisionNote": "Decision note (optional)",
+    "status": {
+      "PROPOSED": "Proposed",
+      "ACCEPTED": "Accepted"
+    },
+    "rationale": {
+      "why": "Why",
+      "benefits": "Benefits",
+      "risks": "Risks",
+      "tradeoffs": "Trade-offs",
+      "taxImplications": "Tax implications",
+      "liquidityImplications": "Liquidity implications",
+      "timeHorizon": "Time horizon",
+      "sensitivity": "Sensitivity",
+      "alternatives": "Alternatives",
+      "expectedImpact": "Expected impact"
+    },
+    "horizon": {
+      "IMMEDIATE": "Immediate",
+      "SHORT": "Short",
+      "MEDIUM": "Medium",
+      "LONG": "Long"
+    },
+    "evidence": "Evidence",
+    "goalsImproved": "Goals improved",
+    "assumptionsUsed": "Assumptions used (pinned versions)"
   }
 }
