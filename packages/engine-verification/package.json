@@ -1,0 +1,10 @@
+{
+  "name": "@wealthos/engine-verification",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@wealthos/domain": "*" },
+  "devDependencies": { "@wealthos/config": "*", "vitest": "^4.1.0" }
+}
