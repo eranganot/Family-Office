@@ -27,6 +27,8 @@ export async function decideAction(fd: FormData): Promise<void> {
     id: str(fd, "id"),
     decision: str(fd, "decision") as never,
     note: opt(fd, "note"),
-  });
+    expectedOutcome: opt(fd, "expectedOutcome"),
+    implementationDate: opt(fd, "implementationDate") as never,
+  } as never);
   redirect(`/${locale}/strategy`);
 }

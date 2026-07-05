@@ -131,7 +131,13 @@ export default async function StrategyPage({
                       <input type="hidden" name="locale" value={locale} />
                       <input type="hidden" name="id" value={rec.id} />
                       <input type="hidden" name="decision" value={decision} />
-                      {decision === "ACCEPTED" ? <TextInput name="note" placeholder={t("decisionNote")} /> : null}
+                      {decision === "ACCEPTED" ? (
+                        <>
+                          <TextInput name="expectedOutcome" placeholder={t("expectedOutcome")} />
+                          <TextInput name="implementationDate" type="date" />
+                          <TextInput name="note" placeholder={t("decisionNote")} />
+                        </>
+                      ) : null}
                       <button
                         type="submit"
                         className={

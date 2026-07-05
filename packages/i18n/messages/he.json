@@ -416,6 +416,7 @@
     },
     "evidence": "אסמכתאות",
     "goalsImproved": "יעדים שמשתפרים",
-    "assumptionsUsed": "הנחות בשימוש (גרסאות מקובעות)"
+    "assumptionsUsed": "הנחות בשימוש (גרסאות מקובעות)",
+    "expectedOutcome": "תוצאה צפויה"
   }
 }
