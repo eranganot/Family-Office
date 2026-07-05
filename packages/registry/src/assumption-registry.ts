@@ -54,16 +54,33 @@ export function assumptionRegistry(db: PrismaClient) {
         where: { householdId, key },
         orderBy: { version: "desc" },
       });
-      const created = await db.assumption.create({
-        data: {
-          householdId,
-          key,
-          version: (latest?.version ?? 0) + 1,
-          value: value as Prisma.InputJsonValue,
-          unit: def.unit,
-          description: def.description,
-          source: "USER",
-        },
+      const created = await db.$transaction(async (tx) => {
+        const row = await tx.assumption.create({
+          data: {
+            householdId,
+            key,
+            version: (latest?.version ?? 0) + 1,
+            value: value as Prisma.InputJsonValue,
+            unit: def.unit,
+            description: def.description,
+            source: "USER",
+          },
+        });
+        // Invalidation: any recommendation pinned to an OLDER version of this key
+        // (default or override) no longer stands on current assumptions.
+        const staleAssumptionIds = (
+          await tx.assumption.findMany({ where: { key, NOT: { id: row.id } }, select: { id: true } })
+        ).map((a) => a.id);
+        if (staleAssumptionIds.length > 0) {
+          await tx.recommendation.updateMany({
+            where: {
+              status: { in: ["PROPOSED", "ACCEPTED"] },
+              assumptionPins: { some: { assumptionId: { in: staleAssumptionIds } } },
+            },
+            data: { status: "INVALIDATED" },
+          });
+        }
+        return row;
       });
       return toCurrent(created, true);
     },
