@@ -112,3 +112,26 @@ d("strategy pipeline — full flow against real PostgreSQL", () => {
     }
   }, 60000);
 });
+
+d("decision journal — outcome round trip", () => {
+  it("expected outcome captured at decide, actual outcome recorded later", async () => {
+    const c = caller();
+    const rec = await db.recommendation.findFirstOrThrow({ where: { status: "PROPOSED" } });
+    await c.strategy.decide({
+      id: rec.id,
+      decision: "ACCEPTED",
+      expectedOutcome: "פער הנזילות ייסגר תוך שנה",
+      implementationDate: new Date("2026-08-01"),
+    });
+    const entry = await db.decisionJournalEntry.findFirstOrThrow({ where: { recommendationId: rec.id } });
+    expect(entry.expectedOutcome).toContain("הנזילות");
+    expect(entry.actualOutcome).toBeNull();
+
+    await c.journal.recordOutcome({ entryId: entry.id, actualOutcome: "הועברו 3,000 ש\"ח בחודש; הפער נסגר" });
+    const done = await db.decisionJournalEntry.findUniqueOrThrow({ where: { id: entry.id } });
+    expect(done.actualOutcome).toContain("נסגר");
+
+    const list = await c.journal.list();
+    expect(list.some((x) => x.id === entry.id && x.recommendation.title.length > 0)).toBe(true);
+  }, 60000);
+});

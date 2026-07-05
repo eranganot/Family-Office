@@ -14,7 +14,8 @@
     "verification": "Verification",
     "registry": "Registry",
     "goals": "Goals",
-    "strategy": "Strategy"
+    "strategy": "Strategy",
+    "journal": "Journal"
   },
   "phase": {
     "label": "Current phase",
@@ -418,5 +419,22 @@
     "goalsImproved": "Goals improved",
     "assumptionsUsed": "Assumptions used (pinned versions)",
     "expectedOutcome": "Expected outcome"
+  },
+  "journal": {
+    "title": "Decision journal",
+    "hint": "The household's institutional memory: every decision, the expectation behind it, and what actually happened.",
+    "empty": "No decisions recorded yet. Accept or reject recommendations on the Strategy page.",
+    "decidedBy": "Decided by",
+    "expected": "Expected outcome",
+    "actual": "Actual outcome",
+    "recordActual": "Record what actually happened",
+    "save": "Save",
+    "implementation": "Implementation date",
+    "note": "Note",
+    "decision": {
+      "ACCEPTED": "Accepted",
+      "REJECTED": "Rejected",
+      "DEFERRED": "Deferred"
+    }
   }
 }

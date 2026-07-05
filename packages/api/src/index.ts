@@ -8,6 +8,7 @@ import { verificationRouter } from "./routers/verification";
 import { registryRouter } from "./routers/registry";
 import { goalsRouter } from "./routers/goals";
 import { strategyRouter } from "./routers/strategy";
+import { journalRouter } from "./routers/journal";
 import { healthRouter } from "./routers/health";
 import { householdRouter } from "./routers/household";
 import { ledgerRouter } from "./routers/ledger";
@@ -30,6 +31,7 @@ export const appRouter = router({
   registry: registryRouter,
   goals: goalsRouter,
   strategy: strategyRouter,
+  journal: journalRouter,
 });
 
 export type AppRouter = typeof appRouter;
