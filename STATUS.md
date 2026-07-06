@@ -2,9 +2,21 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
-## Current state (2026-07-05)
+## Current state (2026-07-06)
 
-- **Milestone: M8 COMPLETE (Scenario Engine v1) — pending owner approval for M9 (final).**
+- **Milestone: M9 COMPLETE (Monitoring, Phase 4) — FINAL v1 milestone. Four-phase loop closed. Pending owner approval.**
+- M9 delivered: new pure `engine-monitoring` (DriftDetector + staleness sweep, 15 tests) comparing the
+  current SCHEDULED snapshot to the strategy baseline (net worth / liquid share / top concentration /
+  goal coverage; thresholds registry-owned via 4 new `drift_*` assumptions; MEDIUM at threshold, HIGH
+  at 2x; items added/removed); staleness sweep flips VERIFIED→STALE by `staleness_days_by_kind`;
+  `runMonitoringCycle` service (snapshot→drift→staleness→MonitoringRun+MonitoringAlerts, audited)
+  shared by `apps/worker` (one-shot Railway cron) and an in-app manual trigger; `monitoring` tRPC
+  router (runNow/runs/snapshots/alerts/acknowledge/reevaluate) with the guarded re-evaluation bridge
+  (MONITORING→VERIFICATION or →STRATEGY, facts computed in-tx, alerts resolved); bilingual monitoring
+  UI (open alerts + severities, re-evaluate actions, run history, snapshot timeline, journal outcomes);
+  new MonitoringRun/MonitoringAlert models + migration 20260706090000_m9_monitoring; monitoring
+  integration test (cycle→drift→staleness→re-evaluation) in CI skipIf style. Docs: 06-monitoring.md,
+  DEPLOY worker-cron section, README rewrite, docs/SMOKE-TEST.md (full M1–M9 walkthrough).
 - M8 delivered: deterministic real-terms projector (annual steps; investable grows at assumption
   return; real estate flat in real terms; mortgage straight-line amortization with CPI-linked
   tracks responding to inflation SURPRISE; income/market shocks; goal outcomes; depletion year;
@@ -96,11 +108,22 @@
 - Sandbox bash: 45s hard timeout per call; background processes do not survive between calls;
   run npm installs as repeated `timeout 40 npm install` slices (cache resumes).
 
-## Next up (M9, after approval) — FINAL v1 milestone
+## Next up — v1 COMPLETE
 
-Monitoring (Phase 4): apps/worker on Railway cron (scheduled snapshots) → DriftDetector vs
-strategy baseline + staleness sweep (items → STALE) → re-evaluation flow (drift → VERIFICATION
-or STRATEGY re-run) → history UI (snapshot timeline, drift alerts, journal outcomes).
+All four phases shipped (M0–M9); the MAPPING→VERIFICATION→STRATEGY→MONITORING loop is closed.
+Post-v1 backlog (architecture already accommodates): real-document adapters per institution, Monte
+Carlo, AI copilot (read-only over canonical model), additional countries (registry keyed by country),
+per-person auth, connectors (new ValuationSource), estate module deep-dive.
+
+## M9 notes / technical debt
+
+- Baseline = latest PRE_STRATEGY snapshot; goal-coverage drift is a coarse assets/Σrequired tripwire,
+  not the M5 funding-gap engine (post-v1 refinement).
+- Worker is one-shot (Railway cron model); sweeps all households (family scale: one). Railway cron
+  service must be wired per docs/DEPLOY.md (start: monitor script; schedule e.g. `0 6 * * *`).
+- `apps/worker` runs TS directly via `tsx` (consistent with the workspace's TS-source packages).
+- Sandbox-only: a broken offline pdfjs-dist install (missing bundled types/) can make ingestion
+  typecheck + the pension-PDF runtime test fail; a clean install resolves both (CI unaffected).
 
 ## M4 notes
 
