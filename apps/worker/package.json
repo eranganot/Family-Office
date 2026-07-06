@@ -1,0 +1,21 @@
+{
+  "name": "@wealthos/worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "monitor": "tsx src/index.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wealthos/api": "*",
+    "@wealthos/db": "*",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@wealthos/config": "*",
+    "@types/node": "^22"
+  }
+}
