@@ -45,6 +45,8 @@ model Household {
   auditEvents     AuditEvent[]
   assumptions     Assumption[]
   users           User[]
+  monitoringRuns   MonitoringRun[]
+  monitoringAlerts MonitoringAlert[]
 }
 
 enum MemberRole {
@@ -625,6 +627,7 @@ model HouseholdSnapshot {
   takenAt       DateTime     @default(now())
 
   recommendations Recommendation[]
+  monitoringRuns  MonitoringRun[] @relation("monitoringSnapshot")
 
   @@index([householdId, takenAt])
 }
@@ -653,6 +656,64 @@ model AuditEvent {
 
 
   @@index([householdId, at])
+}
+
+// --- M9 Monitoring (Phase 4) -----------------------------------------------
+
+enum DriftSeverity {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum MonitoringAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+/// One monitoring cycle: a SCHEDULED snapshot, compared against the strategy
+/// baseline (drift) and swept for staleness. Produced by apps/worker (cron) or
+/// a manual trigger. Immutable record of what monitoring observed and when.
+model MonitoringRun {
+  id                 String            @id @default(uuid())
+  householdId        String
+  household          Household         @relation(fields: [householdId], references: [id])
+  snapshotId         String
+  snapshot           HouseholdSnapshot @relation("monitoringSnapshot", fields: [snapshotId], references: [id])
+  baselineSnapshotId String? // strategy baseline compared against (null before first strategy run)
+  trigger            String // CRON | MANUAL
+  severity           DriftSeverity     @default(NONE)
+  driftReport        Json // structured DriftReport (findings + deltas)
+  stalenessReport    Json // { swept: [...itemIds], evaluated, thresholdsByKind }
+  itemsFlaggedStale  Int               @default(0)
+  createdAt          DateTime          @default(now())
+
+  alerts MonitoringAlert[]
+
+  @@index([householdId, createdAt])
+}
+
+/// An actionable finding surfaced by a monitoring run. Acknowledged/resolved by
+/// the household; drives the re-evaluation flow (VERIFICATION or STRATEGY re-run).
+model MonitoringAlert {
+  id          String                @id @default(uuid())
+  householdId String
+  household   Household             @relation(fields: [householdId], references: [id])
+  runId       String
+  run         MonitoringRun         @relation(fields: [runId], references: [id])
+  kind        String // NET_WORTH_DRIFT | LIQUIDITY_DRIFT | CONCENTRATION_DRIFT | GOAL_FUNDING_DRIFT | STALENESS | ITEM_ADDED | ITEM_REMOVED
+  severity    DriftSeverity
+  title       String
+  titleHe     String?
+  detail      Json // structured finding (baseline value, current value, delta, threshold)
+  recommendedAction String // REVERIFY | RERUN_STRATEGY | REVIEW
+  status      MonitoringAlertStatus @default(OPEN)
+  createdAt   DateTime              @default(now())
+  resolvedAt  DateTime?
+
+  @@index([householdId, status])
 }
 
 // END OF SCHEMA DRAFT

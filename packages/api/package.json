@@ -21,7 +21,8 @@
     "@wealthos/registry": "*",
     "@wealthos/engine-goals": "*",
     "@wealthos/engine-strategy": "*",
-    "@wealthos/engine-scenario": "*"
+    "@wealthos/engine-scenario": "*",
+    "@wealthos/engine-monitoring": "*"
   },
   "devDependencies": {
     "@wealthos/config": "*",

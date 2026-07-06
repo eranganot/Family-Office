@@ -37,4 +37,6 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
+export { runMonitoringCycle } from "./services/monitoring-service";
+export type { MonitoringCycleResult } from "./services/monitoring-service";
 export type { Context, Session } from "./context";

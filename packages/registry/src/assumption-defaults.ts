@@ -27,6 +27,10 @@ export const DEFAULT_ASSUMPTIONS: Array<{
   { key: "mortgage_cpi_linked_max_pct", value: 60, unit: "PCT", description: "CPI-linked share of mortgage principal that triggers a notice" },
   { key: "expensive_debt_rate_pct", value: 8, unit: "PCT", description: "Debt rate above which early repayment is suggested" },
   { key: "large_loan_notice_base", value: 100000, unit: "ILS", description: "Non-mortgage loan size that triggers review" },
+  { key: "drift_net_worth_pct", value: 10, unit: "PCT", description: "Relative net-worth change vs strategy baseline that constitutes drift (M9 monitoring)" },
+  { key: "drift_liquidity_pct", value: 10, unit: "PCT_POINTS", description: "Change in liquid-asset share (percentage points) vs baseline that constitutes drift" },
+  { key: "drift_concentration_pct", value: 5, unit: "PCT_POINTS", description: "Increase in single-asset concentration (percentage points) vs baseline that constitutes drift" },
+  { key: "drift_goal_funding_pct", value: 10, unit: "PCT_POINTS", description: "Change in a goal's funded ratio (percentage points) vs baseline that constitutes drift" },
   {
     key: "priority_weights",
     value: { impact: 30, ease: 15, taxBenefit: 15, riskReduction: 20, goalContribution: 15, urgency: 5 },
