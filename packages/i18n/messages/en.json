@@ -16,7 +16,8 @@
     "goals": "Goals",
     "strategy": "Strategy",
     "journal": "Journal",
-    "scenarios": "Scenarios"
+    "scenarios": "Scenarios",
+    "monitoring": "Monitoring"
   },
   "phase": {
     "label": "Current phase",
@@ -466,6 +467,55 @@
       "MORTGAGE_REFINANCE": "Mortgage refinance (-1pp all tracks)",
       "SAVINGS_RATE_UP": "Save ₪2,000/mo more",
       "SAVINGS_RATE_DOWN": "Save ₪2,000/mo less"
+    }
+  },
+  "monitoring": {
+    "title": "Monitoring",
+    "hint": "Phase 4 — scheduled snapshots watch for drift against your strategy and stale valuations. Re-evaluate to close the loop.",
+    "runNow": "Run monitoring now",
+    "wrongPhase": "Monitoring is the fourth phase. Reach it from Strategy once recommendations are in place; the timeline below stays visible in every phase.",
+    "openAlerts": "Open alerts",
+    "noAlerts": "No open alerts — your household is tracking to strategy.",
+    "acknowledge": "Acknowledge",
+    "acknowledged": "Acknowledged",
+    "severity": "Severity",
+    "action": "Suggested action",
+    "runs": "Monitoring history",
+    "noRuns": "No monitoring runs yet. Run one now or wait for the scheduled worker.",
+    "run": "Run",
+    "trigger": "Trigger",
+    "drift": "Drift findings",
+    "stale": "Flagged stale",
+    "snapshotTimeline": "Snapshot timeline",
+    "kind": "Kind",
+    "takenAt": "Taken",
+    "reevaluate": "Re-evaluate",
+    "reevaluateHint": "Route the household back to close the loop:",
+    "toVerification": "Re-verify stale data",
+    "toStrategy": "Re-run strategy",
+    "baseline": "Baseline",
+    "current": "Current",
+    "delta": "Change",
+    "noBaseline": "No strategy baseline yet — drift is measured once a strategy has run.",
+    "sev": {
+      "NONE": "None",
+      "LOW": "Low",
+      "MEDIUM": "Medium",
+      "HIGH": "High"
+    },
+    "act": {
+      "REVERIFY": "Re-verify",
+      "RERUN_STRATEGY": "Re-run strategy",
+      "REVIEW": "Review"
+    },
+    "kinds": {
+      "NET_WORTH_DRIFT": "Net-worth drift",
+      "LIQUIDITY_DRIFT": "Liquidity drift",
+      "CONCENTRATION_DRIFT": "Concentration drift",
+      "GOAL_FUNDING_DRIFT": "Goal-funding drift",
+      "ITEM_ADDED": "Holdings added",
+      "ITEM_REMOVED": "Holdings removed",
+      "STALENESS": "Stale valuations"
     }
   }
 }
