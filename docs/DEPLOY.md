@@ -38,3 +38,13 @@ The worker shares the web service's migrations — run monitoring only after the
 ```bash
 DATABASE_URL=... npm run monitor --workspace=@wealthos/worker
 ```
+
+### How the `wealthos-worker` service is actually configured
+
+The worker service uses **`apps/worker/railway.json`** (start command `npm run monitor …`,
+`cronSchedule` `0 6 * * *` UTC, `restartPolicyType: NEVER`) rather than the root config. It was
+created with `railway up --service wealthos-worker` (deploying with that config as the root
+`railway.json`) and its only variable is `DATABASE_URL=${{Postgres.DATABASE_URL}}`. To redeploy it,
+deploy with `apps/worker/railway.json` in place of the root `railway.json`, or set the worker
+service's Config-file path to `apps/worker/railway.json` in the dashboard. `0 6 * * *` UTC ≈ 09:00
+Asia/Jerusalem.
