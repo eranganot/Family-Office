@@ -92,10 +92,9 @@
   DATABASE_URL→Postgres). Created via `railway up --service wealthos-worker` (project token can `up`
   + set vars but NOT `add`/`link`/`whoami`). Config recorded in apps/worker/railway.json. Idle until
   first scheduled run; identical code path to the in-app "Run monitoring now".
-- **GitHub push PENDING (owner action):** M9 commits are on local `main` (mount + committed) but NOT
-  pushed — this session could not read the prior session's /tmp/.git-credentials (owned by another
-  user). Prod is ahead of GitHub `main` until the owner runs `git push origin main` (+ feature
-  branches). CI has not run these commits yet; DB-bound integration tests (incl. monitoring) run there.
+- **GitHub: PUSHED — main + all four feat/m9-* branches (owner-supplied PAT). CI GREEN on main
+  (cfacbe8): typecheck, lint, prisma validate, and all DB-bound integration tests incl. the new
+  monitoring loop (cycle→drift→staleness→re-evaluation) passed against CI Postgres.**
 - Railway service `wealthos-web` (1fe5a904), Postgres provisioned, all env vars set.
   Deployed via `railway up` (project token). Empty `Family-Office` service exists — owner to
   either connect the GitHub repo to `wealthos-web` and delete it, or vice versa.
