@@ -84,7 +84,18 @@
   invariant, audit events on every mutation (tested), conservative multi-currency net worth
   (exclusion reporting, never guesses), manual FX rates, full bilingual he/en manual-entry UI.
 - M0 was: foundation shell (deployed + pushed).
-- **Live:** https://wealthos-web-production-c1f7.up.railway.app (health, tRPC, auth, RTL verified live).
+- **Live:** https://wealthos-web-production-c1f7.up.railway.app — **M9 deployed** (migration
+  20260706090000_m9_monitoring applied to prod; 4 drift assumptions seeded; monitoring UI + manual
+  trigger live). Deployed via `railway up` from a clean /tmp checkout (the mount corrupted `.nvmrc`
+  with null bytes on the first attempt → build failed → redeploy from /tmp succeeded).
+- **NEW Railway service `wealthos-worker`** (cron `0 6 * * *` UTC, start `npm run monitor …`,
+  DATABASE_URL→Postgres). Created via `railway up --service wealthos-worker` (project token can `up`
+  + set vars but NOT `add`/`link`/`whoami`). Config recorded in apps/worker/railway.json. Idle until
+  first scheduled run; identical code path to the in-app "Run monitoring now".
+- **GitHub push PENDING (owner action):** M9 commits are on local `main` (mount + committed) but NOT
+  pushed — this session could not read the prior session's /tmp/.git-credentials (owned by another
+  user). Prod is ahead of GitHub `main` until the owner runs `git push origin main` (+ feature
+  branches). CI has not run these commits yet; DB-bound integration tests (incl. monitoring) run there.
 - Railway service `wealthos-web` (1fe5a904), Postgres provisioned, all env vars set.
   Deployed via `railway up` (project token). Empty `Family-Office` service exists — owner to
   either connect the GitHub repo to `wealthos-web` and delete it, or vice versa.
