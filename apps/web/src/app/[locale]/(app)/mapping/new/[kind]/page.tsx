@@ -112,6 +112,9 @@ export default async function NewItemPage({
             <Field label={t("account.depositFeePct")}>
               <TextInput name="depositFeePct" inputMode="decimal" placeholder="1.5" />
             </Field>
+            <Field label={t("account.growthSharePct")}>
+              <TextInput name="growthSharePct" inputMode="decimal" placeholder="60" />
+            </Field>
             <Field label={t("account.employerName")}>
               <TextInput name="employerName" />
             </Field>

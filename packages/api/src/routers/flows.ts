@@ -122,4 +122,96 @@ export const flowsRouter = router({
     );
     return { id };
   }),
+
+  updateCashFlow: protectedProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        name: z.string().min(1).max(200).optional(),
+        notes: z.string().max(2000).optional(),
+        flowType: CreateCashFlowSchema.shape.flowType.optional(),
+        amount: PositiveDecimalString.optional(),
+        frequency: z.enum(["MONTHLY", "ANNUAL", "ONE_TIME"]).optional(),
+        startDate: z.coerce.date().optional(),
+        endDate: z.coerce.date().optional(),
+        isGross: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, name, notes, ...detail } = input;
+      await ctx.db.$transaction(async (tx) => {
+        const base: Record<string, unknown> = {};
+        if (name !== undefined) base["name"] = name;
+        if (notes !== undefined) base["notes"] = notes;
+        if (Object.keys(base).length > 0) await tx.ledgerItem.update({ where: { id }, data: base });
+        const detailData: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(detail)) if (v !== undefined) detailData[k] = v;
+        if (input.flowType !== undefined) {
+          detailData["direction"] = INCOME_TYPES.has(input.flowType) ? "IN" : "OUT";
+        }
+        if (Object.keys(detailData).length > 0) {
+          await tx.cashFlowDetail.update({ where: { ledgerItemId: id }, data: detailData as never });
+        }
+      });
+      return { id };
+    }),
+
+  updateInsurance: protectedProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        name: z.string().min(1).max(200).optional(),
+        notes: z.string().max(2000).optional(),
+        policyType: CreateInsuranceSchema.shape.policyType.optional(),
+        coverageAmount: DecimalString.optional(),
+        monthlyPremium: DecimalString.optional(),
+        throughPension: z.boolean().optional(),
+        insuredMemberId: z.uuid().nullable().optional(),
+        endDate: z.coerce.date().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, name, notes, ...detail } = input;
+      await ctx.db.$transaction(async (tx) => {
+        const base: Record<string, unknown> = {};
+        if (name !== undefined) base["name"] = name;
+        if (notes !== undefined) base["notes"] = notes;
+        if (Object.keys(base).length > 0) await tx.ledgerItem.update({ where: { id }, data: base });
+        const detailData: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(detail)) if (v !== undefined) detailData[k] = v;
+        if (Object.keys(detailData).length > 0) {
+          await tx.insuranceDetail.update({ where: { ledgerItemId: id }, data: detailData as never });
+        }
+      });
+      return { id };
+    }),
+
+  updateLoan: protectedProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        name: z.string().min(1).max(200).optional(),
+        notes: z.string().max(2000).optional(),
+        lenderName: z.string().max(200).optional(),
+        principalRemaining: PositiveDecimalString.optional(),
+        annualRatePct: DecimalString.optional(),
+        endDate: z.coerce.date().optional(),
+        purpose: z.string().max(300).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, name, notes, ...detail } = input;
+      await ctx.db.$transaction(async (tx) => {
+        const base: Record<string, unknown> = {};
+        if (name !== undefined) base["name"] = name;
+        if (notes !== undefined) base["notes"] = notes;
+        if (Object.keys(base).length > 0) await tx.ledgerItem.update({ where: { id }, data: base });
+        const detailData: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(detail)) if (v !== undefined) detailData[k] = v;
+        if (Object.keys(detailData).length > 0) {
+          await tx.loanDetail.update({ where: { ledgerItemId: id }, data: detailData as never });
+        }
+      });
+      return { id };
+    }),
 });

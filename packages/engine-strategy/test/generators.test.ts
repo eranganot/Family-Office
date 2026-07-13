@@ -43,7 +43,12 @@ describe("generators", () => {
     expect(drafts.length).toBeGreaterThanOrEqual(5);
     for (const d of drafts) {
       expect(() => RationaleSchema.parse(d.rationale)).not.toThrow();
+      expect(() => RationaleSchema.parse(d.rationaleHe)).not.toThrow();
       expect(d.titleHe.length).toBeGreaterThan(3);
+      // Hebrew rationale must actually be Hebrew (and share the enum horizon)
+      expect(/[\u0590-\u05FF]/.test(d.rationaleHe.why)).toBe(true);
+      expect(/[\u0590-\u05FF]/.test(d.rationaleHe.expectedImpact)).toBe(true);
+      expect(d.rationaleHe.timeHorizon).toBe(d.rationale.timeHorizon);
       const weights = Object.values(d.subscores);
       expect(weights.every((w) => w >= 0 && w <= 100)).toBe(true);
       expect(d.confidence).toBeGreaterThanOrEqual(60);

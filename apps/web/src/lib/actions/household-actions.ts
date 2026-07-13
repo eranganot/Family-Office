@@ -59,3 +59,20 @@ export async function setFxRateAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/fx`);
 }
+
+export async function updateMemberAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    await trpc.household.updateMember({
+      id: str(fd, "id"),
+      name: str(fd, "name"),
+      role: str(fd, "role") as never,
+      birthDate: opt(fd, "birthDate") as never,
+      employmentStatus: opt(fd, "employmentStatus") as never,
+    } as never);
+  } catch {
+    redirect(`/${locale}/household?error=member`);
+  }
+  redirect(`/${locale}/household`);
+}

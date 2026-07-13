@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
-import { decideAction, runStrategyAction } from "../../../../lib/actions/strategy-actions";
-import { Card, TextInput } from "../../../../components/fields";
+import { deriveTargetGrowthPct } from "@wealthos/engine-strategy";
+import { decideAction, runStrategyAction, saveRiskAction } from "../../../../lib/actions/strategy-actions";
+import { Card, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { Link } from "../../../../i18n/navigation";
 
@@ -43,6 +44,21 @@ export default async function StrategyPage({
   }
 
   const recommendations = await trpc.strategy.recommendations();
+  const assumptions = await trpc.registry.assumptions();
+  const aVal = (key: string, fallback: number) => {
+    const row = assumptions.find((a) => a.key === key);
+    return row ? Number(row.value) : fallback;
+  };
+  const risk = {
+    lossTolerance: aVal("risk_loss_tolerance", 2),
+    incomeStability: aVal("risk_income_stability", 2),
+    horizonYears: aVal("risk_horizon_years", 20),
+  };
+  const targetGrowthPct = deriveTargetGrowthPct({
+    risk_loss_tolerance: risk.lossTolerance,
+    risk_income_stability: risk.incomeStability,
+    risk_horizon_years: risk.horizonYears,
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,13 +85,43 @@ export default async function StrategyPage({
         </form>
       </Card>
 
+      <Card title={t("risk.title")}>
+        <p className="mb-3 text-xs text-neutral-500">{t("risk.hint")}</p>
+        <p className="mb-4 text-sm">
+          {t("risk.currentTarget")}: <span className="font-semibold">{targetGrowthPct}%</span>
+        </p>
+        <form action={saveRiskAction} className="grid max-w-3xl grid-cols-3 items-end gap-3">
+          <input type="hidden" name="locale" value={locale} />
+          <Field label={t("risk.lossTolerance")}>
+            <Select name="risk_loss_tolerance" defaultValue={String(risk.lossTolerance)}>
+              {[1, 2, 3].map((v) => (
+                <option key={v} value={v}>{t(`risk.lossTolerance_${v}`)}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={t("risk.incomeStability")}>
+            <Select name="risk_income_stability" defaultValue={String(risk.incomeStability)}>
+              {[1, 2, 3].map((v) => (
+                <option key={v} value={v}>{t(`risk.incomeStability_${v}`)}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={t("risk.horizonYears")}>
+            <TextInput name="risk_horizon_years" type="number" min={1} max={60} defaultValue={risk.horizonYears} />
+          </Field>
+          <div className="col-span-3">
+            <SubmitButton label={t("risk.save")} />
+          </div>
+        </form>
+      </Card>
+
       {recommendations.length === 0 ? (
         <Card>
           <p className="text-sm text-neutral-500">{t("empty")}</p>
         </Card>
       ) : (
         recommendations.map((rec) => {
-          const r = rec.rationale as unknown as RationaleShape;
+          const r = (locale === "he" && rec.rationaleHe ? rec.rationaleHe : rec.rationale) as unknown as RationaleShape;
           const title = locale === "he" && rec.titleHe ? rec.titleHe : rec.title;
           return (
             <Card key={rec.id}>

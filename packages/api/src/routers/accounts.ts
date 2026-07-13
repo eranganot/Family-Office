@@ -28,6 +28,7 @@ const CreateAccountSchema = LedgerBaseSchema.extend({
   trackName: z.string().max(120).optional(),
   managementFeePct: z.string().regex(/^\d+(\.\d{1,4})?$/).optional(),
   depositFeePct: z.string().regex(/^\d+(\.\d{1,4})?$/).optional(),
+  growthSharePct: z.string().regex(/^\d+(\.\d{1,4})?$/).optional(),
   employerName: z.string().max(200).optional(),
   openedAt: z.coerce.date().optional(),
   liquidityClass: z.enum(["LIQUID", "RESTRICTED", "LOCKED"]).optional(),
@@ -73,6 +74,7 @@ export const accountsRouter = router({
             trackName: input.trackName ?? null,
             managementFeePct: input.managementFeePct ?? null,
             depositFeePct: input.depositFeePct ?? null,
+            growthSharePct: input.growthSharePct ?? null,
             employerName: input.employerName ?? null,
             openedAt: input.openedAt ?? null,
             liquidityClass: input.liquidityClass ?? null,
@@ -82,4 +84,55 @@ export const accountsRouter = router({
     );
     return { id };
   }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        name: z.string().min(1).max(200).optional(),
+        notes: z.string().max(2000).optional(),
+        accountType: AccountTypeSchema.optional(),
+        institutionName: z.string().min(1).max(200).optional(),
+        institutionCountry: z.string().length(2).optional(),
+        accountNumberMasked: z.string().max(40).optional(),
+        trackName: z.string().max(120).optional(),
+        managementFeePct: z.string().regex(/^\d+(\.\d{1,4})?$/).optional(),
+        depositFeePct: z.string().regex(/^\d+(\.\d{1,4})?$/).optional(),
+        growthSharePct: z.string().regex(/^\d+(\.\d{1,4})?$/).optional(),
+        employerName: z.string().max(200).optional(),
+        openedAt: z.coerce.date().optional(),
+        liquidityClass: z.enum(["LIQUID", "RESTRICTED", "LOCKED"]).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, name, notes, institutionName, institutionCountry, ...detail } = input;
+      await ctx.db.$transaction(async (tx) => {
+        const base: Record<string, unknown> = {};
+        if (name !== undefined) base["name"] = name;
+        if (notes !== undefined) base["notes"] = notes;
+        if (Object.keys(base).length > 0) await tx.ledgerItem.update({ where: { id }, data: base });
+
+        const detailData: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(detail)) if (v !== undefined) detailData[k] = v;
+        if (institutionName !== undefined) {
+          const current = await tx.accountDetail.findUniqueOrThrow({ where: { ledgerItemId: id } });
+          const accountType = input.accountType ?? current.accountType;
+          const institutionType = accountType.startsWith("BANK")
+            ? "BANK"
+            : accountType.startsWith("BROKERAGE")
+              ? "BROKER"
+              : "PENSION_COMPANY";
+          const institution = await tx.institution.upsert({
+            where: { name_country: { name: institutionName, country: institutionCountry ?? "IL" } },
+            create: { name: institutionName, country: institutionCountry ?? "IL", type: institutionType },
+            update: {},
+          });
+          detailData["institutionId"] = institution.id;
+        }
+        if (Object.keys(detailData).length > 0) {
+          await tx.accountDetail.update({ where: { ledgerItemId: id }, data: detailData as never });
+        }
+      });
+      return { id };
+    }),
 });

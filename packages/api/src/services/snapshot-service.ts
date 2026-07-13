@@ -50,6 +50,7 @@ export async function buildSnapshot(
       institutionName: i.accountDetail?.institution.name ?? null,
       liquidityClass: i.accountDetail?.liquidityClass ?? null,
       managementFeePct: i.accountDetail?.managementFeePct ? Number(i.accountDetail.managementFeePct) : null,
+      growthSharePct: i.accountDetail?.growthSharePct !== null && i.accountDetail?.growthSharePct !== undefined ? Number(i.accountDetail.growthSharePct) : null,
       valueBase,
       valueAsOf: i.latestValuation ? i.latestValuation.asOf.toISOString().slice(0, 10) : null,
       verified: i.verification === "VERIFIED",

@@ -65,11 +65,12 @@ export async function runMonitoringCycle(
 
   // Thresholds are owned by the AssumptionRegistry — nothing hard-coded here.
   const reg = assumptionRegistry(db);
-  const [nw, liq, conc, goal, staleCfg] = await Promise.all([
+  const [nw, liq, conc, goal, alloc, staleCfg] = await Promise.all([
     reg.current("drift_net_worth_pct", householdId),
     reg.current("drift_liquidity_pct", householdId),
     reg.current("drift_concentration_pct", householdId),
     reg.current("drift_goal_funding_pct", householdId),
+    reg.current("drift_allocation_pct", householdId),
     reg.current("staleness_days_by_kind", householdId),
   ]);
   const thresholds: DriftThresholds = {
@@ -77,6 +78,7 @@ export async function runMonitoringCycle(
     liquidityPct: Number(liq.value),
     concentrationPct: Number(conc.value),
     goalFundingPct: Number(goal.value),
+    allocationPct: Number(alloc.value),
   };
   const thresholdsByKind = staleCfg.value as Record<string, number>;
 

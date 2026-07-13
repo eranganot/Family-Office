@@ -1,6 +1,6 @@
 import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
-import { createGoalAction, setGoalStatusAction } from "../../../../lib/actions/goal-actions";
+import { createGoalAction, setGoalStatusAction, updateGoalAction } from "../../../../lib/actions/goal-actions";
 import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 
@@ -93,6 +93,45 @@ export default async function GoalsPage({
                       <p className="text-xs text-amber-600">{t(`notComputable.${r.reason}`)}</p>
                     )
                   ) : null}
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs text-blue-600 underline">{tf("edit")}</summary>
+                    <form action={updateGoalAction} className="mt-3 grid max-w-2xl grid-cols-2 gap-3 rounded-lg bg-neutral-50 p-3">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="id" value={g.id} />
+                      <Field label={t("name")}>
+                        <TextInput name="name" defaultValue={g.name} required />
+                      </Field>
+                      <Field label={t("type")}>
+                        <Select name="type" defaultValue={g.type}>
+                          {GOAL_TYPES.map((gt) => <option key={gt} value={gt}>{t(`types.${gt}`)}</option>)}
+                        </Select>
+                      </Field>
+                      <Field label={t("priority")}>
+                        <TextInput name="priority" type="number" min={1} max={99} defaultValue={g.priority} />
+                      </Field>
+                      <Field label={t("targetDate")}>
+                        <TextInput name="targetDate" type="date" defaultValue={g.targetDate ? new Date(g.targetDate).toISOString().slice(0, 10) : ""} />
+                      </Field>
+                      <Field label={`${t("requiredFunding")} (${household.baseCurrency})`}>
+                        <TextInput name="requiredFunding" inputMode="decimal" defaultValue={g.requiredFunding ? String(g.requiredFunding) : ""} />
+                      </Field>
+                      <Field label={t("riskTolerance")}>
+                        <Select name="riskTolerance" defaultValue={g.riskTolerance}>
+                          {(["LOW", "MEDIUM", "HIGH"] as const).map((rt) => <option key={rt} value={rt}>{t(rt)}</option>)}
+                        </Select>
+                      </Field>
+                      {goals.length > 1 ? (
+                        <Field label={t("dependsOn")}>
+                          <Select name="dependsOn" multiple defaultValue={g.dependsOn.map((dep) => dep.dependsOnGoal.id)}>
+                            {goals.filter((o) => o.id !== g.id).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                          </Select>
+                        </Field>
+                      ) : null}
+                      <div className="col-span-2">
+                        <SubmitButton label={tf("submit")} />
+                      </div>
+                    </form>
+                  </details>
                 </li>
               );
             })}

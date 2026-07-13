@@ -2,7 +2,55 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
-## Current state (2026-07-06)
+## Current state (2026-07-13)
+
+- **M10 (bilingual rationale) code-complete, NOT yet deployed.** All 11 strategy generators now carry a
+  full Hebrew `rationaleHe` (same Rationale schema, same timeHorizon enums); product-reference validator
+  scans the Hebrew text too; `Recommendation.rationaleHe Json?` added (migration
+  20260713080000_m10_bilingual_rationale — pre-M10 rows stay null and the UI falls back to English);
+  strategy page picks rationale by locale. Verified in sandbox: engine-strategy tsc + 16/16 tests
+  (new assertions: rationaleHe parses, is actually Hebrew, horizon enums match), api tsc, web tsc,
+  prisma validate. **Deploy pending: run migration on Railway PG + `railway up` (needs owner token).**
+  NOTE: rerunning strategy after deploy regenerates recommendations WITH Hebrew; old PROPOSED rows
+  will be superseded as usual.
+- **M11 (edit everything) code-complete, NOT yet deployed.** New update mutations (all audited via the
+  tRPC audit middleware): `accounts.update` (base + AccountDetail + institution re-upsert),
+  `property.updateRealEstate`, `property.updateMortgage` (detail + full track-set replacement with the
+  create-path validation, appends a CALCULATED valuation at the new total principal),
+  `flows.updateCashFlow` (direction re-derived from flowType), `flows.updateInsurance`,
+  `flows.updateLoan`; goals.update + household.updateMember already existed and are now exposed in UI.
+  New UI: goal inline edit (name/type/priority/targetDate/requiredFunding/riskTolerance/dependencies —
+  fixes the "לא הוגדר" goals), member inline edit, per-item edit link on mapping →
+  `/mapping/edit/[id]` kind-specific prefilled form (OTHER_* get base-only form). Valuations remain
+  append-only; currency intentionally not editable; ownership editing still deferred (M3 debt).
+  Empty form fields mean "leave unchanged" (v1 semantics). i18n: forms.edit/editTitle added.
+  Verified: api tsc, web tsc. No schema change.
+- **M12 (allocation engine) + M13 (allocation drift) code-complete, NOT yet deployed.**
+  M12: `AccountDetail.growthSharePct` (null = unknown; migration 20260713090000_m12_allocation);
+  SnapshotItem gains additive defaulted `growthSharePct` (old payloads still parse, schemaVersion 1);
+  7 new assumptions seeded (risk_loss_tolerance / risk_income_stability / risk_horizon_years,
+  allocation_rebalance_band_pct, allocation_real_estate_max_pct, allocation_mix_unknown_max_pct,
+  drift_allocation_pct). New pure analyzer `analyzers/allocation.ts`: target growth share derived
+  deterministically from the 3 questionnaire assumptions (documented rule: base 30/50/70 by tolerance,
+  ±10 horizon, ±5 stability, clamp [20,90] — `deriveTargetGrowthPct`, exported); whole-net-worth view;
+  cash = defensive by definition; unknown-mix accounts EXCLUDED-AND-REPORTED, comparison REFUSED above
+  allocation_mix_unknown_max_pct. 4 new bilingual generators (below/above target with shift amount in
+  base currency, mix-unknown data-gap, real-estate-high structural — explicitly not a sell instruction).
+  Risk questionnaire card on the strategy page (writes assumption overrides ONLY on change → no
+  gratuitous invalidation); growthSharePct field in account create/edit forms. 8 new engine tests
+  (24 total in engine-strategy).
+  M13: HouseholdMetrics.growthSharePct (known-mix-only, mirrors M12 policy), ALLOCATION_DRIFT kind in
+  DriftDetector (pp vs strategy baseline, RERUN_STRATEGY), drift_allocation_pct threshold wired in
+  monitoring-service, i18n alert labels, 2 new drift tests (17 total in engine-monitoring).
+  Verified in sandbox: domain/api/web/registry tsc, engine suites green, prisma validate.
+  **Deploy pending (both migrations + seed): needs owner Railway token / git push.**
+- Owner direction for v1.1 (recorded 2026-07-13): (1) all recommendations in Hebrew — M10;
+  (2) edit everything (goals/accounts/members/RE/mortgages/flows) — M11; (3) asset-allocation
+  strategy: risk questionnaire as versioned assumptions, whole-net-worth target model with
+  rebalanceable-vs-structural gap split — M12; (4) allocation-drift monitoring — M13.
+  Allocation stays asset-class level ONLY (never products/securities), per domain rules.
+
+## Previous state (2026-07-06)
 
 - **Milestone: M9 COMPLETE (Monitoring, Phase 4) — FINAL v1 milestone. Four-phase loop closed. Pending owner approval.**
 - M9 delivered: new pure `engine-monitoring` (DriftDetector + staleness sweep, 15 tests) comparing the

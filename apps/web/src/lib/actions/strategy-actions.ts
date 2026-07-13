@@ -32,3 +32,24 @@ export async function decideAction(fd: FormData): Promise<void> {
   } as never);
   redirect(`/${locale}/strategy`);
 }
+
+export async function saveRiskAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    const current = await trpc.registry.assumptions();
+    const byKey = new Map(current.map((a) => [a.key, a.value]));
+    for (const key of ["risk_loss_tolerance", "risk_income_stability", "risk_horizon_years"] as const) {
+      const raw = str(fd, key);
+      if (raw === "") continue;
+      const value = Number(raw);
+      if (Number.isNaN(value)) continue;
+      if (Number(byKey.get(key)) === value) continue; // unchanged — no new version, no invalidation
+      await trpc.registry.setAssumption({ key, value });
+    }
+  } catch (e) {
+    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "UNKNOWN";
+    redirect(`/${locale}/strategy?error=${code}`);
+  }
+  redirect(`/${locale}/strategy`);
+}
