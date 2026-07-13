@@ -116,7 +116,8 @@
       "liquidityClass": "נזילות",
       "LIQUID": "נזיל",
       "RESTRICTED": "מוגבל",
-      "LOCKED": "נעול"
+      "LOCKED": "נעול",
+      "growthSharePct": "רכיב צמיחה % (נכסי צמיחה)"
     },
     "accountTypes": {
       "BANK_CHECKING": "בנק — עו\"ש",
@@ -217,7 +218,9 @@
     "other": {
       "titleAsset": "נכס אחר חדש",
       "titleLiability": "התחייבות אחרת חדשה"
-    }
+    },
+    "edit": "עריכה",
+    "editTitle": "עריכת פריט"
   },
   "fx": {
     "title": "שערי מטבע (ידני)",
@@ -420,7 +423,22 @@
     "evidence": "אסמכתאות",
     "goalsImproved": "יעדים שמשתפרים",
     "assumptionsUsed": "הנחות בשימוש (גרסאות מקובעות)",
-    "expectedOutcome": "תוצאה צפויה"
+    "expectedOutcome": "תוצאה צפויה",
+    "risk": {
+      "title": "שאלון סיכון (קובע את יעד ההקצאה)",
+      "hint": "שלוש תשובות גוזרות את יעד רכיב הצמיחה של משק הבית. שינוי שלהן יוצר גרסת הנחות חדשה ומבטל המלצות נעוצות.",
+      "lossTolerance": "סיבולת להפסדים זמניים",
+      "lossTolerance_1": "נמוכה — הפסדים מדירים שינה",
+      "lossTolerance_2": "בינונית — לא נעים אבל נשארים במסלול",
+      "lossTolerance_3": "גבוהה — ירידות הן הזדמנות",
+      "incomeStability": "יציבות הכנסת משק הבית",
+      "incomeStability_1": "לא יציבה / מקור תנודתי יחיד",
+      "incomeStability_2": "מעורבת",
+      "incomeStability_3": "יציבה — שני מפרנסים / משרות בטוחות",
+      "horizonYears": "אופק השקעה עיקרי (שנים)",
+      "currentTarget": "יעד רכיב צמיחה נוכחי",
+      "save": "שמירת תשובות"
+    }
   },
   "journal": {
     "title": "יומן החלטות",
@@ -513,6 +531,7 @@
       "LIQUIDITY_DRIFT": "סטיית נזילות",
       "CONCENTRATION_DRIFT": "סטיית ריכוזיות",
       "GOAL_FUNDING_DRIFT": "סטיית מימון יעדים",
+      "ALLOCATION_DRIFT": "סטיית הקצאה (רכיב צמיחה)",
       "ITEM_ADDED": "אחזקות נוספו",
       "ITEM_REMOVED": "אחזקות הוסרו",
       "STALENESS": "הערכות שווי מיושנות"

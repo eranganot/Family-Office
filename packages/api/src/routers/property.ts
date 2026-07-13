@@ -103,4 +103,96 @@ export const propertyRouter = router({
     );
     return { id };
   }),
+
+  updateRealEstate: protectedProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        name: z.string().min(1).max(200).optional(),
+        notes: z.string().max(2000).optional(),
+        address: z.string().min(1).max(300).optional(),
+        city: z.string().max(120).optional(),
+        propertyType: z.enum(["APARTMENT", "HOUSE", "LOT", "COMMERCIAL"]).optional(),
+        isPrimaryResidence: z.boolean().optional(),
+        purchaseDate: z.coerce.date().optional(),
+        purchasePrice: DecimalString.optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, name, notes, ...detail } = input;
+      await ctx.db.$transaction(async (tx) => {
+        const base: Record<string, unknown> = {};
+        if (name !== undefined) base["name"] = name;
+        if (notes !== undefined) base["notes"] = notes;
+        if (Object.keys(base).length > 0) await tx.ledgerItem.update({ where: { id }, data: base });
+        const detailData: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(detail)) if (v !== undefined) detailData[k] = v;
+        if (Object.keys(detailData).length > 0) {
+          await tx.realEstateDetail.update({ where: { ledgerItemId: id }, data: detailData as never });
+        }
+      });
+      return { id };
+    }),
+
+  /** Track edits replace the full track set (same validation as create); a new CALCULATED valuation is appended. */
+  updateMortgage: protectedProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        name: z.string().min(1).max(200).optional(),
+        notes: z.string().max(2000).optional(),
+        linkedPropertyId: z.uuid().nullable().optional(),
+        startDate: z.coerce.date().optional(),
+        tracks: z.array(MortgageTrackSchema).min(1).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, name, notes, linkedPropertyId, startDate, tracks } = input;
+      if (linkedPropertyId) {
+        const property = await ctx.db.realEstateDetail.findUnique({ where: { ledgerItemId: linkedPropertyId } });
+        if (!property) throw new TRPCError({ code: "BAD_REQUEST", message: "LINKED_PROPERTY_NOT_FOUND" });
+      }
+      await ctx.db.$transaction(async (tx) => {
+        const base: Record<string, unknown> = {};
+        if (name !== undefined) base["name"] = name;
+        if (notes !== undefined) base["notes"] = notes;
+        if (Object.keys(base).length > 0) await tx.ledgerItem.update({ where: { id }, data: base });
+
+        const detailData: Record<string, unknown> = {};
+        if (linkedPropertyId !== undefined) detailData["linkedPropertyId"] = linkedPropertyId;
+        if (startDate !== undefined) detailData["startDate"] = startDate;
+        if (Object.keys(detailData).length > 0) {
+          await tx.mortgageDetail.update({ where: { ledgerItemId: id }, data: detailData as never });
+        }
+
+        if (tracks !== undefined) {
+          const validation = validateMortgageTracks(tracks);
+          if (!validation.valid) throw new TRPCError({ code: "BAD_REQUEST", message: validation.reason });
+          await tx.mortgageTrack.deleteMany({ where: { mortgageId: id } });
+          await tx.mortgageTrack.createMany({
+            data: tracks.map((t) => ({
+              mortgageId: id,
+              trackType: t.trackType,
+              principalRemaining: t.principalRemaining,
+              annualRatePct: t.annualRatePct,
+              cpiLinked: t.cpiLinked,
+              monthlyPayment: t.monthlyPayment ?? null,
+              endDate: t.endDate,
+            })),
+          });
+          const item = await tx.ledgerItem.findUniqueOrThrow({ where: { id }, select: { currency: true } });
+          await tx.valuation.create({
+            data: {
+              ledgerItemId: id,
+              asOf: new Date(),
+              value: totalPrincipal(tracks).toFixed(4),
+              currency: item.currency,
+              source: "CALCULATED",
+              confidence: 80,
+            },
+          });
+        }
+      });
+      return { id };
+    }),
 });

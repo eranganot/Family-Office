@@ -32,6 +32,8 @@ export const SnapshotItemSchema = z.object({
   institutionName: z.string().nullable(),
   liquidityClass: z.string().nullable(),
   managementFeePct: z.number().nullable(),
+  /** v1.1 additive: growth-asset share (0-100) of the account; null/absent = unknown (never guessed). */
+  growthSharePct: z.number().nullable().default(null),
   /** Latest valuation converted to base currency; null = no valuation or no FX rate. */
   valueBase: z.number().nullable(),
   valueAsOf: z.string().nullable(),

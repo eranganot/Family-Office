@@ -212,6 +212,8 @@ model AccountDetail {
   accountType        AccountType
   accountNumberMasked String?
   trackName          String? // maslul, e.g. "מניות", "כללי"
+  /** Share (0-100) of this account held in growth assets (equity-type tracks); null = unknown → allocation engine excludes-and-reports. */
+  growthSharePct   Decimal? @db.Decimal(7, 4)
   managementFeePct   Decimal?   @db.Decimal(6, 4) // dmei nihul from balance
   depositFeePct      Decimal?   @db.Decimal(6, 4) // dmei nihul from deposits
   employerName       String?
@@ -542,6 +544,7 @@ model Recommendation {
   title                 String
   titleHe               String?
   rationale             Json // structured: { why, benefits[], risks[], tradeoffs[], taxImplications, liquidityImplications, timeHorizon, sensitivity, alternatives[], expectedImpact }
+  rationaleHe           Json? // same structure in Hebrew; null on pre-M10 rows (UI falls back to rationale)
   confidenceScore       Int // 0-100
   dataCompletenessScore Int // 0-100
   priorityScore         Decimal              @db.Decimal(8, 4)

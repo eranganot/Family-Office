@@ -9,6 +9,7 @@ export type DriftKind =
   | "LIQUIDITY_DRIFT"
   | "CONCENTRATION_DRIFT"
   | "GOAL_FUNDING_DRIFT"
+  | "ALLOCATION_DRIFT"
   | "ITEM_ADDED"
   | "ITEM_REMOVED";
 
@@ -36,6 +37,8 @@ export interface DriftThresholds {
   concentrationPct: number;
   /** Goal-coverage change in percentage points. */
   goalFundingPct: number;
+  /** Growth-share change in percentage points (follow-the-strategy tripwire). */
+  allocationPct: number;
 }
 
 export interface DriftReport {
@@ -108,6 +111,9 @@ export function detectDrift(
 
   // Goal coverage — percentage-point change either direction.
   findings.push(...ppFinding("GOAL_FUNDING_DRIFT", baselineMetrics.goalCoveragePct, currentMetrics.goalCoveragePct, thresholds.goalFundingPct, "RERUN_STRATEGY", false));
+
+  // Allocation — growth-share change in percentage points vs the strategy baseline (M12/M13).
+  findings.push(...ppFinding("ALLOCATION_DRIFT", baselineMetrics.growthSharePct, currentMetrics.growthSharePct, thresholds.allocationPct, "RERUN_STRATEGY", false));
 
   // Composition changes — items that appeared or disappeared since the baseline.
   const baseIds = new Set(baseline.items.map((i) => i.id));

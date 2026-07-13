@@ -116,7 +116,8 @@
       "liquidityClass": "Liquidity",
       "LIQUID": "Liquid",
       "RESTRICTED": "Restricted",
-      "LOCKED": "Locked"
+      "LOCKED": "Locked",
+      "growthSharePct": "Growth share % (equity-type assets)"
     },
     "accountTypes": {
       "BANK_CHECKING": "Bank — checking",
@@ -217,7 +218,9 @@
     "other": {
       "titleAsset": "New other asset",
       "titleLiability": "New other liability"
-    }
+    },
+    "edit": "Edit",
+    "editTitle": "Edit item"
   },
   "fx": {
     "title": "FX rates (manual)",
@@ -420,7 +423,22 @@
     "evidence": "Evidence",
     "goalsImproved": "Goals improved",
     "assumptionsUsed": "Assumptions used (pinned versions)",
-    "expectedOutcome": "Expected outcome"
+    "expectedOutcome": "Expected outcome",
+    "risk": {
+      "title": "Risk questionnaire (drives the allocation target)",
+      "hint": "Three answers derive the household's target growth share. Changing them re-versions the assumptions and invalidates pinned recommendations.",
+      "lossTolerance": "Tolerance for temporary losses",
+      "lossTolerance_1": "Low — losses keep me up at night",
+      "lossTolerance_2": "Medium — uncomfortable but I stay the course",
+      "lossTolerance_3": "High — declines are buying opportunities",
+      "incomeStability": "Household income stability",
+      "incomeStability_1": "Unstable / single volatile source",
+      "incomeStability_2": "Mixed",
+      "incomeStability_3": "Stable — two earners / secure roles",
+      "horizonYears": "Primary investment horizon (years)",
+      "currentTarget": "Current target growth share",
+      "save": "Save answers"
+    }
   },
   "journal": {
     "title": "Decision journal",
@@ -513,6 +531,7 @@
       "LIQUIDITY_DRIFT": "Liquidity drift",
       "CONCENTRATION_DRIFT": "Concentration drift",
       "GOAL_FUNDING_DRIFT": "Goal-funding drift",
+      "ALLOCATION_DRIFT": "Allocation drift (growth share)",
       "ITEM_ADDED": "Holdings added",
       "ITEM_REMOVED": "Holdings removed",
       "STALENESS": "Stale valuations"

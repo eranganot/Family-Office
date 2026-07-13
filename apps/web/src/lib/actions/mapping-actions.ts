@@ -31,6 +31,7 @@ export async function createAccountAction(fd: FormData): Promise<void> {
       trackName: opt(fd, "trackName"),
       managementFeePct: opt(fd, "managementFeePct"),
       depositFeePct: opt(fd, "depositFeePct"),
+      growthSharePct: opt(fd, "growthSharePct"),
       employerName: opt(fd, "employerName"),
       openedAt: opt(fd, "openedAt"),
       liquidityClass: opt(fd, "liquidityClass") as never,
@@ -174,4 +175,136 @@ export async function addValuationAction(fd: FormData): Promise<void> {
 export async function closeItemAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   await run(locale, "/mapping", (trpc) => trpc.ledger.close({ id: str(fd, "id") }));
+}
+
+export async function updateAccountAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  await run(locale, `/mapping/edit/${id}`, (trpc) =>
+    trpc.accounts.update({
+      id,
+      name: str(fd, "name"),
+      notes: opt(fd, "notes"),
+      accountType: str(fd, "accountType") as never,
+      institutionName: opt(fd, "institutionName"),
+      accountNumberMasked: opt(fd, "accountNumberMasked"),
+      trackName: opt(fd, "trackName"),
+      managementFeePct: opt(fd, "managementFeePct"),
+      depositFeePct: opt(fd, "depositFeePct"),
+      growthSharePct: opt(fd, "growthSharePct"),
+      employerName: opt(fd, "employerName"),
+      openedAt: opt(fd, "openedAt"),
+      liquidityClass: opt(fd, "liquidityClass") as never,
+    } as never),
+  );
+}
+
+export async function updateRealEstateAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  await run(locale, `/mapping/edit/${id}`, (trpc) =>
+    trpc.property.updateRealEstate({
+      id,
+      name: str(fd, "name"),
+      notes: opt(fd, "notes"),
+      address: opt(fd, "address"),
+      city: opt(fd, "city"),
+      propertyType: str(fd, "propertyType") as never,
+      isPrimaryResidence: bool(fd, "isPrimaryResidence"),
+      purchaseDate: opt(fd, "purchaseDate"),
+      purchasePrice: opt(fd, "purchasePrice"),
+    } as never),
+  );
+}
+
+export async function updateMortgageAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  const tracks: Array<{
+    trackType: string; principalRemaining: string; annualRatePct: string;
+    cpiLinked: boolean; monthlyPayment: string | undefined; endDate: string;
+  }> = [];
+  for (let i = 0; i < 4; i++) {
+    const principal = opt(fd, `track_${i}_principal`);
+    if (!principal) continue;
+    tracks.push({
+      trackType: str(fd, `track_${i}_type`),
+      principalRemaining: principal,
+      annualRatePct: opt(fd, `track_${i}_rate`) ?? "0",
+      cpiLinked: bool(fd, `track_${i}_cpi`),
+      monthlyPayment: opt(fd, `track_${i}_payment`),
+      endDate: opt(fd, `track_${i}_end`) ?? new Date().toISOString(),
+    });
+  }
+  await run(locale, `/mapping/edit/${id}`, (trpc) =>
+    trpc.property.updateMortgage({
+      id,
+      name: str(fd, "name"),
+      notes: opt(fd, "notes"),
+      linkedPropertyId: opt(fd, "linkedPropertyId") ?? null,
+      startDate: opt(fd, "startDate"),
+      ...(tracks.length > 0 ? { tracks } : {}),
+    } as never),
+  );
+}
+
+export async function updateCashFlowAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  await run(locale, `/mapping/edit/${id}`, (trpc) =>
+    trpc.flows.updateCashFlow({
+      id,
+      name: str(fd, "name"),
+      notes: opt(fd, "notes"),
+      flowType: str(fd, "flowType") as never,
+      amount: opt(fd, "amount"),
+      frequency: str(fd, "frequency") as never,
+      startDate: opt(fd, "startDate"),
+      endDate: opt(fd, "endDate"),
+      isGross: bool(fd, "isGross"),
+    } as never),
+  );
+}
+
+export async function updateInsuranceAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  await run(locale, `/mapping/edit/${id}`, (trpc) =>
+    trpc.flows.updateInsurance({
+      id,
+      name: str(fd, "name"),
+      notes: opt(fd, "notes"),
+      policyType: str(fd, "policyType") as never,
+      coverageAmount: opt(fd, "coverageAmount"),
+      monthlyPremium: opt(fd, "monthlyPremium"),
+      throughPension: bool(fd, "throughPension"),
+      insuredMemberId: opt(fd, "insuredMemberId") ?? null,
+      endDate: opt(fd, "endDate"),
+    } as never),
+  );
+}
+
+export async function updateLoanAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  await run(locale, `/mapping/edit/${id}`, (trpc) =>
+    trpc.flows.updateLoan({
+      id,
+      name: str(fd, "name"),
+      notes: opt(fd, "notes"),
+      lenderName: opt(fd, "lenderName"),
+      principalRemaining: opt(fd, "principalRemaining"),
+      annualRatePct: opt(fd, "annualRatePct"),
+      endDate: opt(fd, "endDate"),
+      purpose: opt(fd, "purpose"),
+    } as never),
+  );
+}
+
+export async function updateBaseAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  await run(locale, `/mapping/edit/${id}`, (trpc) =>
+    trpc.ledger.updateBase({ id, name: str(fd, "name"), notes: opt(fd, "notes") }),
+  );
 }

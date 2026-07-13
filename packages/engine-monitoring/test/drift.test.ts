@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SnapshotPayload } from "@wealthos/domain";
 import { detectDrift, type DriftThresholds } from "../src/index";
 
-const TH: DriftThresholds = { netWorthPct: 10, liquidityPct: 10, concentrationPct: 5, goalFundingPct: 10 };
+const TH: DriftThresholds = { netWorthPct: 10, liquidityPct: 10, concentrationPct: 5, goalFundingPct: 10, allocationPct: 10 };
 
 function snap(items: SnapshotPayload["items"], goals: SnapshotPayload["goals"] = []): SnapshotPayload {
   return {
@@ -21,7 +21,7 @@ function snap(items: SnapshotPayload["items"], goals: SnapshotPayload["goals"] =
 function acct(id: string, valueBase: number, accountType = "BANK_CHECKING"): SnapshotPayload["items"][number] {
   return {
     id, kind: "ACCOUNT", name: id, currency: "ILS", accountType, institutionName: "Bank",
-    liquidityClass: null, managementFeePct: null, valueBase, valueAsOf: "2026-01-01",
+    liquidityClass: null, managementFeePct: null, growthSharePct: null, valueBase, valueAsOf: "2026-01-01",
     verified: true, ownerMemberIds: [], mortgageTracks: null, cashFlow: null,
   };
 }
@@ -102,4 +102,23 @@ describe("detectDrift", () => {
     const r = detectDrift(cur, base, TH);
     expect(r.severity).toBe("HIGH");
   });
+
+  it("flags allocation drift when the known growth share moves beyond the threshold", () => {
+    const grow = (id: string, valueBase: number, pct: number) => ({ ...acct(id, valueBase, "BROKERAGE_IL"), growthSharePct: pct });
+    const base = snap([grow("a", 500_000, 60), acct("b", 500_000, "BANK_DEPOSIT")]); // growth 30%
+    const cur = snap([grow("a", 900_000, 60), acct("b", 100_000, "BANK_DEPOSIT")]); // growth 54%
+    const r = detectDrift(cur, base, TH);
+    const f = r.findings.find((x) => x.kind === "ALLOCATION_DRIFT");
+    expect(f).toBeDefined();
+    expect(f!.severity).toBe("HIGH"); // 24pp ≥ 2×10pp
+    expect(f!.recommendedAction).toBe("RERUN_STRATEGY");
+  });
+
+  it("emits no allocation drift when the mix is unknown in either snapshot", () => {
+    const base = snap([acct("a", 500_000, "BROKERAGE_IL")]); // unknown mix, no cash → null
+    const cur = snap([acct("a", 900_000, "BROKERAGE_IL")]);
+    const r = detectDrift(cur, base, TH);
+    expect(r.findings.some((x) => x.kind === "ALLOCATION_DRIFT")).toBe(false);
+  });
+
 });

@@ -86,13 +86,18 @@ export default async function MappingPage({
                           : t("mapping.noValuation")}
                       </span>
                     </div>
-                    <form action={closeItemAction}>
-                      <input type="hidden" name="locale" value={locale} />
-                      <input type="hidden" name="id" value={item.id} />
-                      <button type="submit" className="text-xs text-neutral-400 underline">
-                        {t("mapping.close")}
-                      </button>
-                    </form>
+                    <div className="flex items-center gap-3">
+                      <Link href={`/mapping/edit/${item.id}`} className="text-xs text-blue-600 underline">
+                        {t("forms.edit")}
+                      </Link>
+                      <form action={closeItemAction}>
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="id" value={item.id} />
+                        <button type="submit" className="text-xs text-neutral-400 underline">
+                          {t("mapping.close")}
+                        </button>
+                      </form>
+                    </div>
                   </div>
                   {item.kind !== "CASH_FLOW" && item.kind !== "INSURANCE" ? (
                     <form action={addValuationAction} className="mt-2 flex items-end gap-2">

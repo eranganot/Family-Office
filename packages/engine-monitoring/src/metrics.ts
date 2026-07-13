@@ -21,6 +21,9 @@ export const isRetirement = (i: SnapshotItem): boolean => i.kind === "ACCOUNT" &
 export const isLiquid = (i: SnapshotItem): boolean =>
   (i.kind === "ACCOUNT" && !isRetirement(i)) || i.kind === "OTHER_ASSET";
 
+const CASH_TYPES = new Set(["BANK_CHECKING", "BANK_SAVINGS", "BANK_DEPOSIT", "CASH_OTHER"]);
+const isCash = (i: SnapshotItem): boolean => i.kind === "ACCOUNT" && CASH_TYPES.has(i.accountType ?? "");
+
 const valued = (items: SnapshotItem[]): SnapshotItem[] => items.filter((i) => i.valueBase !== null);
 const sum = (items: SnapshotItem[]): number => items.reduce((s, i) => s + (i.valueBase ?? 0), 0);
 
@@ -35,6 +38,8 @@ export interface HouseholdMetrics {
   topConcentrationPct: number | null;
   /** Total assets as a share of total required goal funding (0-100+), or null when no funded goals. */
   goalCoveragePct: number | null;
+  /** Growth share (0-100) of investable accounts with KNOWN mix (growthSharePct set, cash = defensive); null when nothing is known. Mirrors the M12 allocation analyzer. */
+  growthSharePct: number | null;
   itemIds: string[];
 }
 
@@ -59,6 +64,21 @@ export function computeMetrics(snapshot: SnapshotPayload): HouseholdMetrics {
     .reduce((s, g) => s + (g.requiredFundingBase ?? 0), 0);
   const goalCoveragePct = requiredGoalFunding > 0 ? (assetsTotal / requiredGoalFunding) * 100 : null;
 
+  // Growth vs defensive over KNOWN mix only — unknown wrappers are excluded, never guessed (M12 policy).
+  let growth = 0;
+  let defensive = 0;
+  for (const i of assets.filter((a) => a.kind === "ACCOUNT")) {
+    const v = i.valueBase ?? 0;
+    if (i.growthSharePct !== null && i.growthSharePct !== undefined) {
+      growth += (v * i.growthSharePct) / 100;
+      defensive += (v * (100 - i.growthSharePct)) / 100;
+    } else if (isCash(i)) {
+      defensive += v;
+    }
+  }
+  const knownMixTotal = growth + defensive;
+  const growthSharePct = knownMixTotal > 0 ? (growth / knownMixTotal) * 100 : null;
+
   return {
     netWorth: assetsTotal - liabilitiesTotal,
     assetsTotal,
@@ -66,6 +86,7 @@ export function computeMetrics(snapshot: SnapshotPayload): HouseholdMetrics {
     liquidSharePct,
     topConcentrationPct,
     goalCoveragePct,
+    growthSharePct,
     itemIds: snapshot.items.map((i) => i.id),
   };
 }

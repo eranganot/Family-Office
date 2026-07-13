@@ -20,6 +20,8 @@ export interface RecommendationDraft {
   title: string;
   titleHe: string;
   rationale: Rationale;
+  /** Full Hebrew rationale — same structure, same enum values for timeHorizon. */
+  rationaleHe: Rationale;
   /** Subscores 0-100, weighted by the priority_weights assumption. */
   subscores: { impact: number; ease: number; taxBenefit: number; riskReduction: number; goalContribution: number; urgency: number };
   confidence: number; // 0-100, pre-gate
