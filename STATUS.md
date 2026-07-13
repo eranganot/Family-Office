@@ -44,6 +44,12 @@
   monitoring-service, i18n alert labels, 2 new drift tests (17 total in engine-monitoring).
   Verified in sandbox: domain/api/web/registry tsc, engine suites green, prisma validate.
   **Deploy pending (both migrations + seed): needs owner Railway token / git push.**
+- **v1.1 deploy fixes (2026-07-13, post-deploy):** CI red on main — engine-scenario test fixture
+  lacked the new required SnapshotItem.growthSharePct → added (test-only; engine-scenario 8 tests +
+  tsc green; full package sweep now clean incl. worker). Questionnaire save gave zero feedback
+  ("nothing happens") though overrides persisted (prod showed derived target 85%) → saveRiskAction
+  now redirects with ?savedRisk=1 and the strategy page shows a green "answers saved" banner.
+  Recommendations remain English until owner clicks הרצה (by design; old rows fall back to en).
 - Owner direction for v1.1 (recorded 2026-07-13): (1) all recommendations in Hebrew — M10;
   (2) edit everything (goals/accounts/members/RE/mortgages/flows) — M11; (3) asset-allocation
   strategy: risk questionnaire as versioned assumptions, whole-net-worth target model with

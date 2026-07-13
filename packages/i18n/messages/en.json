@@ -437,7 +437,8 @@
       "incomeStability_3": "Stable — two earners / secure roles",
       "horizonYears": "Primary investment horizon (years)",
       "currentTarget": "Current target growth share",
-      "save": "Save answers"
+      "save": "Save answers",
+      "saved": "Answers saved — the target growth share above is updated."
     }
   },
   "journal": {
