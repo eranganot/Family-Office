@@ -23,7 +23,7 @@ export default async function StrategyPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ error?: string; ran?: string; created?: string; superseded?: string; gap?: string }>;
+  searchParams: Promise<{ error?: string; ran?: string; created?: string; superseded?: string; gap?: string; savedRisk?: string }>;
 }) {
   const { locale } = await params;
   const sp = await searchParams;
@@ -86,6 +86,9 @@ export default async function StrategyPage({
       </Card>
 
       <Card title={t("risk.title")}>
+        {sp.savedRisk ? (
+          <p className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{t("risk.saved")}</p>
+        ) : null}
         <p className="mb-3 text-xs text-neutral-500">{t("risk.hint")}</p>
         <p className="mb-4 text-sm">
           {t("risk.currentTarget")}: <span className="font-semibold">{targetGrowthPct}%</span>

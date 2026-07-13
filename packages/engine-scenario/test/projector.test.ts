@@ -6,7 +6,7 @@ import { project } from "../src/projector";
 const item = (over: Partial<SnapshotItem> = {}): SnapshotItem => ({
   id: "i-" + Math.random().toString(36).slice(2, 8),
   kind: "ACCOUNT", name: "x", currency: "ILS", accountType: "BROKERAGE_IL", institutionName: null,
-  liquidityClass: null, managementFeePct: null, valueBase: 100_000, valueAsOf: "2026-06-01",
+  liquidityClass: null, managementFeePct: null, growthSharePct: null, valueBase: 100_000, valueAsOf: "2026-06-01",
   verified: true, ownerMemberIds: ["m1"], mortgageTracks: null, cashFlow: null, ...over,
 });
 const flow = (dir: "IN" | "OUT", monthly: number): SnapshotItem =>

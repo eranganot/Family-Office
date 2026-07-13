@@ -51,5 +51,5 @@ export async function saveRiskAction(fd: FormData): Promise<void> {
     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "UNKNOWN";
     redirect(`/${locale}/strategy?error=${code}`);
   }
-  redirect(`/${locale}/strategy`);
+  redirect(`/${locale}/strategy?savedRisk=1`);
 }
