@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { setAssumptionAction } from "../../../../lib/actions/registry-actions";
+import { reviewTaxRuleAction, setAssumptionAction } from "../../../../lib/actions/registry-actions";
 import { Card, ErrorBanner, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 
@@ -14,10 +14,10 @@ export default async function RegistryPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ error?: string; year?: string }>;
+  searchParams: Promise<{ error?: string; year?: string; reviewed?: string }>;
 }) {
   const { locale } = await params;
-  const { error, year } = await searchParams;
+  const { error, year, reviewed } = await searchParams;
   const t = await getTranslations("registry");
   const tf = await getTranslations("forms");
   const trpc = await serverCaller();
@@ -70,6 +70,7 @@ export default async function RegistryPage({
 
       <Card title={`${t("taxMatrices")} — ${t("year")} ${activeYear}`}>
         <p className="mb-2 text-xs text-neutral-500">{t("taxHint")}</p>
+        {reviewed ? <p className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{t("reviewedBanner")}</p> : null}
         <div className="mb-4 flex gap-2">
           {years.map((y) => (
             <a
@@ -89,9 +90,9 @@ export default async function RegistryPage({
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-sm font-medium">{r.ruleType}</span>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${meta?.ownerReviewed ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}
+                    className={`rounded-full px-2 py-0.5 text-xs ${r.ownerReviewed ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}
                   >
-                    {meta?.ownerReviewed ? t("reviewed") : t("pendingReview")} · v{r.version}
+                    {r.ownerReviewed ? t("reviewed") : t("pendingReview")} · v{r.version}
                   </span>
                 </div>
                 <pre className="max-h-56 overflow-auto rounded bg-neutral-50 p-2 text-xs" dir="ltr">
@@ -106,6 +107,14 @@ export default async function RegistryPage({
                       </a>
                     ))}
                   </p>
+                ) : null}
+                {!r.ownerReviewed ? (
+                  <form action={reviewTaxRuleAction} className="mt-2">
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="taxYear" value={activeYear} />
+                    <input type="hidden" name="ruleType" value={r.ruleType} />
+                    <button type="submit" className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{t("confirmReview")}</button>
+                  </form>
                 ) : null}
               </li>
             );

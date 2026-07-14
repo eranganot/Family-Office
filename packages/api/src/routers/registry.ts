@@ -25,4 +25,13 @@ export const registryRouter = router({
   taxRule: protectedProcedure
     .input(z.object({ taxYear: z.number().int(), ruleType: RuleTypeSchema }))
     .query(({ ctx, input }) => taxRegistry(ctx.db).forYear(input.taxYear).get(input.ruleType)),
+
+  /** D5: owner sign-off — mark a tax matrix as reviewed (audited via the mutation middleware). */
+  reviewTaxRule: protectedProcedure
+    .input(z.object({ taxYear: z.number().int(), ruleType: RuleTypeSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await requireHouseholdId(ctx.db);
+      const reviewed = await taxRegistry(ctx.db).forYear(input.taxYear).review(input.ruleType);
+      return { reviewed };
+    }),
 });

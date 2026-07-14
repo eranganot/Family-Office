@@ -466,6 +466,8 @@ model TaxRuleSet {
   version     Int
   payload     Json // the versioned configuration matrix
   source      String // citation: law/circular/official publication
+  /** D5: owner has reviewed and confirmed these figures (separate from the immutable versioned payload). */
+  ownerReviewed Boolean @default(false)
   publishedAt DateTime @default(now())
 
   @@unique([country, taxYear, ruleType, version])

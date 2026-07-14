@@ -30,7 +30,7 @@ export class TaxRegistryYear {
     return { version: row.version, payload: payload as never, source: row.source };
   }
 
-  async list(): Promise<Array<{ ruleType: string; version: number; payload: unknown; source: string }>> {
+  async list(): Promise<Array<{ ruleType: string; version: number; payload: unknown; source: string; ownerReviewed: boolean }>> {
     const rows = await this.db.taxRuleSet.findMany({
       where: { country: this.country, taxYear: this.taxYear },
       orderBy: [{ ruleType: "asc" }, { version: "desc" }],
@@ -38,7 +38,16 @@ export class TaxRegistryYear {
     const seen = new Set<string>();
     return rows
       .filter((r) => (seen.has(r.ruleType) ? false : (seen.add(r.ruleType), true)))
-      .map((r) => ({ ruleType: r.ruleType, version: r.version, payload: r.payload, source: r.source }));
+      .map((r) => ({ ruleType: r.ruleType, version: r.version, payload: r.payload, source: r.source, ownerReviewed: r.ownerReviewed }));
+  }
+
+  /** D5: mark every version of a rule set as owner-reviewed. Returns rows updated. */
+  async review(ruleType: string): Promise<number> {
+    const res = await this.db.taxRuleSet.updateMany({
+      where: { country: this.country, taxYear: this.taxYear, ruleType },
+      data: { ownerReviewed: true },
+    });
+    return res.count;
   }
 }
 

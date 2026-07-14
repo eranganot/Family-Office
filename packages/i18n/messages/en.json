@@ -404,7 +404,9 @@
     "explainerTitle": "What is this tab?",
     "explainer1": "The registry holds every ASSUMPTION the engines use (emergency-fund target, expected returns, your risk answers, drift thresholds) and the Israeli TAX RULES (brackets, hishtalmut/pension ceilings) — deliberately outside the code, so you can see and control them.",
     "explainer2": "Overriding a value creates a new VERSION. Recommendations are pinned to the exact versions they were built with — changing an assumption marks affected recommendations as invalidated, so advice never silently rests on outdated inputs.",
-    "explainer3": "Tax rules carry their sources and stay marked \"pending owner review\" until you confirm the figures match reality."
+    "explainer3": "Tax rules carry their sources and stay marked \"pending owner review\" until you confirm the figures match reality.",
+    "confirmReview": "I reviewed & approved",
+    "reviewedBanner": "Matrix marked as reviewed"
   },
   "goals": {
     "emptyTitle": "No goals yet",

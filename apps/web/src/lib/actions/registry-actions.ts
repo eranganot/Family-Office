@@ -4,6 +4,15 @@ import { redirect } from "next/navigation";
 import { serverCaller } from "../trpc-server";
 import { str } from "./form-helpers";
 
+export async function reviewTaxRuleAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const taxYear = Number(str(fd, "taxYear"));
+  const ruleType = str(fd, "ruleType");
+  const trpc = await serverCaller();
+  await trpc.registry.reviewTaxRule({ taxYear, ruleType: ruleType as never });
+  redirect(`/${locale}/registry?year=${taxYear}&reviewed=1`);
+}
+
 export async function setAssumptionAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const key = str(fd, "key");

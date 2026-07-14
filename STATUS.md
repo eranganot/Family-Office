@@ -4,6 +4,14 @@
 
 ## Current state (2026-07-14)
 
+- **D5 (tax-matrix owner sign-off) code-complete, NOT yet deployed.** New `TaxRuleSet.ownerReviewed` column
+  (migration 20260714150000_m18_tax_owner_reviewed) — a real review flag, separate from the immutable versioned
+  payload. `tax-registry.list()` returns it + a `review(ruleType)` method; new `registry.reviewTaxRule` mutation
+  (audited via the mutation middleware). The registry page badge now reads the column, and each unreviewed matrix
+  shows a "בדקתי ואישרתי" button that flips it + a confirmation banner. Verified: prisma valid, registry/api/web
+  tsc clean, i18n 606-key parity. (Pulled out of M18; the alert-email half of M18 is backlogged.) **Deploys with
+  the push (migrate adds the column).**
+
 - **M21a (BOI rate feed + mortgage refinance signal, B6) code-complete, NOT yet deployed.** New `MarketIndicator`
   table (migration 20260714140000_m21_market_indicator) stores fetched indicators; `boi-rate-service` fetches the
   BOI policy rate from the verified PublicApi `GetInterest` endpoint (same family as the FX feed) and upserts
