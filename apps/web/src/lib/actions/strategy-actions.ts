@@ -33,6 +33,13 @@ export async function decideAction(fd: FormData): Promise<void> {
   redirect(`/${locale}/strategy`);
 }
 
+export async function dismissRecommendationAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  await trpc.strategy.dismiss({ id: str(fd, "id") });
+  redirect(`/${locale}/strategy?ok=recDismissed`);
+}
+
 export async function saveRiskAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const trpc = await serverCaller();

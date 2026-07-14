@@ -114,9 +114,15 @@ export default async function MappingPage({
                         )
                       ) : null}
                       <span className="ms-2 text-xs text-neutral-400">
-                        {item.latestValuation
-                          ? `${t("mapping.latestValue")}: ${formatMoney(item.latestValuation.value.toString(), item.latestValuation.currency, locale as Locale)} (${t("mapping.asOf")} ${formatDate(item.latestValuation.asOf, locale as Locale)})`
-                          : t("mapping.noValuation")}
+                        {item.kind === "INSURANCE" && item.insuranceDetail
+                          ? item.insuranceDetail.coverageAmount != null
+                            ? `${t("mapping.coverage")}: ${formatMoney(item.insuranceDetail.coverageAmount.toString(), item.currency, locale as Locale)}`
+                            : t("mapping.noCoverage")
+                          : item.kind === "CASH_FLOW" && item.cashFlowDetail
+                            ? `${t("mapping.flowAmount")}: ${formatMoney(item.cashFlowDetail.amount.toString(), item.currency, locale as Locale)}`
+                            : item.latestValuation
+                              ? `${t("mapping.latestValue")}: ${formatMoney(item.latestValuation.value.toString(), item.latestValuation.currency, locale as Locale)} (${t("mapping.asOf")} ${formatDate(item.latestValuation.asOf, locale as Locale)})`
+                              : t("mapping.noValuation")}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">

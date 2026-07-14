@@ -6,7 +6,8 @@
     "memberAdded": "Family member added",
     "memberSaved": "Family member updated",
     "memberArchived": "Family member archived",
-    "itemSaved": "Item saved"
+    "itemSaved": "Item saved",
+    "recDismissed": "Recommendation dismissed"
   },
   "app": {
     "title": "WealthOS",
@@ -120,7 +121,10 @@
     "suggestGrowthHint": "Heuristic estimates from track names — flagged until you confirm.",
     "growthEstimate": "Growth est.",
     "confirmEstimate": "confirm",
-    "growthConfirmed": "Growth"
+    "growthConfirmed": "Growth",
+    "coverage": "Coverage",
+    "noCoverage": "no coverage entered",
+    "flowAmount": "Amount"
   },
   "kinds": {
     "ACCOUNT": "Accounts",
@@ -511,7 +515,8 @@
       "CLOSE_MORTGAGE_LIFE_GAP": "Mapping → edit the mortgage policy: set type = Mortgage life with coverage ≥ the outstanding balance, then re-run strategy. A Property-type policy is not counted as life cover.",
       "MAXIMIZE_HISHTALMUT_HEADROOM": "Mapping → Cash flow: add a Study-fund contribution flow for the member with the amount, then re-run strategy.",
       "MAXIMIZE_PENSION_HEADROOM": "Mapping → Cash flow: add a Pension contribution flow for the member with the amount, then re-run strategy."
-    }
+    },
+    "dismiss": "Dismiss"
   },
   "journal": {
     "explainerTitle": "What is this tab?",

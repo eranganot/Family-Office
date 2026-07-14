@@ -47,4 +47,13 @@ export const strategyRouter = router({
       });
       return updated;
     }),
+
+  /** Remove an ACCEPTED recommendation from the active list once it has been acted on.
+   *  Sets it SUPERSEDED (kept in history/journal). If the finding still applies, a later
+   *  strategy run will re-propose it. */
+  dismiss: workflowGuard("STRATEGY")
+    .input(z.object({ id: z.uuid() }))
+    .mutation(({ ctx, input }) =>
+      ctx.db.recommendation.update({ where: { id: input.id }, data: { status: "SUPERSEDED" } }),
+    ),
 });

@@ -4,6 +4,13 @@
 
 ## Current state (2026-07-14)
 
+- **M16 fixes round 2 (post-deploy) — NOT yet deployed.** (1) ACCEPTED recommendations had no way to be
+  cleared once acted on (a resolved gap left a frozen accepted card). Added `strategy.dismiss` (sets
+  SUPERSEDED; kept in history/journal) + a "הסר מהרשימה" button on ACCEPTED cards. (2) The mapping list
+  showed "אין הערכת שווי" for INSURANCE/CASH_FLOW items, which carry no valuation by design; it now shows
+  the coverage amount (insurance) / flow amount (cash flow) instead. New i18n: strategy.dismiss,
+  mapping.coverage/noCoverage/flowAmount, ok.recDismissed. Verified: api/web tsc clean; i18n 581-key parity.
+
 - **M16 fixes (post-deploy) — NOT yet deployed.** (1) Duplicate recommendations: rerunning strategy
   after ACCEPTING a rec kept the accepted copy AND created a fresh PROPOSED duplicate. strategy-service
   now skips generating a draft whose `type` already has an ACCEPTED recommendation, so a rerun

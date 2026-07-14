@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { deriveTargetGrowthPct } from "@wealthos/engine-strategy";
-import { decideAction, runStrategyAction, saveRiskAction } from "../../../../lib/actions/strategy-actions";
+import { decideAction, dismissRecommendationAction, runStrategyAction, saveRiskAction } from "../../../../lib/actions/strategy-actions";
 import { Card, Field, Select, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { Link } from "../../../../i18n/navigation";
@@ -216,6 +216,14 @@ export default async function StrategyPage({
                     </form>
                   ))}
                 </div>
+              ) : null}
+
+              {rec.status === "ACCEPTED" ? (
+                <form action={dismissRecommendationAction} className="mt-4">
+                  <input type="hidden" name="locale" value={locale} />
+                  <input type="hidden" name="id" value={rec.id} />
+                  <button type="submit" className="text-xs text-neutral-400 underline">{t("dismiss")}</button>
+                </form>
               ) : null}
             </Card>
           );
