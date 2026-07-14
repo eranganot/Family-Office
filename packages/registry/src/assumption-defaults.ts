@@ -10,6 +10,7 @@ export const DEFAULT_ASSUMPTIONS: Array<{
   { key: "inflation_il_pct", value: 2.5, unit: "PCT", description: "Long-run Israeli CPI assumption (BOI target band midpoint+)" },
   { key: "goal_projection_real_return_pct", value: 3.0, unit: "PCT", description: "Real return used for goal funding projections (conservative blend)" },
   { key: "emergency_fund_months", value: 6, unit: "MONTHS", description: "Target emergency fund in months of expenses" },
+  { key: "insurance_survivor_expense_months", value: 60, unit: "MONTHS", description: "Life cover for an earner should sustain household expenses for at least this many months (insurance-gap analyzer)" },
   { key: "low_confidence_threshold", value: 50, unit: "SCORE", description: "Items below this confidence are flagged in verification" },
   {
     key: "staleness_days_by_kind",

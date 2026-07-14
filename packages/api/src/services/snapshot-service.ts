@@ -74,6 +74,22 @@ export async function buildSnapshot(
             frequency: i.cashFlowDetail.frequency,
           }
         : null,
+      insurance: i.insuranceDetail
+        ? {
+            policyType: i.insuranceDetail.policyType,
+            coverageAmountBase:
+              i.insuranceDetail.coverageAmount !== null && i.insuranceDetail.coverageAmount !== undefined
+                ? toBase(Number(i.insuranceDetail.coverageAmount), i.currency)
+                : null,
+            monthlyPremiumBase:
+              i.insuranceDetail.monthlyPremium !== null && i.insuranceDetail.monthlyPremium !== undefined
+                ? toBase(Number(i.insuranceDetail.monthlyPremium), i.currency)
+                : null,
+            throughPension: i.insuranceDetail.throughPension,
+            insuredMemberId: i.insuranceDetail.insuredMemberId ?? null,
+            endDate: i.insuranceDetail.endDate ? i.insuranceDetail.endDate.toISOString().slice(0, 10) : null,
+          }
+        : undefined,
     };
   });
 

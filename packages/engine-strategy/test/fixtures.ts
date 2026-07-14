@@ -38,6 +38,7 @@ export const snapshot = (items: SnapshotItem[], over: Partial<SnapshotPayload> =
 export const CTX = {
   assumptions: {
     emergency_fund_months: 6,
+    insurance_survivor_expense_months: 60,
     concentration_single_asset_max_pct: 30,
     concentration_institution_max_pct: 50,
     currency_foreign_min_pct: 10,
@@ -62,4 +63,43 @@ export const expense = (monthly: number) =>
     accountType: null,
     valueBase: null,
     cashFlow: { flowType: "LIVING_EXPENSE", direction: "OUT", amountBase: monthly, frequency: "MONTHLY" },
+  });
+
+export const income = (monthly: number, ownerMemberIds = ["m1"], flowType = "SALARY") =>
+  item({
+    kind: "CASH_FLOW",
+    accountType: null,
+    valueBase: null,
+    ownerMemberIds,
+    cashFlow: { flowType, direction: "IN", amountBase: monthly, frequency: "MONTHLY" },
+  });
+
+export const policy = (
+  over: {
+    policyType: string;
+    coverageAmountBase?: number | null;
+    insuredMemberId?: string | null;
+    throughPension?: boolean;
+  },
+) =>
+  item({
+    kind: "INSURANCE",
+    accountType: null,
+    valueBase: null,
+    insurance: {
+      policyType: over.policyType,
+      coverageAmountBase: over.coverageAmountBase ?? null,
+      monthlyPremiumBase: null,
+      throughPension: over.throughPension ?? false,
+      insuredMemberId: over.insuredMemberId ?? null,
+      endDate: null,
+    },
+  });
+
+export const mortgageItem = (principalRemaining: number) =>
+  item({
+    kind: "MORTGAGE",
+    accountType: null,
+    valueBase: -principalRemaining,
+    mortgageTracks: [{ trackType: "PRIME", principalRemaining, annualRatePct: 5, cpiLinked: false, endDate: "2040-01-01" }],
   });

@@ -28,6 +28,7 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
   const reg = assumptionRegistry(db);
   const assumptionKeys = [
     "emergency_fund_months", "expected_real_return_equity_pct", "inflation_il_pct",
+    "emergency_fund_months", "insurance_survivor_expense_months",
     "concentration_single_asset_max_pct", "concentration_institution_max_pct",
     "currency_foreign_min_pct", "currency_foreign_max_pct", "management_fee_notice_pct",
     "mortgage_cpi_linked_max_pct", "expensive_debt_rate_pct", "large_loan_notice_base",

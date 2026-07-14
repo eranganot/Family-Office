@@ -4,6 +4,21 @@
 
 ## Current state (2026-07-14)
 
+- **M16a (insurance-gap analyzer, B2) code-complete, NOT yet deployed.** New pure analyzer
+  `analyzers/insurance.ts` on the M6 finding→generator pattern: flags survivor-income gap (life
+  cover vs household expenses × `insurance_survivor_expense_months`, default 60 months), missing
+  disability cover for an active earner, and mortgage-life cover below outstanding principal.
+  SnapshotItem gains an additive OPTIONAL `insurance` object (policyType, coverageAmountBase,
+  monthlyPremiumBase, throughPension, insuredMemberId, endDate) — NO migration; snapshot-service
+  populates it from InsuranceDetail (base-currency converted). 3 bilingual generators
+  (CLOSE_SURVIVOR_GAP / ADD_DISABILITY_COVER / CLOSE_MORTGAGE_LIFE_GAP), category-level only
+  (passes the product-reference validator). New assumption `insurance_survivor_expense_months`=60,
+  seeded idempotently in preDeploy (no migration). The insurance mapping form already captures
+  policyType/coverage/insuredMember, so the analyzer fires on existing data. Verified in sandbox:
+  domain/registry/engine-strategy/engine-scenario/engine-monitoring/api tsc clean; engine-strategy
+  31 tests (7 new) + scenario 8 green. B3 (tax-year utilization) is the next M16 step (needs a
+  contribution cash-flow type — schema migration). **Deploys with the pending push.**
+
 - **M15 (guided first-run & UX) code-complete, NOT yet deployed.** Web-only, no schema/engine change.
   A1: dashboard leads with a "מה עכשיו?" next-step card — current phase + blocking counts + one primary
   CTA — computed from `workflowState` + `verification.assessment` (+ `strategy.recommendations` in

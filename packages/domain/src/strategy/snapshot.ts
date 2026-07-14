@@ -45,6 +45,17 @@ export const SnapshotItemSchema = z.object({
   cashFlow: z
     .object({ flowType: z.string(), direction: z.string(), amountBase: z.number().nullable(), frequency: z.string() })
     .nullable(),
+  /** v1.2 additive: insurance policy detail for INSURANCE items; absent for others. Coverage/premium in base currency. */
+  insurance: z
+    .object({
+      policyType: z.string(),
+      coverageAmountBase: z.number().nullable(),
+      monthlyPremiumBase: z.number().nullable(),
+      throughPension: z.boolean(),
+      insuredMemberId: z.string().nullable(),
+      endDate: z.string().nullable(),
+    })
+    .optional(),
 });
 
 export const SnapshotGoalSchema = z.object({
