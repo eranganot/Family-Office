@@ -49,6 +49,10 @@ describe("generators", () => {
       expect(/[\u0590-\u05FF]/.test(d.rationaleHe.why)).toBe(true);
       expect(/[\u0590-\u05FF]/.test(d.rationaleHe.expectedImpact)).toBe(true);
       expect(d.rationaleHe.timeHorizon).toBe(d.rationale.timeHorizon);
+      // M23c: computed steps, both languages, Hebrew actually Hebrew
+      expect(d.actionItems.length).toBeGreaterThanOrEqual(1);
+      expect(d.actionItemsHe.length).toBeGreaterThanOrEqual(1);
+      expect(/[\u0590-\u05FF]/.test(d.actionItemsHe.join(" "))).toBe(true);
       const weights = Object.values(d.subscores);
       expect(weights.every((w) => w >= 0 && w <= 100)).toBe(true);
       expect(d.confidence).toBeGreaterThanOrEqual(60);

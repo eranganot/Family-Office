@@ -99,6 +99,7 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
           titleHe: draft.titleHe,
           rationale: draft.rationale as never,
           rationaleHe: draft.rationaleHe as never,
+          actionItems: { en: draft.actionItems, he: draft.actionItemsHe } as never,
           confidenceScore: confidence,
           dataCompletenessScore: payload.dataQuality.completenessScore,
           priorityScore: String(scorePriority(draft, weights)),

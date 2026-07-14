@@ -1,3 +1,4 @@
+import { actionItemsFor } from "./action-items";
 import type { Finding } from "./findings";
 import { RationaleSchema, type RecommendationDraft } from "./rationale";
 import { validateStrategyText } from "./validator";
@@ -9,7 +10,8 @@ import { validateStrategyText } from "./validator";
  * Every draft carries a FULL Hebrew rationale (rationaleHe) alongside the English one.
  */
 
-type Generator = (f: Finding) => RecommendationDraft | null;
+type GeneratorBody = Omit<RecommendationDraft, "actionItems" | "actionItemsHe">;
+type Generator = (f: Finding) => GeneratorBody | null;
 
 const severityConfidence = { WARNING: 80, NOTICE: 70, INFO: 60 } as const;
 
@@ -790,8 +792,14 @@ export function generateRecommendations(findings: Finding[]): GenerationResult {
   for (const finding of findings) {
     const generator = GENERATORS[finding.code];
     if (!generator) { unmapped.push(finding.code); continue; }
-    const draft = generator(finding);
-    if (!draft) continue;
+    const body = generator(finding);
+    if (!body) continue;
+    // Every recommendation ships with concrete computed steps (M23c) — missing entries throw.
+    const acts = actionItemsFor(finding.code, finding.metrics);
+    if (acts.actionItems.length === 0 || acts.actionItemsHe.length === 0) {
+      throw new Error(`ACTION_ITEMS_EMPTY:${finding.code}`);
+    }
+    const draft: RecommendationDraft = { ...body, ...acts };
     RationaleSchema.parse(draft.rationale);
     RationaleSchema.parse(draft.rationaleHe);
     const validation = validateStrategyText([
@@ -800,6 +808,7 @@ export function generateRecommendations(findings: Finding[]): GenerationResult {
       ...draft.rationale.benefits, ...draft.rationale.alternatives, ...draft.rationale.tradeoffs,
       draft.rationaleHe.why, draft.rationaleHe.expectedImpact,
       ...draft.rationaleHe.benefits, ...draft.rationaleHe.alternatives, ...draft.rationaleHe.tradeoffs,
+      ...draft.actionItems, ...draft.actionItemsHe,
     ]);
     if (!validation.valid) {
       throw new Error(`PRODUCT_REFERENCE_IN_GENERATOR:${finding.code}:${validation.pattern}`);

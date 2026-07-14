@@ -2,6 +2,29 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-15)
+
+- **M23 (wizard + action checklists + audit + trust ladder) code-complete — delivered as a GIT PATCH
+  (m23.patch at repo root) because another session had uncommitted work in overlapping files; apply on
+  the owner's machine with `git apply --check` first.** No conflicts possible: apply fails loudly.
+- M23a audit: every M15–M21a/D5 claim verified against HEAD (all artifacts present; 89 engine tests
+  green; tsc clean everywhere; 5 migrations sequenced; i18n 706-key parity). No contradictions.
+- M23b wizard: `packages/registry/src/wizard.ts` pure mapper (10 plain-language answers → 15 threshold
+  assumptions; market numbers stay system-owned; 6 unit tests incl. neutral-answers==defaults),
+  `registry.applyWizard` mutation (writes only changed values), `/registry/wizard` page (he/en),
+  changed-keys banner using registry.meta labels, CTA on the registry page.
+- M23c action checklists: `engine-strategy/src/action-items.ts` — 22 builders (one per finding code,
+  bilingual, amounts computed from finding metrics; missing code THROWS); composed centrally in
+  generateRecommendations (generator bodies untouched); validator scans action items too;
+  `Recommendation.actionItems Json?` ({en,he}; migration 20260715090000_m23_action_items — pre-M23
+  rows null); strategy card renders numbered "צעדים לביצוע". Generators tests assert bilingual
+  non-empty steps.
+- M23d: docs/DATA-TRUST.md (4-tier trust ladder, bounds checks, estimate flags, suspense-first) +
+  docs/M23-PLAN.md handoff spec — already on disk as untracked files (commit together with the patch).
+- Option B (tax-sequenced execution plans) is the agreed NEXT milestone after checklists prove out.
+- ⚠️ Coordination: mount view still shows 14 uncommitted modified files + phantom index deletions —
+  owner to confirm on-machine `git status`; patch-based delivery sidesteps the ambiguity.
+
 ## Current state (2026-07-14, session 2)
 
 - **⚠️ MOUNT CORRUPTION INCIDENT:** the Windows-mount working tree was found TRUNCATED mid-line on 14

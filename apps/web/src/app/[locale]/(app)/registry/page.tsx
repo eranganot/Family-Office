@@ -15,10 +15,10 @@ export default async function RegistryPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ error?: string; year?: string; reviewed?: string }>;
+  searchParams: Promise<{ error?: string; year?: string; reviewed?: string; wizardChanged?: string }>;
 }) {
   const { locale } = await params;
-  const { error, year, reviewed } = await searchParams;
+  const { error, year, reviewed, wizardChanged } = await searchParams;
   const t = await getTranslations("registry");
   const tf = await getTranslations("forms");
   const trpc = await serverCaller();
@@ -39,6 +39,16 @@ export default async function RegistryPage({
           </div>
         </details>
         <ErrorBanner message={error ? tf("error") : undefined} />
+        {wizardChanged !== undefined ? (
+          <p className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+            {wizardChanged === ""
+              ? t("wizard.nothingChanged")
+              : `${t("wizard.changedBanner")}: ${decodeURIComponent(wizardChanged).split(",").map((k) => (t.has(`meta.${k}.label`) ? t(`meta.${k}.label`) : k)).join(" · ")}`}
+          </p>
+        ) : null}
+        <a href={`/${locale}/registry/wizard`} className="mb-4 inline-block rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700">
+          {t("wizard.cta")}
+        </a>
         <p className="mb-4 text-xs text-neutral-500">{t("assumptionsHint")}</p>
         {GROUP_ORDER.map((group) => {
           const inGroup = assumptions.filter((a) => (ASSUMPTION_GROUP[a.key] ?? "engine") === group);

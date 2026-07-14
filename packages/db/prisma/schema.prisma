@@ -570,6 +570,7 @@ model Recommendation {
   titleHe               String?
   rationale             Json // structured: { why, benefits[], risks[], tradeoffs[], taxImplications, liquidityImplications, timeHorizon, sensitivity, alternatives[], expectedImpact }
   rationaleHe           Json? // same structure in Hebrew; null on pre-M10 rows (UI falls back to rationale)
+  actionItems           Json? // M23c: { en: string[], he: string[] } computed steps; null on pre-M23 rows
   confidenceScore       Int // 0-100
   dataCompletenessScore Int // 0-100
   priorityScore         Decimal              @db.Decimal(8, 4)

@@ -15,7 +15,12 @@ export const RationaleSchema = z.object({
 });
 export type Rationale = z.infer<typeof RationaleSchema>;
 
+/** What generators emit — action items are composed centrally in the generation loop. */
 export interface RecommendationDraft {
+  /** Concrete, computed steps (English). Injected from action-items.ts — min 1 enforced at generation. */
+  actionItems: string[];
+  /** Concrete, computed steps (Hebrew). */
+  actionItemsHe: string[];
   type: string;
   title: string;
   titleHe: string;

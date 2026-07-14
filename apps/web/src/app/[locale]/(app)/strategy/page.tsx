@@ -195,6 +195,20 @@ export default async function StrategyPage({
                 <RBlock label={t("rationale.timeHorizon")}>{t(`horizon.${r.timeHorizon}`)}</RBlock>
               </div>
 
+              {(() => {
+                const acts = rec.actionItems as { en?: string[]; he?: string[] } | null;
+                const list = acts ? (locale === "he" ? (acts.he ?? acts.en) : (acts.en ?? acts.he)) : null;
+                if (!list || list.length === 0) return null;
+                return (
+                  <div className="mt-4 rounded-lg bg-blue-50/60 p-3">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-700">{t("actionItems")}</div>
+                    <ol className="list-inside list-decimal text-sm text-neutral-800">
+                      {list.map((step, n) => <li key={n} className="mb-0.5" dir="auto">{step}</li>)}
+                    </ol>
+                  </div>
+                );
+              })()}
+
               <div className="mt-3 flex flex-wrap gap-4 text-xs text-neutral-400">
                 {rec.evidence.length > 0 ? (
                   <span>{t("evidence")}: {rec.evidence.map((e) => e.ledgerItem?.name).filter(Boolean).join(", ")}</span>

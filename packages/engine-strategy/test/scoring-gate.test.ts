@@ -7,6 +7,7 @@ const draft = {
   type: "X", title: "t", titleHe: "ת",
   rationale: {} as never,
   rationaleHe: {} as never,
+  actionItems: ["x"], actionItemsHe: ["איקס"],
   subscores: { impact: 80, ease: 60, taxBenefit: 40, riskReduction: 70, goalContribution: 50, urgency: 30 },
   confidence: 80, evidenceItemIds: [], goalTypesImproved: [], assumptionKeysUsed: [],
 };

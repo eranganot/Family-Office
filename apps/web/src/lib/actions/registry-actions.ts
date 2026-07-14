@@ -29,3 +29,28 @@ export async function setAssumptionAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/registry`);
 }
+
+export async function applyWizardAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    const num = (name: string, fallback: number) => Number(str(fd, name) || fallback);
+    const { changed } = await trpc.registry.applyWizard({
+      bufferMonths: num("bufferMonths", 6) as never,
+      spendRigidity: num("spendRigidity", 2) as never,
+      nagging: num("nagging", 2) as never,
+      concentrationSensitivity: num("concentrationSensitivity", 2) as never,
+      israelDependence: num("israelDependence", 2) as never,
+      regretType: num("regretType", 2) as never,
+      homeView: num("homeView", 2) as never,
+      driftSpeed: num("driftSpeed", 2) as never,
+      feeImportance: num("feeImportance", 2) as never,
+      largeLoanBase: num("largeLoanBase", 100000),
+    });
+    redirect(`/${locale}/registry?wizardChanged=${encodeURIComponent(changed.join(","))}`);
+  } catch (e) {
+    if (e && typeof e === "object" && "digest" in e) throw e; // NEXT_REDIRECT passthrough
+    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "UNKNOWN";
+    redirect(`/${locale}/registry/wizard?error=${code}`);
+  }
+}
