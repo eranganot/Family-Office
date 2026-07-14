@@ -2,6 +2,7 @@ import type { PrismaClient, SnapshotKind } from "@wealthos/db";
 import { ledgerRepo } from "@wealthos/db";
 import { assessHousehold, type ItemProjection } from "@wealthos/engine-verification";
 import { SnapshotPayloadSchema, type SnapshotPayload } from "@wealthos/domain";
+import { assumptionRegistry } from "@wealthos/registry";
 
 /**
  * Builds and persists a schema-versioned household snapshot. The ONE place where
@@ -51,6 +52,7 @@ export async function buildSnapshot(
       liquidityClass: i.accountDetail?.liquidityClass ?? null,
       managementFeePct: i.accountDetail?.managementFeePct ? Number(i.accountDetail.managementFeePct) : null,
       growthSharePct: i.accountDetail?.growthSharePct !== null && i.accountDetail?.growthSharePct !== undefined ? Number(i.accountDetail.growthSharePct) : null,
+      growthShareEstimated: i.accountDetail?.growthShareEstimated ?? false,
       valueBase,
       valueAsOf: i.latestValuation ? i.latestValuation.asOf.toISOString().slice(0, 10) : null,
       verified: i.verification === "VERIFIED",
@@ -81,6 +83,9 @@ export async function buildSnapshot(
   }));
   const pendingSuspense = await db.suspenseItem.count({ where: { status: "PENDING" } });
   const assessment = assessHousehold(projections, pendingSuspense, new Date());
+  const goalRealReturnPct = Number(
+    (await assumptionRegistry(db).current("goal_projection_real_return_pct", householdId)).value,
+  );
 
   const payload: SnapshotPayload = SnapshotPayloadSchema.parse({
     schemaVersion: 1,
@@ -96,7 +101,12 @@ export async function buildSnapshot(
     goals: goals.map((g) => ({
       id: g.id, type: g.type, name: g.name, priority: g.priority,
       targetDate: g.targetDate ? g.targetDate.toISOString().slice(0, 10) : null,
-      requiredFundingBase: g.requiredFunding ? Number(g.requiredFunding) : null,
+      // Income-mode goals: capital target derived from the CURRENT real-return assumption.
+      requiredFundingBase: g.targetMonthlyIncome
+        ? (Number(g.targetMonthlyIncome) * 12) / (goalRealReturnPct / 100)
+        : g.requiredFunding
+          ? Number(g.requiredFunding)
+          : null,
     })),
     fxRatesUsed: latestRates
       .filter((r) => usedRates.has(`${r.from}->${r.to}`))

@@ -88,6 +88,20 @@ export function analyzeAllocation(snapshot: SnapshotPayload, ctx: AnalyzerContex
     });
   }
 
+  const estimated = investable.filter((i) => i.growthShareEstimated && i.growthSharePct !== null);
+  if (estimated.length > 0) {
+    findings.push({
+      code: "ALLOCATION_MIX_ESTIMATED",
+      severity: "INFO",
+      metrics: {
+        estimatedCount: estimated.length,
+        estimatedSharePct: round1((sum(estimated) / investableTotal) * 100),
+        itemNames: estimated.map((i) => i.name).slice(0, 5).join(", "),
+      },
+      evidenceItemIds: estimated.map((i) => i.id),
+    });
+  }
+
   // Refuse the comparison when too much of the base is unknown — data gap, not advice.
   if (unknownSharePct > unknownMaxPct) return findings;
 

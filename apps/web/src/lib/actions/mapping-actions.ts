@@ -308,3 +308,16 @@ export async function updateBaseAction(fd: FormData): Promise<void> {
     trpc.ledger.updateBase({ id, name: str(fd, "name"), notes: opt(fd, "notes") }),
   );
 }
+
+export async function suggestGrowthSharesAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  await run(locale, "/mapping", async (trpc) => {
+    const r = await trpc.accounts.suggestGrowthShares();
+    return r;
+  });
+}
+
+export async function confirmGrowthShareAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  await run(locale, "/mapping", (trpc) => trpc.accounts.confirmGrowthShare({ id: str(fd, "id") }));
+}

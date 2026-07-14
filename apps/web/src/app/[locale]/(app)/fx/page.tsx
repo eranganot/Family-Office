@@ -1,6 +1,6 @@
 import { formatDate, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
-import { setFxRateAction } from "../../../../lib/actions/household-actions";
+import { refreshFxAction, setFxRateAction } from "../../../../lib/actions/household-actions";
 import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 
@@ -9,10 +9,10 @@ export default async function FxPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; refreshed?: string }>;
 }) {
   const { locale } = await params;
-  const { error } = await searchParams;
+  const { error, refreshed } = await searchParams;
   const t = await getTranslations("fx");
   const tf = await getTranslations("forms");
   const trpc = await serverCaller();
@@ -24,6 +24,13 @@ export default async function FxPage({
     <div className="flex flex-col gap-6">
       <Card title={t("title")}>
         <ErrorBanner message={error ? tf("error") : undefined} />
+        {refreshed ? <p className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{t("refreshedBanner")}</p> : null}
+        <form action={refreshFxAction} className="mb-4">
+          <input type="hidden" name="locale" value={locale} />
+          <button type="submit" className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700">
+            {t("refreshFromBoi")}
+          </button>
+        </form>
         <form action={setFxRateAction} className="grid max-w-3xl grid-cols-4 items-end gap-4">
           <input type="hidden" name="locale" value={locale} />
           <Field label={t("from")}>

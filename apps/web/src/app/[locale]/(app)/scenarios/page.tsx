@@ -31,6 +31,14 @@ export default async function ScenariosPage({
   if (household.workflowState !== "STRATEGY") {
     return (
       <Card title={t("title")}>
+        <details className="mb-4 rounded-lg bg-blue-50/50 p-3 text-sm text-neutral-700">
+          <summary className="cursor-pointer font-medium text-blue-700">{t("explainerTitle")}</summary>
+          <div className="mt-2 flex flex-col gap-1.5">
+            <p>{t("explainer1")}</p>
+            <p>{t("explainer2")}</p>
+            <p>{t("explainer3")}</p>
+          </div>
+        </details>
         <p className="mb-4 text-sm text-neutral-600">{t("wrongPhase")}</p>
         <Link href="/verification" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
           {t("title")} → {t("wrongPhase").split(".")[0]}

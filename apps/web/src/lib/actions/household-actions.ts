@@ -76,3 +76,14 @@ export async function updateMemberAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/household`);
 }
+
+export async function refreshFxAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    await trpc.networth.refreshFxFromBoi();
+  } catch {
+    redirect(`/${locale}/fx?error=BOI_FETCH_FAILED`);
+  }
+  redirect(`/${locale}/fx?refreshed=1`);
+}

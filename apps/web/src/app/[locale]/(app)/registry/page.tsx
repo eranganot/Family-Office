@@ -29,6 +29,14 @@ export default async function RegistryPage({
   return (
     <div className="flex flex-col gap-6">
       <Card title={t("assumptions")}>
+        <details className="mb-4 rounded-lg bg-blue-50/50 p-3 text-sm text-neutral-700">
+          <summary className="cursor-pointer font-medium text-blue-700">{t("explainerTitle")}</summary>
+          <div className="mt-2 flex flex-col gap-1.5">
+            <p>{t("explainer1")}</p>
+            <p>{t("explainer2")}</p>
+            <p>{t("explainer3")}</p>
+          </div>
+        </details>
         <ErrorBanner message={error ? tf("error") : undefined} />
         <p className="mb-4 text-xs text-neutral-500">{t("assumptionsHint")}</p>
         <ul className="flex flex-col gap-3">

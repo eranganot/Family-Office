@@ -13,15 +13,26 @@ export const GoalTypeSchema = z.enum([
   "FINANCIAL_INDEPENDENCE", "LIFESTYLE", "LEGACY", "INHERITANCE", "PHILANTHROPY", "OTHER",
 ]);
 
+const INCOME_MODE_TYPES = new Set(["FINANCIAL_INDEPENDENCE", "RETIREMENT"]);
+
 const GoalInputSchema = z.object({
   type: GoalTypeSchema,
   name: z.string().min(1).max(200),
   priority: z.number().int().min(1).max(99),
   targetDate: z.coerce.date().optional(),
   requiredFunding: DecimalString.optional(),
+  /** Income mode: desired monthly income (FI/RETIREMENT only); capital target derived at read time. */
+  targetMonthlyIncome: DecimalString.optional(),
   riskTolerance: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
   dependsOnGoalIds: z.array(z.uuid()).default([]),
 });
+
+/** requiredFunding derived from monthly income at the CURRENT real-return assumption (perpetuity). */
+export function derivedRequiredFunding(targetMonthlyIncome: string, realReturnPct: number): string {
+  const rate = realReturnPct / 100;
+  if (rate <= 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "REAL_RETURN_NOT_POSITIVE" });
+  return String((Number(targetMonthlyIncome) * 12) / rate);
+}
 
 async function assertAcyclic(
   db: Parameters<typeof requireHouseholdId>[0],
@@ -50,6 +61,9 @@ export const goalsRouter = router({
 
   create: protectedProcedure.input(GoalInputSchema).mutation(async ({ ctx, input }) => {
     const householdId = await requireHouseholdId(ctx.db);
+    if (input.targetMonthlyIncome && !INCOME_MODE_TYPES.has(input.type)) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "INCOME_MODE_ONLY_FOR_FI_RETIREMENT" });
+    }
     const household = await ctx.db.household.findFirstOrThrow({ select: { baseCurrency: true } });
     return ctx.db.$transaction(async (tx) => {
       const goal = await tx.goal.create({
@@ -60,6 +74,7 @@ export const goalsRouter = router({
           priority: input.priority,
           targetDate: input.targetDate ?? null,
           requiredFunding: input.requiredFunding ?? null,
+          targetMonthlyIncome: input.targetMonthlyIncome ?? null,
           currency: household.baseCurrency,
           riskTolerance: input.riskTolerance,
         },
@@ -78,6 +93,13 @@ export const goalsRouter = router({
     .input(GoalInputSchema.partial().extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input: { id, dependsOnGoalIds, ...patch } }) => {
       const householdId = await requireHouseholdId(ctx.db);
+      if (patch.targetMonthlyIncome) {
+        const existing = await ctx.db.goal.findUniqueOrThrow({ where: { id }, select: { type: true } });
+        const effectiveType = patch.type ?? existing.type;
+        if (!INCOME_MODE_TYPES.has(effectiveType)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "INCOME_MODE_ONLY_FOR_FI_RETIREMENT" });
+        }
+      }
       return ctx.db.$transaction(async (tx) => {
         const data: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(patch)) if (v !== undefined) data[k] = v;
@@ -128,16 +150,22 @@ export const goalsRouter = router({
       verified: i.verification === "VERIFIED",
     }));
 
+    const realReturn = await assumptionRegistry(ctx.db).current("goal_projection_real_return_pct", householdId);
+
+    // Income-mode goals derive their capital target from the CURRENT assumption (perpetuity at real return).
     const goalInputs: GoalInput[] = goals.map((g) => ({
       id: g.id,
       name: g.name,
       type: g.type,
       priority: g.priority,
       targetDate: g.targetDate,
-      requiredFundingILS: g.requiredFunding ? g.requiredFunding.toString() : null,
+      requiredFundingILS: g.targetMonthlyIncome
+        ? derivedRequiredFunding(g.targetMonthlyIncome.toString(), realReturn.value as number)
+        : g.requiredFunding
+          ? g.requiredFunding.toString()
+          : null,
     }));
 
-    const realReturn = await assumptionRegistry(ctx.db).current("goal_projection_real_return_pct", householdId);
     return computeFundingGaps(goalInputs, assets, realReturn.value as number, new Date());
   }),
 

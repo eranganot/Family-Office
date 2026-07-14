@@ -10,6 +10,7 @@ export const item = (over: Partial<SnapshotItem> = {}): SnapshotItem => ({
   liquidityClass: null,
   managementFeePct: null,
   growthSharePct: null,
+  growthShareEstimated: false,
   valueBase: 100_000,
   valueAsOf: "2026-06-01",
   verified: true,

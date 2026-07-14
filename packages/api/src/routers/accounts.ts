@@ -1,4 +1,5 @@
 import { ledgerRepo } from "@wealthos/db";
+import { suggestGrowthShare } from "../services/growth-heuristic";
 import { z } from "zod";
 import { LedgerBaseSchema, ValuationInputSchema } from "../schemas/ledger";
 import { protectedProcedure, router } from "../trpc";
@@ -129,10 +130,50 @@ export const accountsRouter = router({
           });
           detailData["institutionId"] = institution.id;
         }
+        if (input.growthSharePct !== undefined) {
+          // Owner-entered value is authoritative — clear any heuristic-estimate flag.
+          detailData["growthShareEstimated"] = false;
+        }
         if (Object.keys(detailData).length > 0) {
           await tx.accountDetail.update({ where: { ledgerItemId: id }, data: detailData as never });
         }
       });
       return { id };
+    }),
+
+  /** Heuristic suggestions for every ACCOUNT with unknown growth mix; stored as flagged estimates. */
+  suggestGrowthShares: protectedProcedure.mutation(async ({ ctx }) => {
+    await requireHouseholdId(ctx.db);
+    const details = await ctx.db.accountDetail.findMany({
+      where: { growthSharePct: null },
+      include: { ledgerItem: { select: { id: true, name: true, status: true } } },
+    });
+    let suggested = 0;
+    const noBasis: string[] = [];
+    for (const d of details) {
+      if (d.ledgerItem.status !== "ACTIVE") continue;
+      const pct = suggestGrowthShare(d.accountType, d.trackName);
+      if (pct === null) {
+        noBasis.push(d.ledgerItem.name);
+        continue;
+      }
+      await ctx.db.accountDetail.update({
+        where: { ledgerItemId: d.ledgerItemId },
+        data: { growthSharePct: String(pct), growthShareEstimated: true },
+      });
+      suggested += 1;
+    }
+    return { suggested, noBasis };
+  }),
+
+  /** One-click owner confirmation of a heuristic estimate. */
+  confirmGrowthShare: protectedProcedure
+    .input(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.accountDetail.update({
+        where: { ledgerItemId: input.id },
+        data: { growthShareEstimated: false },
+      });
+      return { id: input.id };
     }),
 });
