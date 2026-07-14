@@ -4,6 +4,17 @@
 
 ## Current state (2026-07-14)
 
+- **M17b (tax-aware drawdown, C4) code-complete, NOT yet deployed. M17 COMPLETE.** The projector splits
+  investable into taxable / hishtalmut / pension sub-pools; on a net drawdown it pulls tax-efficiently
+  (taxable → hishtalmut → pension), grossing each withdrawal up by that pool's effective tax rate so depletion
+  years and net outcomes are more accurate. Tax is OPT-IN via `ProjectionParams.taxDrawdown` (undefined =
+  untaxed v1 aggregate — so all existing projector + Monte Carlo tests stay byte-identical). Rates come from
+  the registry: CGT (CAPITAL_GAINS 25%) × `taxable_gain_fraction` (new assumption, 0.5) for taxable; 0 for
+  hishtalmut (exempt after vesting); `pension_withdrawal_effective_tax_pct` (new, 15) for pension.
+  `scenarios.run` + `runMonteCarlo` pass taxDrawdown; the scenarios page notes it. No migration (assumptions
+  seeded in preDeploy). Verified: engine-scenario 14 tests (2 new C4), registry/api/web tsc clean, i18n
+  600-key parity. **Deploys with the push.**
+
 - **M17a (Monte Carlo projector, C2) code-complete, NOT yet deployed.** The M8 projector was refactored to
   expose `projectPath(snapshot, params, annualRealReturns[])`; `project` is now a thin wrapper (constant
   returns) so deterministic behavior + all 8 projector tests are UNCHANGED. New `monte-carlo.ts`:

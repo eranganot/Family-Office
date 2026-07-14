@@ -8,7 +8,7 @@ import {
   type ProjectionParams,
 } from "@wealthos/engine-scenario";
 import { SnapshotPayloadSchema } from "@wealthos/domain";
-import { assumptionRegistry } from "@wealthos/registry";
+import { assumptionRegistry, taxRegistry } from "@wealthos/registry";
 import { z } from "zod";
 import { buildSnapshot } from "../services/snapshot-service";
 import { router, workflowGuard } from "../trpc";
@@ -24,16 +24,29 @@ const OverridesSchema = z.object({
   incomeStopsAtYear: z.number().int().min(1).max(60).nullable().optional(),
 });
 
+/** Effective per-pool withdrawal tax rates from the registry: CGT on the taxable gain fraction,
+ *  hishtalmut exempt after vesting, pension income-taxed at a conservative effective rate. */
+async function computeTaxDrawdown(db: Parameters<typeof assumptionRegistry>[0], householdId: string) {
+  const reg = assumptionRegistry(db);
+  const cgt = await taxRegistry(db).forYear(new Date().getFullYear()).get("CAPITAL_GAINS");
+  const gainFraction = Number((await reg.current("taxable_gain_fraction", householdId)).value);
+  const pensionPct = Number((await reg.current("pension_withdrawal_effective_tax_pct", householdId)).value);
+  const cgtPct = Number((cgt.payload as { realGainIndividualPct: number }).realGainIndividualPct);
+  return { taxablePct: cgtPct * gainFraction, hishtalmutPct: 0, pensionPct };
+}
+
 /** Scenario procedures live behind the STRATEGY gate like all Phase-3 modules. */
 export const scenariosRouter = router({
   run: workflowGuard("STRATEGY")
     .input(z.object({ type: ScenarioTypeSchema, name: z.string().max(200).optional(), overrides: OverridesSchema.default({ years: 20 }) }))
     .mutation(async ({ ctx, input }) => {
       const { snapshotId, payload } = await buildSnapshot(ctx.db, ctx.householdId, "MANUAL");
-      const realReturn = await assumptionRegistry(ctx.db).current("goal_projection_real_return_pct", ctx.householdId);
+      const reg = assumptionRegistry(ctx.db);
+      const realReturn = await reg.current("goal_projection_real_return_pct", ctx.householdId);
+      const taxDrawdown = await computeTaxDrawdown(ctx.db, ctx.householdId);
 
       const years = input.overrides.years;
-      const baselineParams = buildScenarioParams(years, realReturn.value as number, {});
+      const baselineParams = buildScenarioParams(years, realReturn.value as number, { taxDrawdown });
       const canned = CANNED_SCENARIOS[input.type as CannedScenarioType];
       const scenarioOverrides: Partial<ProjectionParams> = {
         ...canned,
@@ -42,7 +55,7 @@ export const scenariosRouter = router({
           ? { incomeStopsAtYear: input.overrides.incomeStopsAtYear }
           : {}),
       };
-      const scenarioParams = buildScenarioParams(years, realReturn.value as number, scenarioOverrides);
+      const scenarioParams = buildScenarioParams(years, realReturn.value as number, { ...scenarioOverrides, taxDrawdown });
 
       const baseline = project(payload, baselineParams);
       const scenario = project(payload, scenarioParams);
@@ -67,7 +80,8 @@ export const scenariosRouter = router({
       const reg = assumptionRegistry(ctx.db);
       const realReturn = await reg.current("goal_projection_real_return_pct", ctx.householdId);
       const vol = await reg.current("mc_return_volatility_pct", ctx.householdId);
-      const params = buildScenarioParams(input.years, realReturn.value as number, {});
+      const taxDrawdown = await computeTaxDrawdown(ctx.db, ctx.householdId);
+      const params = buildScenarioParams(input.years, realReturn.value as number, { taxDrawdown });
       const monteCarlo = projectMonteCarlo(payload, params, { runs: 1000, volatilityPct: vol.value as number, seed: 42 });
       const row = await ctx.db.scenario.create({
         data: {

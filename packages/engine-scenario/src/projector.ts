@@ -29,6 +29,9 @@ export interface ProjectionParams {
   mortgageRateDeltaPct: number;
   /** Stop all income permanently from this year (retirement modelling). Null = never. */
   incomeStopsAtYear: number | null;
+  /** C4: effective withdrawal tax rate (%) per sub-pool. When set, drawdowns are taxed and ordered
+   *  taxable → hishtalmut → pension. Undefined = untaxed single-pool behaviour (v1). */
+  taxDrawdown?: { taxablePct: number; hishtalmutPct: number; pensionPct: number } | undefined;
 }
 
 export const BASELINE_PARAMS: Omit<ProjectionParams, "years" | "realReturnPct"> = {
@@ -71,14 +74,24 @@ export interface ProjectionResult {
 
 const round = (n: number) => Math.round(n);
 
+const HISHTALMUT_TYPES = new Set(["KEREN_HISHTALMUT"]);
+const PENSION_TYPES = new Set(["PENSION_COMPREHENSIVE", "PENSION_GENERAL", "KUPAT_GEMEL", "IRA_GEMEL", "FOREIGN_RETIREMENT"]);
+type DrawPool = "taxable" | "hishtalmut" | "pension";
+function drawPoolFor(accountType: string | null, kind: string): DrawPool {
+  if (kind === "ACCOUNT" && accountType) {
+    if (HISHTALMUT_TYPES.has(accountType)) return "hishtalmut";
+    if (PENSION_TYPES.has(accountType)) return "pension";
+  }
+  return "taxable";
+}
+
 export function projectPath(
   snapshot: SnapshotPayload,
   params: ProjectionParams,
   annualRealReturns: number[],
 ): ProjectionResult {
 
-  const RETIREMENT = new Set(["PENSION_COMPREHENSIVE", "PENSION_GENERAL", "KUPAT_GEMEL", "IRA_GEMEL", "FOREIGN_RETIREMENT"]);
-  let investable = 0;
+  const pools = { taxable: 0, hishtalmut: 0, pension: 0 };
   let realEstate = 0;
   const tracks: Array<{ principal: number; ratePct: number; cpiLinked: boolean; yearsLeft: number }> = [];
   let otherDebt = 0;
@@ -86,7 +99,7 @@ export function projectPath(
   const startYear = new Date(snapshot.takenAt).getFullYear();
   for (const item of snapshot.items) {
     const v = item.valueBase ?? 0;
-    if (item.kind === "ACCOUNT" || item.kind === "OTHER_ASSET") investable += v;
+    if (item.kind === "ACCOUNT" || item.kind === "OTHER_ASSET") pools[drawPoolFor(item.accountType, item.kind)] += v;
     else if (item.kind === "REAL_ESTATE") realEstate += v;
     else if (item.kind === "MORTGAGE" && item.mortgageTracks) {
       for (const t of item.mortgageTracks) {
@@ -94,7 +107,6 @@ export function projectPath(
         tracks.push({ principal: t.principalRemaining, ratePct: t.annualRatePct + params.mortgageRateDeltaPct, cpiLinked: t.cpiLinked, yearsLeft });
       }
     } else if (item.kind === "LOAN" || item.kind === "OTHER_LIABILITY") otherDebt += v;
-    void RETIREMENT;
   }
 
   const monthlyIncome = snapshot.items
@@ -105,14 +117,15 @@ export function projectPath(
     .reduce((s, i) => s + normalizeMonthly(i.cashFlow!.amountBase!, i.cashFlow!.frequency), 0);
 
   const rows: YearRow[] = [];
-  let minInvestable = investable;
+  let minInvestable = pools.taxable + pools.hishtalmut + pools.pension;
   let yearsToDepletion: number | null = null;
 
   for (let year = 1; year <= params.years; year++) {
     const r = annualRealReturns[year - 1] ?? params.realReturnPct / 100;
     // Shocks at the start of the year
     if (params.marketShock && params.marketShock.year === year) {
-      investable *= 1 - params.marketShock.drawdownPct / 100;
+      const f = 1 - params.marketShock.drawdownPct / 100;
+      pools.taxable *= f; pools.hishtalmut *= f; pools.pension *= f;
     }
 
     const incomeMonths = 12;
@@ -132,8 +145,34 @@ export function projectPath(
     const expenses = monthlyExpenses * 12;
     const savings = income - expenses + params.extraMonthlySavings * 12;
 
-    // Wealth grows, then absorbs the year's savings (mid-year approximation: half-growth on flows)
-    investable = investable * (1 + r) + savings * (1 + r / 2);
+    // Sub-pools grow; positive savings land in the taxable pool; net drawdowns are pulled
+    // tax-efficiently (taxable → hishtalmut → pension), grossing up for each pool's withdrawal tax.
+    pools.taxable *= 1 + r;
+    pools.hishtalmut *= 1 + r;
+    pools.pension *= 1 + r;
+    const netFlow = savings * (1 + r / 2);
+    if (netFlow >= 0) {
+      pools.taxable += netFlow;
+    } else {
+      let need = -netFlow;
+      for (const pk of ["taxable", "hishtalmut", "pension"] as DrawPool[]) {
+        if (need <= 0) break;
+        const taxPct = params.taxDrawdown
+          ? pk === "taxable"
+            ? params.taxDrawdown.taxablePct
+            : pk === "hishtalmut"
+              ? params.taxDrawdown.hishtalmutPct
+              : params.taxDrawdown.pensionPct
+          : 0;
+        const tax = taxPct / 100;
+        const grossNeeded = tax < 1 ? need / (1 - tax) : need;
+        const take = Math.min(grossNeeded, Math.max(pools[pk], 0));
+        pools[pk] -= take;
+        need -= take * (1 - tax);
+      }
+      if (need > 0) pools.pension -= need; // unfunded shortfall drives the aggregate negative (depletion)
+    }
+    const investable = pools.taxable + pools.hishtalmut + pools.pension;
     if (investable < minInvestable) minInvestable = investable;
     if (investable < 0 && yearsToDepletion === null) yearsToDepletion = year;
 

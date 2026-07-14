@@ -92,6 +92,7 @@ export default async function ScenariosPage({
           </Field>
           <SubmitButton label={t("runMonteCarlo")} />
         </form>
+        <p className="mt-3 text-xs text-neutral-400">{t("taxNote")}</p>
       </Card>
 
       {selected && mc ? (

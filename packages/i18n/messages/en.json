@@ -589,7 +589,8 @@
     "p50": "Median (P50)",
     "p90": "P90 (optimistic)",
     "depletionProbability": "Probability of depletion",
-    "goalSuccess": "Goal-success probability"
+    "goalSuccess": "Goal-success probability",
+    "taxNote": "Projections apply tax-aware withdrawals: drawdowns are pulled taxable → study-fund → pension, taxed per the registry."
   },
   "monitoring": {
     "explainerTitle": "What is this tab?",

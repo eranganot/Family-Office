@@ -100,3 +100,22 @@ describe("canned scenarios vs baseline", () => {
     expect(project(base, params(CANNED_SCENARIOS.SAVINGS_RATE_UP))).toEqual(up); // deterministic
   });
 });
+
+describe("tax-aware drawdown (C4)", () => {
+  it("taxed drawdown depletes no later, and ends no higher, than untaxed", () => {
+    const retiree = snap([item({ valueBase: 1_000_000, accountType: "BROKERAGE_IL" }), flow("OUT", 12_000)]);
+    const noTax = project(retiree, buildScenarioParams(30, 2, {}));
+    const taxed = project(retiree, buildScenarioParams(30, 2, { taxDrawdown: { taxablePct: 20, hishtalmutPct: 0, pensionPct: 20 } }));
+    expect(taxed.terminalNetWorth).toBeLessThanOrEqual(noTax.terminalNetWorth);
+    if (noTax.yearsToDepletion !== null && taxed.yearsToDepletion !== null) {
+      expect(taxed.yearsToDepletion).toBeLessThanOrEqual(noTax.yearsToDepletion);
+    }
+  });
+
+  it("pension withdrawals are taxed (pension-heavy household ends lower than untaxed)", () => {
+    const pensionHeavy = snap([item({ valueBase: 500_000, accountType: "PENSION_COMPREHENSIVE" }), flow("OUT", 10_000)]);
+    const taxed = project(pensionHeavy, buildScenarioParams(20, 2, { taxDrawdown: { taxablePct: 0, hishtalmutPct: 0, pensionPct: 30 } }));
+    const untaxed = project(pensionHeavy, buildScenarioParams(20, 2, {}));
+    expect(taxed.terminalNetWorth).toBeLessThan(untaxed.terminalNetWorth);
+  });
+});
