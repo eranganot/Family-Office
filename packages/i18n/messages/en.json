@@ -406,7 +406,216 @@
     "explainer2": "Overriding a value creates a new VERSION. Recommendations are pinned to the exact versions they were built with — changing an assumption marks affected recommendations as invalidated, so advice never silently rests on outdated inputs.",
     "explainer3": "Tax rules carry their sources and stay marked \"pending owner review\" until you confirm the figures match reality.",
     "confirmReview": "I reviewed & approved",
-    "reviewedBanner": "Matrix marked as reviewed"
+    "reviewedBanner": "Matrix marked as reviewed",
+    "meta": {
+      "expected_real_return_equity_pct": {
+        "label": "Expected real return — growth",
+        "desc": "Long-run annual return of the growth component (global equities) after inflation.",
+        "guide": "Historically 4-6%. Lower = more cautious planning."
+      },
+      "expected_real_return_bonds_pct": {
+        "label": "Expected real return — defensive",
+        "desc": "Investment-grade bond return after inflation, long-run.",
+        "guide": "0.5-2.5% is reasonable."
+      },
+      "inflation_il_pct": {
+        "label": "Israeli inflation",
+        "desc": "Long-run price-growth assumption; BOI target is 1-3%.",
+        "guide": "2-3% reasonable; mainly affects CPI-linked mortgage and scenarios."
+      },
+      "goal_projection_real_return_pct": {
+        "label": "Return for goal projections",
+        "desc": "Real return used for funding gaps and income-derived targets.",
+        "guide": "Keep conservative (2.5-3.5%)."
+      },
+      "mc_return_volatility_pct": {
+        "label": "Annual volatility (Monte Carlo)",
+        "desc": "Standard deviation of growth returns in probabilistic simulations.",
+        "guide": "12-18% matches global markets."
+      },
+      "taxable_gain_fraction": {
+        "label": "Taxable gain fraction",
+        "desc": "Share of a taxable balance assumed to be gain when simulating withdrawals.",
+        "guide": "Mature portfolio ~0.4-0.6; young ~0.1-0.3."
+      },
+      "pension_withdrawal_effective_tax_pct": {
+        "label": "Effective pension withdrawal tax",
+        "desc": "Estimated tax on pension-tier withdrawals in scenarios.",
+        "guide": "10-20% reasonable for most."
+      },
+      "emergency_fund_months": {
+        "label": "Emergency fund (months)",
+        "desc": "Months of expenses required liquid before investing surpluses.",
+        "guide": "Stable salaried 4-6; self-employed 9-12."
+      },
+      "insurance_survivor_expense_months": {
+        "label": "Survivor cover (months)",
+        "desc": "Months of expenses life/survivor cover must provide before the insurance engine flags a gap.",
+        "guide": "36-120 depending on dependents."
+      },
+      "low_confidence_threshold": {
+        "label": "Low-confidence threshold",
+        "desc": "Items below this confidence score get flagged in verification.",
+        "guide": "50 is reasonable."
+      },
+      "staleness_days_by_kind": {
+        "label": "Valuation staleness by kind",
+        "desc": "Days after which an unrefreshed valuation counts as stale, per item kind.",
+        "guide": "Accounts ~400, real estate ~800."
+      },
+      "strategy_min_completeness": {
+        "label": "Minimum data completeness",
+        "desc": "The strategy engine refuses to run below this.",
+        "guide": "80 balanced."
+      },
+      "strategy_min_confidence": {
+        "label": "Minimum data confidence",
+        "desc": "Overall confidence floor for strategy runs.",
+        "guide": "60 balanced."
+      },
+      "concentration_single_asset_max_pct": {
+        "label": "Max single-position share",
+        "desc": "Above this share of assets one position is flagged.",
+        "guide": "20-30% typical."
+      },
+      "concentration_institution_max_pct": {
+        "label": "Max single-institution share",
+        "desc": "Above this share at one institution an operational notice appears.",
+        "guide": "50 reasonable."
+      },
+      "currency_foreign_min_pct": {
+        "label": "Minimum foreign exposure",
+        "desc": "Below this, a global-diversification recommendation appears.",
+        "guide": "10-30% by comfort."
+      },
+      "currency_foreign_max_pct": {
+        "label": "Maximum foreign exposure",
+        "desc": "Above this, a rebalance recommendation appears (expenses are in ILS).",
+        "guide": "40-60%."
+      },
+      "management_fee_notice_pct": {
+        "label": "Fee notice threshold (global)",
+        "desc": "Balance fee above which fee-drag is flagged, when no per-type threshold exists.",
+        "guide": "0.8 global; per-type map wins."
+      },
+      "management_fee_notice_by_type": {
+        "label": "Fee thresholds by product type",
+        "desc": "Separate notice level per wrapper type.",
+        "guide": "Calibrated to the 2026 Israeli market; update to your own best offers."
+      },
+      "mortgage_cpi_linked_max_pct": {
+        "label": "Max CPI-linked mortgage share",
+        "desc": "Above this share of principal, a review recommendation appears.",
+        "guide": "33-60%."
+      },
+      "expensive_debt_rate_pct": {
+        "label": "Expensive debt rate",
+        "desc": "Rate above which early repayment is suggested.",
+        "guide": "7-9% reasonable."
+      },
+      "mortgage_prime_spread_pct": {
+        "label": "Prime spread",
+        "desc": "Prime = BOI rate + this spread (1.5 in Israel).",
+        "guide": "Do not change — market definition."
+      },
+      "mortgage_refinance_notice_spread_pct": {
+        "label": "Refinance notice spread",
+        "desc": "Points above the live prime benchmark before a refinance recommendation.",
+        "guide": "0.3-0.7."
+      },
+      "large_loan_notice_base": {
+        "label": "Large loan review base",
+        "desc": "Non-mortgage loans above this are flagged for review.",
+        "guide": "Tune to household scale."
+      },
+      "risk_loss_tolerance": {
+        "label": "Questionnaire: loss tolerance",
+        "desc": "Questionnaire answer (1-3). Prefer updating via the strategy-tab questionnaire.",
+        "guide": "Update via the questionnaire."
+      },
+      "risk_income_stability": {
+        "label": "Questionnaire: income stability",
+        "desc": "Questionnaire answer (1-3).",
+        "guide": "Update via the questionnaire."
+      },
+      "risk_horizon_years": {
+        "label": "Questionnaire: horizon",
+        "desc": "Primary investment horizon in years.",
+        "guide": "Update via the questionnaire."
+      },
+      "allocation_rebalance_band_pct": {
+        "label": "Rebalance band (points)",
+        "desc": "Allowed growth-share deviation from target before a recommendation.",
+        "guide": "5-15; narrower = more rebalancing (and tax events)."
+      },
+      "allocation_real_estate_max_pct": {
+        "label": "Max real-estate share",
+        "desc": "Above this share of gross assets a structural notice appears (never a sell instruction).",
+        "guide": "50-70% by philosophy."
+      },
+      "allocation_mix_unknown_max_pct": {
+        "label": "Unknown-mix ceiling",
+        "desc": "If more of the investable value than this has unknown mix, the comparison is refused.",
+        "guide": "Fix the data rather than raising this."
+      },
+      "drift_allocation_pct": {
+        "label": "Allocation drift (monitoring)",
+        "desc": "Growth-share movement since the strategy baseline that opens an alert.",
+        "guide": "5-15."
+      },
+      "drift_net_worth_pct": {
+        "label": "Net-worth drift (monitoring)",
+        "desc": "Relative net-worth change that opens an alert.",
+        "guide": "10 reasonable."
+      },
+      "drift_liquidity_pct": {
+        "label": "Liquidity drift (monitoring)",
+        "desc": "Liquid-share change in points that opens an alert.",
+        "guide": "10 reasonable."
+      },
+      "drift_concentration_pct": {
+        "label": "Concentration drift (monitoring)",
+        "desc": "Top-position concentration increase that opens an alert.",
+        "guide": "5 reasonable."
+      },
+      "drift_goal_funding_pct": {
+        "label": "Goal-coverage drift (monitoring)",
+        "desc": "Goal-coverage change in points that opens an alert.",
+        "guide": "10 reasonable."
+      },
+      "priority_weights": {
+        "label": "Recommendation priority weights",
+        "desc": "How the priority score is computed (impact/ease/tax/risk/goals/urgency, sum 100).",
+        "guide": "Raise the weight of what matters most to you."
+      },
+      "risk_drawdown_reaction": {
+        "label": "Questionnaire: drawdown reaction",
+        "desc": "Stated reaction to a 30% drop (1=sell, 2=hold, 3=buy).",
+        "guide": "Update via the questionnaire."
+      },
+      "risk_investment_experience": {
+        "label": "Questionnaire: experience",
+        "desc": "Market investment experience (1-3).",
+        "guide": "Update via the questionnaire."
+      },
+      "risk_spending_flexibility": {
+        "label": "Questionnaire: spending flexibility",
+        "desc": "Ability to cut expenses in a bad stretch (1-3).",
+        "guide": "Update via the questionnaire."
+      }
+    },
+    "groups": {
+      "economy": "Market & economy assumptions",
+      "risk": "Risk profile (from the questionnaire)",
+      "allocation": "Asset allocation",
+      "thresholds": "Alert & recommendation thresholds",
+      "quality": "Data quality",
+      "drift": "Monitoring & drift",
+      "engine": "Internal — recommendation engine"
+    },
+    "sourceUser": "set by you",
+    "sourceDefault": "conservative default",
+    "guideLabel": "How to tune"
   },
   "goals": {
     "emptyTitle": "No goals yet",
@@ -461,7 +670,9 @@
     "incomeModeHint": "FI/Retirement goals: capital target derived automatically",
     "incomeModeBadge": "Income target",
     "perMonth": "mo",
-    "earmarked": "Earmarked"
+    "earmarked": "Earmarked",
+    "guidanceGap": "To stay on track: save about {saving} per month toward this goal.",
+    "guidanceOnTrack": "On track — current assets and projection cover this goal."
   },
   "strategy": {
     "explainerTitle": "What is this tab?",
@@ -521,7 +732,19 @@
       "horizonYears": "Primary investment horizon (years)",
       "currentTarget": "Current target growth share",
       "save": "Save answers",
-      "saved": "Answers saved — the target growth share above is updated."
+      "saved": "Answers saved — the target growth share above is updated.",
+      "drawdownReaction": "If the portfolio dropped 30% tomorrow",
+      "drawdownReaction_1": "I would sell to stop the bleeding",
+      "drawdownReaction_2": "I would hold and wait",
+      "drawdownReaction_3": "I would invest more at the lows",
+      "investmentExperience": "Experience with market investments",
+      "investmentExperience_1": "None — first time",
+      "investmentExperience_2": "Some — a few years",
+      "investmentExperience_3": "Experienced — through downturns",
+      "spendingFlexibility": "Could you cut expenses in a bad stretch?",
+      "spendingFlexibility_1": "Hardly — expenses are rigid",
+      "spendingFlexibility_2": "Somewhat",
+      "spendingFlexibility_3": "Easily — much is discretionary"
     },
     "resolveTitle": "How to complete",
     "resolve": {
@@ -596,7 +819,10 @@
     "p90": "P90 (optimistic)",
     "depletionProbability": "Probability of depletion",
     "goalSuccess": "Goal-success probability",
-    "taxNote": "Projections apply tax-aware withdrawals: drawdowns are pulled taxable → study-fund → pension, taxed per the registry."
+    "taxNote": "Projections apply tax-aware withdrawals: drawdowns are pulled taxable → study-fund → pension, taxed per the registry.",
+    "mcScenario": "Simulated path",
+    "baselinePath": "Baseline — as things are today",
+    "mcMeasured": "Simulated path"
   },
   "monitoring": {
     "explainerTitle": "What is this tab?",
@@ -652,5 +878,11 @@
       "STALENESS": "Stale valuations",
       "RECOMMENDATION_REVIEW": "Accepted recommendation awaiting outcome"
     }
+  },
+  "journey": {
+    "MAPPING": "Now: map every account, property, mortgage, flow and policy. When the picture is complete — move to verification.",
+    "VERIFICATION": "Now: confirm each item's value and resolve suspense. When everything is verified — the gate to strategy opens.",
+    "STRATEGY": "Now: answer the risk questionnaire, set goals, run the engine, accept/reject recommendations — then move to monitoring.",
+    "MONITORING": "Now: the system watches drift daily. Handle alerts; re-enter strategy when something material changes."
   }
 }

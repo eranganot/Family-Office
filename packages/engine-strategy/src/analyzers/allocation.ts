@@ -21,10 +21,17 @@ export function deriveTargetGrowthPct(assumptions: Record<string, unknown>): num
   const tolerance = Number(assumptions["risk_loss_tolerance"] ?? 2);
   const stability = Number(assumptions["risk_income_stability"] ?? 2);
   const horizonYears = Number(assumptions["risk_horizon_years"] ?? 20);
+  const drawdown = Number(assumptions["risk_drawdown_reaction"] ?? 2);
+  const experience = Number(assumptions["risk_investment_experience"] ?? 2);
+  const flexibility = Number(assumptions["risk_spending_flexibility"] ?? 2);
   const base = tolerance <= 1 ? 30 : tolerance >= 3 ? 70 : 50;
   const horizonAdj = horizonYears >= 15 ? 10 : horizonYears < 5 ? -10 : 0;
   const stabilityAdj = stability <= 1 ? -5 : stability >= 3 ? 5 : 0;
-  return Math.min(90, Math.max(20, base + horizonAdj + stabilityAdj));
+  // Behavioral answers: stated reaction to a real 30% drop outweighs stated tolerance.
+  const drawdownAdj = drawdown <= 1 ? -10 : drawdown >= 3 ? 5 : 0;
+  const experienceAdj = experience <= 1 ? -5 : experience >= 3 ? 5 : 0;
+  const flexibilityAdj = flexibility <= 1 ? -5 : flexibility >= 3 ? 5 : 0;
+  return Math.min(90, Math.max(20, base + horizonAdj + stabilityAdj + drawdownAdj + experienceAdj + flexibilityAdj));
 }
 
 export function analyzeAllocation(snapshot: SnapshotPayload, ctx: AnalyzerContext): Finding[] {

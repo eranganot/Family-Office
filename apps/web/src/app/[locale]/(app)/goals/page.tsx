@@ -93,6 +93,14 @@ export default async function GoalsPage({
                   </div>
                   {r ? (
                     r.computable ? (
+                      <>
+                      {Number(r.gapILS) > 0 ? (
+                        <p className="mb-2 rounded-lg bg-amber-50 px-3 py-1.5 text-sm text-amber-800">
+                          {t("guidanceGap", { saving: formatMoney(r.requiredMonthlySavingILS!, "ILS", l) })}
+                        </p>
+                      ) : (
+                        <p className="mb-2 rounded-lg bg-green-50 px-3 py-1.5 text-sm text-green-700">{t("guidanceOnTrack")}</p>
+                      )}
                       <div className="grid grid-cols-5 gap-3 text-sm">
                         <Stat label={t("required")} value={formatMoney(r.requiredILS!, "ILS", l)} />
                         <Stat label={t("allocated")} value={formatMoney(r.allocatedNowILS!, "ILS", l)} />
@@ -103,6 +111,7 @@ export default async function GoalsPage({
                         <Stat label={t("gap")} value={formatMoney(r.gapILS!, "ILS", l)} highlight={Number(r.gapILS) > 0} />
                         <Stat label={t("monthlySaving")} value={formatMoney(r.requiredMonthlySavingILS!, "ILS", l)} highlight={Number(r.requiredMonthlySavingILS) > 0} />
                       </div>
+                      </>
                     ) : (
                       <p className="text-xs text-amber-600">{t(`notComputable.${r.reason}`)}</p>
                     )

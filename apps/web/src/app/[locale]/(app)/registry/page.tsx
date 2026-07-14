@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { reviewTaxRuleAction, setAssumptionAction } from "../../../../lib/actions/registry-actions";
 import { Card, ErrorBanner, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
+import { ASSUMPTION_GROUP, GROUP_ORDER } from "../../../../lib/assumption-groups";
 
 interface RuleMeta {
   sources?: string[];
@@ -39,33 +40,51 @@ export default async function RegistryPage({
         </details>
         <ErrorBanner message={error ? tf("error") : undefined} />
         <p className="mb-4 text-xs text-neutral-500">{t("assumptionsHint")}</p>
-        <ul className="flex flex-col gap-3">
-          {assumptions.map((a) => (
-            <li key={a.key} className="rounded-lg border border-neutral-100 p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-medium">{a.key}</span>
-                  <span className="ms-2 text-xs text-neutral-400">{a.description}</span>
-                </div>
-                <span className="text-xs text-neutral-400">
-                  v{a.version} · {a.isOverride ? "USER" : a.source}
-                </span>
-              </div>
-              <div className="mt-2 flex items-end gap-3">
-                <code className="rounded bg-neutral-50 px-2 py-1 text-xs" dir="ltr">
-                  {typeof a.value === "object" ? JSON.stringify(a.value) : String(a.value)}
-                  {a.unit ? ` ${a.unit}` : ""}
-                </code>
-                <form action={setAssumptionAction} className="flex items-end gap-2">
-                  <input type="hidden" name="locale" value={locale} />
-                  <input type="hidden" name="key" value={a.key} />
-                  <TextInput name="value" placeholder={t("override")} />
-                  <SubmitButton label={t("set")} />
-                </form>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {GROUP_ORDER.map((group) => {
+          const inGroup = assumptions.filter((a) => (ASSUMPTION_GROUP[a.key] ?? "engine") === group);
+          if (inGroup.length === 0) return null;
+          return (
+            <div key={group} className="mb-5">
+              <h3 className="mb-2 text-sm font-semibold text-neutral-600">{t(`groups.${group}`)}</h3>
+              <ul className="flex flex-col gap-3">
+                {inGroup.map((a) => {
+                  const hasMeta = t.has(`meta.${a.key}.label`);
+                  return (
+                    <li key={a.key} className="rounded-lg border border-neutral-100 p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium">{hasMeta ? t(`meta.${a.key}.label`) : a.key}</span>
+                          <code className="ms-2 text-[10px] text-neutral-300" dir="ltr">{a.key}</code>
+                        </div>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${a.isOverride ? "bg-blue-50 text-blue-700" : "bg-neutral-100 text-neutral-500"}`}>
+                          v{a.version} · {a.isOverride ? t("sourceUser") : t("sourceDefault")}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-neutral-500">{hasMeta ? t(`meta.${a.key}.desc`) : a.description}</p>
+                      {hasMeta ? (
+                        <p className="mt-0.5 text-xs text-neutral-400">
+                          <span className="font-medium">{t("guideLabel")}:</span> {t(`meta.${a.key}.guide`)}
+                        </p>
+                      ) : null}
+                      <div className="mt-2 flex items-end gap-3">
+                        <code className="rounded bg-neutral-50 px-2 py-1 text-xs" dir="ltr">
+                          {typeof a.value === "object" ? JSON.stringify(a.value) : String(a.value)}
+                          {a.unit ? ` ${a.unit}` : ""}
+                        </code>
+                        <form action={setAssumptionAction} className="flex items-end gap-2">
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="key" value={a.key} />
+                          <TextInput name="value" placeholder={t("override")} />
+                          <SubmitButton label={t("set")} />
+                        </form>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </Card>
 
       <Card title={`${t("taxMatrices")} — ${t("year")} ${activeYear}`}>
