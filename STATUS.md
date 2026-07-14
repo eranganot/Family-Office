@@ -2,7 +2,23 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
-## Current state (2026-07-13)
+## Current state (2026-07-14)
+
+- **M15 (guided first-run & UX) code-complete, NOT yet deployed.** Web-only, no schema/engine change.
+  A1: dashboard leads with a "מה עכשיו?" next-step card — current phase + blocking counts + one primary
+  CTA — computed from `workflowState` + `verification.assessment` (+ `strategy.recommendations` in
+  STRATEGY, `monitoring.alerts` in MONITORING). A7: goals + mapping empty states rewritten as onboarding
+  (teaching copy + direct CTA: mapping → add first bank account `/mapping/new/ACCOUNT`, goals → anchor to
+  the add form). A4: shared `SuccessBanner` + `?ok=<key>` convention wired on goal create/update/status,
+  member add/update/archive, and all mapping mutations (`run()`); new top-level `ok` i18n namespace. A2:
+  reusable `<Explainer>` `<details>` block added to verification/strategy/monitoring/journal (mirrors the
+  ✅ scenarios/registry pattern). A3: `dir="auto"` on strategy rationale (RBlock/RList) + journal
+  outcome/notes so mixed EN/HE resolves per paragraph. New i18n keys at exact he/en 567-key parity.
+  Verified in sandbox: web `tsc` clean (only the documented sandbox-only pdfjs-dist noise), i18n parity.
+  **Deploys with the pending push.**
+- **Phase 0 (pre-M15):** CI actions bumped checkout/setup-node v4→v6 (D3); Postgres backup policy
+  documented in docs/DEPLOY.md (D4). M10–M14 production deploy + Railway backup enablement remain the
+  owner's credentialed action.
 
 - **M10 (bilingual rationale) code-complete, NOT yet deployed.** All 11 strategy generators now carry a
   full Hebrew `rationaleHe` (same Rationale schema, same timeHorizon enums); product-reference validator

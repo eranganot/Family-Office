@@ -1,6 +1,6 @@
 import { formatDate, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
-import { Card, ErrorBanner, SubmitButton } from "../../../../components/fields";
+import { Card, ErrorBanner, SubmitButton, Explainer } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { acknowledgeAlertAction, reevaluateAction, runMonitoringAction } from "../../../../lib/actions/monitoring-actions";
 
@@ -42,6 +42,7 @@ export default async function MonitoringPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <Explainer title={t("explainerTitle")} paragraphs={[t("explainer1"), t("explainer2"), t("explainer3")]} />
       <Card title={t("title")}>
         <p className="text-xs text-neutral-500">{t("hint")}</p>
         <ErrorBanner message={error ? decodeURIComponent(error) : undefined} />

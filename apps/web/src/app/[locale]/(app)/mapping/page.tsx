@@ -1,7 +1,7 @@
 import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
 import { addValuationAction, closeItemAction, confirmGrowthShareAction, suggestGrowthSharesAction } from "../../../../lib/actions/mapping-actions";
-import { Card, ErrorBanner, SubmitButton, TextInput } from "../../../../components/fields";
+import { Card, ErrorBanner, SubmitButton, TextInput, SuccessBanner } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { Link } from "../../../../i18n/navigation";
 
@@ -32,11 +32,12 @@ export default async function MappingPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
   const { locale } = await params;
-  const { error } = await searchParams;
+  const { error, ok } = await searchParams;
   const t = await getTranslations();
+  const tok = await getTranslations("ok");
   const trpc = await serverCaller();
   const household = await trpc.household.get();
   const items = household ? await trpc.ledger.list() : [];
@@ -53,6 +54,7 @@ export default async function MappingPage({
     <div className="flex flex-col gap-6">
       <Card title={t("mapping.title")}>
         <ErrorBanner message={error ? `${t("forms.error")}: ${decodeURIComponent(error)}` : undefined} />
+        <SuccessBanner message={ok === "itemSaved" ? tok(ok) : undefined} />
         {!hasMembers ? <p className="mb-3 text-sm text-amber-700">{t("mapping.needMembers")}</p> : null}
         <form action={suggestGrowthSharesAction} className="mb-3">
           <input type="hidden" name="locale" value={locale} />
@@ -76,7 +78,15 @@ export default async function MappingPage({
 
       {items.length === 0 ? (
         <Card>
-          <p className="text-sm text-neutral-500">{t("mapping.empty")}</p>
+          <div className="flex flex-col items-start gap-3">
+            <div>
+              <p className="text-base font-semibold text-neutral-900">{t("mapping.emptyTitle")}</p>
+              <p className="mt-1 text-sm text-neutral-600" dir="auto">{t("mapping.emptyHint")}</p>
+            </div>
+            <Link href="/mapping/new/ACCOUNT" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+              {t("mapping.emptyCta")}
+            </Link>
+          </div>
         </Card>
       ) : (
         [...byKind.entries()].map(([kind, kindItems]) => (

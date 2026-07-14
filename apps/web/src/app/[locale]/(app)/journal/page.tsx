@@ -1,7 +1,7 @@
 import { formatDate, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
 import { recordOutcomeAction } from "../../../../lib/actions/journal-actions";
-import { Card, SubmitButton, TextInput } from "../../../../components/fields";
+import { Card, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 
 export default async function JournalPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -15,6 +15,7 @@ export default async function JournalPage({ params }: { params: Promise<{ locale
 
   return (
     <div className="flex flex-col gap-6">
+      <Explainer title={t("explainerTitle")} paragraphs={[t("explainer1"), t("explainer2"), t("explainer3")]} />
       <Card title={t("title")}>
         <p className="text-xs text-neutral-500">{t("hint")}</p>
       </Card>
@@ -49,20 +50,20 @@ export default async function JournalPage({ params }: { params: Promise<{ locale
                 {e.expectedOutcome ? (
                   <div>
                     <div className="text-xs text-neutral-400">{t("expected")}</div>
-                    <p>{e.expectedOutcome}</p>
+                    <p dir="auto">{e.expectedOutcome}</p>
                   </div>
                 ) : null}
                 {e.notes ? (
                   <div>
                     <div className="text-xs text-neutral-400">{t("note")}</div>
-                    <p>{e.notes}</p>
+                    <p dir="auto">{e.notes}</p>
                   </div>
                 ) : null}
               </div>
               <div className="mt-3">
                 <div className="text-xs text-neutral-400">{t("actual")}</div>
                 {e.actualOutcome ? (
-                  <p className="text-sm text-neutral-700">{e.actualOutcome}</p>
+                  <p dir="auto" className="text-sm text-neutral-700">{e.actualOutcome}</p>
                 ) : (
                   <form action={recordOutcomeAction} className="mt-1 flex items-end gap-2">
                     <input type="hidden" name="locale" value={locale} />

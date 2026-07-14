@@ -6,7 +6,7 @@ import {
   bootstrapHouseholdAction,
   updateMemberAction,
 } from "../../../../lib/actions/household-actions";
-import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
+import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput, SuccessBanner } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 
 export default async function HouseholdPage({
@@ -14,12 +14,13 @@ export default async function HouseholdPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
   const { locale } = await params;
-  const { error } = await searchParams;
+  const { error, ok } = await searchParams;
   const t = await getTranslations("household");
   const tf = await getTranslations("forms");
+  const tok = await getTranslations("ok");
   const trpc = await serverCaller();
   const household = await trpc.household.get();
 
@@ -60,6 +61,7 @@ export default async function HouseholdPage({
       </Card>
       <Card title={t("members")}>
         <ErrorBanner message={error ? tf("error") : undefined} />
+        <SuccessBanner message={ok && ["memberAdded","memberSaved","memberArchived"].includes(ok) ? tok(ok) : undefined} />
         <ul className="mb-6 flex flex-col gap-2">
           {household.members.map((m) => (
             <li key={m.id} className="rounded-lg border border-neutral-100 px-3 py-2 text-sm">

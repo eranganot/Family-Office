@@ -22,14 +22,14 @@ export async function createGoalAction(fd: FormData): Promise<void> {
     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "UNKNOWN";
     redirect(`/${locale}/goals?error=${code}`);
   }
-  redirect(`/${locale}/goals`);
+  redirect(`/${locale}/goals?ok=goalCreated`);
 }
 
 export async function setGoalStatusAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const trpc = await serverCaller();
   await trpc.goals.setStatus({ id: str(fd, "id"), status: str(fd, "status") as never });
-  redirect(`/${locale}/goals`);
+  redirect(`/${locale}/goals?ok=goalStatus`);
 }
 
 export async function updateGoalAction(fd: FormData): Promise<void> {
@@ -51,5 +51,5 @@ export async function updateGoalAction(fd: FormData): Promise<void> {
     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "UNKNOWN";
     redirect(`/${locale}/goals?error=${code}`);
   }
-  redirect(`/${locale}/goals`);
+  redirect(`/${locale}/goals?ok=goalSaved`);
 }

@@ -2,7 +2,7 @@ import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
 import { addValuationAction } from "../../../../lib/actions/mapping-actions";
 import { rejectItemAction, verifyItemAction } from "../../../../lib/actions/verification-actions";
-import { Card, SubmitButton, TextInput } from "../../../../components/fields";
+import { Card, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { GatePanel } from "./gate-panel";
 
@@ -29,6 +29,7 @@ export default async function VerificationPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <Explainer title={t("explainerTitle")} paragraphs={[t("explainer1"), t("explainer2"), t("explainer3")]} />
       {error ? (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {t("transitionError")}: {decodeURIComponent(error)}

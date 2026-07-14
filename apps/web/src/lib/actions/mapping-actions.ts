@@ -14,7 +14,7 @@ async function run(locale: string, backTo: string, fn: (trpc: Caller) => Promise
     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 120)) : "UNKNOWN";
     redirect(`/${locale}${backTo}?error=${code}`);
   }
-  redirect(`/${locale}/mapping`);
+  redirect(`/${locale}/mapping?ok=itemSaved`);
 }
 
 export async function createAccountAction(fd: FormData): Promise<void> {

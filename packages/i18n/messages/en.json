@@ -1,4 +1,13 @@
 {
+  "ok": {
+    "goalCreated": "Goal added",
+    "goalSaved": "Goal updated",
+    "goalStatus": "Goal status updated",
+    "memberAdded": "Family member added",
+    "memberSaved": "Family member updated",
+    "memberArchived": "Family member archived",
+    "itemSaved": "Item saved"
+  },
   "app": {
     "title": "WealthOS",
     "tagline": "The operating system for your household's financial strategy"
@@ -34,6 +43,30 @@
     "error": "Incorrect email or password"
   },
   "dashboard": {
+    "next": {
+      "title": "What now?",
+      "toMapping": "Go to mapping",
+      "toVerify": "Go to verification",
+      "toStrategy": "Go to strategy",
+      "toReview": "Review recommendations",
+      "toMonitoring": "Go to monitoring",
+      "mappingEmptyHead": "Start here: add your first account",
+      "mappingEmptyDetail": "Map a bank account, fund, or asset to build your wealth picture.",
+      "mappingItemsHead": "You've mapped {count} items",
+      "mappingItemsDetail": "Move on to verifying the data before building strategy.",
+      "verifyItems": "{count} items awaiting verification",
+      "verifySuspense": "{count} suspense items to resolve",
+      "verifyReadyHead": "Verification complete",
+      "verifyReadyDetail": "You can run the strategy engine now.",
+      "strategyRunHead": "Time to run your strategy",
+      "strategyRunDetail": "Run the engine to get data-driven recommendations.",
+      "strategyPendingHead": "{count} recommendations awaiting review",
+      "strategyClearHead": "All recommendations handled",
+      "strategyClearDetail": "You can move to ongoing monitoring.",
+      "monitoringAlertsHead": "{count} open alerts",
+      "monitoringClearHead": "No open alerts — all clear",
+      "monitoringClearDetail": "Keep tracking drift and updates."
+    },
     "netWorth": "Net worth",
     "assets": "Total assets",
     "liabilities": "Total liabilities",
@@ -70,6 +103,9 @@
     "archive": "Archive"
   },
   "mapping": {
+    "emptyTitle": "Start here",
+    "emptyHint": "Map your first item — for example your bank account — to build your wealth picture. You can add accounts, assets, mortgages, and cash flows.",
+    "emptyCta": "Add your first bank account",
     "title": "Financial mapping",
     "empty": "Nothing mapped yet. Add your first item.",
     "add": "Add",
@@ -277,6 +313,10 @@
     }
   },
   "verification": {
+    "explainerTitle": "What is this tab?",
+    "explainer1": "Verification is where you confirm every item reflects reality — a current valuation, its data source, and a confidence level. Unverified items block the move to strategy.",
+    "explainer2": "For each item you can confirm it (\"correct as shown\"), reject it with a note, or correct the value — the correction is appended to the valuation history and never overwrites it.",
+    "explainer3": "Suspense items (data the system couldn't attribute) must be resolved before this phase counts as complete.",
     "title": "Verification",
     "gate": "Strategy gate",
     "gateOpen": "All checks passed — you can advance to Strategy.",
@@ -349,6 +389,9 @@
     "explainer3": "Tax rules carry their sources and stay marked \"pending owner review\" until you confirm the figures match reality."
   },
   "goals": {
+    "emptyTitle": "No goals yet",
+    "emptyHint": "A goal defines where your wealth should go — an emergency fund, retirement, financial independence, or children's education. Add your first goal to see funding gaps and recommendations.",
+    "emptyCta": "Add your first goal",
     "title": "Goals",
     "add": "Add goal",
     "name": "Name",
@@ -400,6 +443,10 @@
     "perMonth": "mo"
   },
   "strategy": {
+    "explainerTitle": "What is this tab?",
+    "explainer1": "Strategy runs pure engines over your verified wealth picture and produces strategy-level recommendations only — never specific products or securities.",
+    "explainer2": "Every recommendation carries full reasoning: why, benefits, risks, tax and liquidity implications, time horizon, sensitivity, and alternatives — linked to the evidence and assumptions it relies on.",
+    "explainer3": "Accepting or rejecting a recommendation is recorded in the journal. Changing an assumption invalidates recommendations pinned to the old version.",
     "title": "Strategy",
     "run": "Run strategy analysis",
     "wrongPhase": "Strategy is locked until verification is complete. Advance to the Strategy phase on the Verification page.",
@@ -457,6 +504,10 @@
     }
   },
   "journal": {
+    "explainerTitle": "What is this tab?",
+    "explainer1": "The journal records the lifecycle of every decision: what you accepted or rejected, the expected outcome, and when it was planned for implementation.",
+    "explainer2": "When something actually happens you can record the real outcome against the expectation — closing the loop between decision and reality.",
+    "explainer3": "Recording outcomes is a monitoring activity and is available at any phase of the process.",
     "title": "Decision journal",
     "hint": "The household's institutional memory: every decision, the expectation behind it, and what actually happened.",
     "empty": "No decisions recorded yet. Accept or reject recommendations on the Strategy page.",
@@ -508,6 +559,10 @@
     "explainer3": "\"Goal outcomes\" shows whether each goal ends up funded under each path. Nothing here changes your data — scenarios are safe experiments, saved for comparison."
   },
   "monitoring": {
+    "explainerTitle": "What is this tab?",
+    "explainer1": "Monitoring compares your current wealth picture to the baseline set during strategy and flags drift — in net worth, liquidity, concentration, allocation, or goal coverage — plus valuations that have gone stale.",
+    "explainer2": "Each alert carries a severity and a recommended action (re-verify or re-run strategy). You can acknowledge an alert or act on it.",
+    "explainer3": "A cycle runs automatically each day, and you can also run one manually. Acting on an alert resolves it and records the round.",
     "title": "Monitoring",
     "hint": "Phase 4 — scheduled snapshots watch for drift against your strategy and stale valuations. Re-evaluate to close the loop.",
     "runNow": "Run monitoring now",

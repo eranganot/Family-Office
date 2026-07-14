@@ -1,7 +1,7 @@
 import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
 import { createGoalAction, setGoalStatusAction, updateGoalAction } from "../../../../lib/actions/goal-actions";
-import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
+import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput, SuccessBanner } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 
 const GOAL_TYPES = [
@@ -14,11 +14,12 @@ export default async function GoalsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
   const { locale } = await params;
-  const { error } = await searchParams;
+  const { error, ok } = await searchParams;
   const t = await getTranslations("goals");
+  const tok = await getTranslations("ok");
   const tf = await getTranslations("forms");
   const trpc = await serverCaller();
   const household = await trpc.household.get();
@@ -30,6 +31,7 @@ export default async function GoalsPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <SuccessBanner message={ok && ["goalCreated","goalSaved","goalStatus"].includes(ok) ? tok(ok) : undefined} />
       <Card title={t("gapReport")}>
         <p className="mb-3 text-xs text-neutral-500">
           {t("gapHint")}: {gap.realReturnPctUsed}%.
@@ -50,7 +52,15 @@ export default async function GoalsPage({
       <Card title={`${t("title")} (${goals.length})`}>
         <ErrorBanner message={error ? `${tf("error")}: ${decodeURIComponent(error)}` : undefined} />
         {goals.length === 0 ? (
-          <p className="text-sm text-neutral-500">{t("empty")}</p>
+          <div className="flex flex-col items-start gap-3">
+            <div>
+              <p className="text-base font-semibold text-neutral-900">{t("emptyTitle")}</p>
+              <p className="mt-1 text-sm text-neutral-600" dir="auto">{t("emptyHint")}</p>
+            </div>
+            <a href="#goal-add" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+              {t("emptyCta")}
+            </a>
+          </div>
         ) : (
           <ul className="flex flex-col gap-4">
             {goals.map((g) => {
@@ -145,6 +155,7 @@ export default async function GoalsPage({
         )}
       </Card>
 
+      <div id="goal-add" />
       <Card title={t("add")}>
         <form action={createGoalAction} className="grid max-w-2xl grid-cols-2 gap-3">
           <input type="hidden" name="locale" value={locale} />

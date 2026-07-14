@@ -40,3 +40,23 @@ export function Card({ title, children }: { title?: string; children: React.Reac
     </section>
   );
 }
+
+/** A2 — collapsible "what is this tab?" explainer. dir="auto" keeps mixed EN/HE tidy. */
+export function Explainer({ title, paragraphs }: { title: string; paragraphs: string[] }) {
+  return (
+    <details className="rounded-lg bg-blue-50/50 p-3 text-sm text-neutral-700">
+      <summary className="cursor-pointer font-medium text-blue-700">{title}</summary>
+      <div className="mt-2 flex flex-col gap-1.5">
+        {paragraphs.map((p, i) => (
+          <p key={i} dir="auto">{p}</p>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+/** A4 — shared success banner for the ?ok=<key> server-action convention. */
+export function SuccessBanner({ message }: { message: string | undefined }) {
+  if (!message) return null;
+  return <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{message}</p>;
+}

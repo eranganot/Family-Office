@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { deriveTargetGrowthPct } from "@wealthos/engine-strategy";
 import { decideAction, runStrategyAction, saveRiskAction } from "../../../../lib/actions/strategy-actions";
-import { Card, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
+import { Card, Field, Select, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { Link } from "../../../../i18n/navigation";
 
@@ -62,6 +62,7 @@ export default async function StrategyPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <Explainer title={t("explainerTitle")} paragraphs={[t("explainer1"), t("explainer2"), t("explainer3")]} />
       <Card title={t("title")}>
         {sp.error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{decodeURIComponent(sp.error)}</p> : null}
         {sp.ran ? (
@@ -213,7 +214,7 @@ function RBlock({ label, children }: { label: string; children: React.ReactNode 
   return (
     <div>
       <div className="mb-0.5 text-xs font-medium uppercase tracking-wide text-neutral-400">{label}</div>
-      <p className="text-neutral-700">{children}</p>
+      <p dir="auto" className="text-neutral-700">{children}</p>
     </div>
   );
 }
@@ -222,7 +223,7 @@ function RList({ label, items }: { label: string; items: string[] }) {
   return (
     <div>
       <div className="mb-0.5 text-xs font-medium uppercase tracking-wide text-neutral-400">{label}</div>
-      <ul className="list-inside list-disc text-neutral-700">
+      <ul dir="auto" className="list-inside list-disc text-neutral-700">
         {items.map((i, n) => <li key={n}>{i}</li>)}
       </ul>
     </div>

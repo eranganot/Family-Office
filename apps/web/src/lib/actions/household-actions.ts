@@ -34,14 +34,14 @@ export async function addMemberAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/household?error=member`);
   }
-  redirect(`/${locale}/household`);
+  redirect(`/${locale}/household?ok=memberAdded`);
 }
 
 export async function archiveMemberAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const trpc = await serverCaller();
   await trpc.household.archiveMember({ id: str(fd, "id") });
-  redirect(`/${locale}/household`);
+  redirect(`/${locale}/household?ok=memberArchived`);
 }
 
 export async function setFxRateAction(fd: FormData): Promise<void> {
@@ -74,7 +74,7 @@ export async function updateMemberAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/household?error=member`);
   }
-  redirect(`/${locale}/household`);
+  redirect(`/${locale}/household?ok=memberSaved`);
 }
 
 export async function refreshFxAction(fd: FormData): Promise<void> {
