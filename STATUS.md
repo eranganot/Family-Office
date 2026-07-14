@@ -4,6 +4,15 @@
 
 ## Current state (2026-07-14)
 
+- **M19a (fee benchmark by product type, B5) code-complete, NOT yet deployed.** The single global
+  `management_fee_notice_pct` is now backed by a per-type map `management_fee_notice_by_type` (pension mekifa
+  0.5, pension general 0.6, gemel lehashkaa 0.6, hishtalmut/kupat gemel/IRA 0.7), falling back to the global
+  0.8. The fee analyzer flags managementFeePct above the per-type threshold; the HIGH_MANAGEMENT_FEE generator
+  pins both keys. No migration (assumption seeded in preDeploy). Verified: registry/engine-strategy/api tsc
+  clean, engine-strategy 40 tests (2 new B5). **C1 (real Gemel-Net/Pensia-Net data) deferred** — the CMA feed
+  is XML/reverse-engineered, not sandbox-verifiable; needs a validated endpoint + a fund-number field (spike).
+  **Deploys with the push.**
+
 - **M17b (tax-aware drawdown, C4) code-complete, NOT yet deployed. M17 COMPLETE.** The projector splits
   investable into taxable / hishtalmut / pension sub-pools; on a net drawdown it pulls tax-efficiently
   (taxable → hishtalmut → pension), grossing each withdrawal up by that pool's effective tax rate so depletion

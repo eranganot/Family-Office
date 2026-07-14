@@ -326,7 +326,7 @@ const GENERATORS: Record<string, Generator> = {
     confidence: severityConfidence.NOTICE,
     evidenceItemIds: f.evidenceItemIds,
     goalTypesImproved: ["RETIREMENT", "FINANCIAL_INDEPENDENCE"],
-    assumptionKeysUsed: ["management_fee_notice_pct"],
+    assumptionKeysUsed: ["management_fee_notice_pct", "management_fee_notice_by_type"],
   }),
 
   MORTGAGE_CPI_CONCENTRATION: (f) => ({

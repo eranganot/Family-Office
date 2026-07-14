@@ -104,3 +104,21 @@ describe("runAnalyzers", () => {
     expect(r.length).toBeGreaterThanOrEqual(3); // idle cash + home bias + hishtalmut/pension missing...
   });
 });
+
+describe("fee benchmark by product type (B5)", () => {
+  it("flags a pension fee above its per-type threshold that the global default would miss", () => {
+    // 0.6% on a comprehensive pension (type threshold 0.5) — global default 0.8 would NOT flag it.
+    const codes = runAnalyzers(
+      snapshot([item({ accountType: "PENSION_COMPREHENSIVE", managementFeePct: 0.6 })]),
+      CTX,
+    ).map((f) => f.code);
+    expect(codes).toContain("HIGH_MANAGEMENT_FEE");
+  });
+  it("does not flag a bank/brokerage fee below the global fallback", () => {
+    const codes = runAnalyzers(
+      snapshot([item({ accountType: "BROKERAGE_IL", managementFeePct: 0.7 })]),
+      CTX,
+    ).map((f) => f.code);
+    expect(codes).not.toContain("HIGH_MANAGEMENT_FEE");
+  });
+});

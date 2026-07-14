@@ -43,16 +43,20 @@ export function analyzeTaxHeadroom(snapshot: SnapshotPayload, ctx: AnalyzerConte
     }
   }
 
-  // Fee drag on tax-advantaged vehicles: management fee well above market norms.
+  // Fee drag: management fee above the per-product-type notice threshold (falls back to the global one).
   const feeMax = Number(ctx.assumptions["management_fee_notice_pct"] ?? 0.8);
+  const feeByType = (ctx.assumptions["management_fee_notice_by_type"] as Record<string, number> | undefined) ?? {};
   for (const item of snapshot.items) {
-    if (item.kind === "ACCOUNT" && item.managementFeePct !== null && item.managementFeePct > feeMax) {
-      findings.push({
-        code: "HIGH_MANAGEMENT_FEE",
-        severity: "NOTICE",
-        metrics: { itemName: item.name, feePct: item.managementFeePct, noticePct: feeMax },
-        evidenceItemIds: [item.id],
-      });
+    if (item.kind === "ACCOUNT" && item.managementFeePct !== null) {
+      const threshold = feeByType[item.accountType ?? ""] ?? feeMax;
+      if (item.managementFeePct > threshold) {
+        findings.push({
+          code: "HIGH_MANAGEMENT_FEE",
+          severity: "NOTICE",
+          metrics: { itemName: item.name, feePct: item.managementFeePct, noticePct: threshold },
+          evidenceItemIds: [item.id],
+        });
+      }
     }
   }
   return findings;

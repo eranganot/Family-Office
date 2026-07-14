@@ -44,6 +44,7 @@ export const CTX = {
     currency_foreign_min_pct: 10,
     currency_foreign_max_pct: 50,
     management_fee_notice_pct: 0.8,
+    management_fee_notice_by_type: { PENSION_COMPREHENSIVE: 0.5, KEREN_HISHTALMUT: 0.7, GEMEL_LEHASHKAA: 0.6 },
     mortgage_cpi_linked_max_pct: 60,
     expensive_debt_rate_pct: 8,
     large_loan_notice_base: 100_000,
