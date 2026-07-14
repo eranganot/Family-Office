@@ -5,6 +5,8 @@ const base: WizardAnswers = {
   bufferMonths: 6, spendRigidity: 2, nagging: 2, concentrationSensitivity: 2,
   israelDependence: 2, regretType: 2, homeView: 2, driftSpeed: 2, feeImportance: 2,
   largeLoanBase: 100_000,
+  institutionDependence: 2, paymentRiseSensitivity: 2, dataStrictness: 2,
+  taxablePortfolioAge: 2, advicePriority: 4,
 };
 const val = (out: ReturnType<typeof wizardAnswersToAssumptions>, key: string) =>
   out.find((o) => o.key === key)!.value;
@@ -43,6 +45,19 @@ describe("wizardAnswersToAssumptions", () => {
     const out = wizardAnswersToAssumptions({ ...base, feeImportance: 1 });
     const map = val(out, "management_fee_notice_by_type") as Record<string, number>;
     for (const v of Object.values(map)) expect(v).toBeLessThan(1);
+  });
+
+  it("v2 questions: strictness gates, portfolio age → gain fraction, priority presets sum to 100", () => {
+    const strict = wizardAnswersToAssumptions({ ...base, dataStrictness: 1, taxablePortfolioAge: 3, advicePriority: 1 });
+    expect(val(strict, "strategy_min_completeness")).toBe(90);
+    expect(val(strict, "allocation_mix_unknown_max_pct")).toBe(40);
+    expect(val(strict, "taxable_gain_fraction")).toBe(0.6);
+    const w = val(strict, "priority_weights") as Record<string, number>;
+    expect(Object.values(w).reduce((s, x) => s + x, 0)).toBe(100);
+    expect(w["riskReduction"]).toBe(35);
+    const neutral = wizardAnswersToAssumptions(base);
+    expect(val(neutral, "mortgage_refinance_notice_spread_pct")).toBe(0.5);
+    expect(val(neutral, "concentration_institution_max_pct")).toBe(50);
   });
 
   it("emergency months clamp to [3,12]", () => {

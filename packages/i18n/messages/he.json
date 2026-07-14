@@ -661,7 +661,28 @@
       "applyNote": "כל ערך בודד אפשר לכוון אחר-כך בעמוד הרגיסטרי — האשף והדריסות הידניות משתמשים באותו מנגנון.",
       "apply": "החלת התשובות",
       "changedBanner": "עודכנו",
-      "nothingChanged": "התשובות תואמות את הערכים הנוכחיים — שום דבר לא השתנה."
+      "nothingChanged": "התשובות תואמות את הערכים הנוכחיים — שום דבר לא השתנה.",
+      "institutionDependence": "שרוב הכסף מנוהל בגוף אחד — זה מפריע לכם…",
+      "institutionDependence_1": "מאוד — לפזר",
+      "institutionDependence_2": "רגיל",
+      "institutionDependence_3": "מעט — כניסה אחת זה נוח",
+      "paymentRiseSensitivity": "אם החזר המשכנתא יטפס עם השנים, זה יהיה…",
+      "paymentRiseSensitivity_1": "בעיה אמיתית — לתחום הצמדה",
+      "paymentRiseSensitivity_2": "נסבל",
+      "paymentRiseSensitivity_3": "בסדר — זול היום חשוב יותר",
+      "dataStrictness": "כשחסרים נתונים או שהם מיושנים, הייעוץ צריך…",
+      "dataStrictness_1": "לסרב עד שהנתונים מלאים",
+      "dataStrictness_2": "מאוזן",
+      "dataStrictness_3": "לעבוד עם מה שיש",
+      "taxablePortfolioAge": "תיק ההשקעות החייב במס (ברוקר) קיים…",
+      "taxablePortfolioAge_1": "פחות מ~שנתיים — בעיקר קרן",
+      "taxablePortfolioAge_2": "כמה שנים — יש רווחים",
+      "taxablePortfolioAge_3": "עשור+ — חלק גדול רווחים",
+      "advicePriority": "מה הכי חשוב בדירוג ההמלצות?",
+      "advicePriority_1": "ביטחון — קודם להקטין סיכונים",
+      "advicePriority_2": "מס — קודם למצות הטבות",
+      "advicePriority_3": "צמיחה — קודם התקדמות ליעדים",
+      "advicePriority_4": "מאוזן (ברירת המחדל)"
     }
   },
   "goals": {
@@ -870,7 +891,9 @@
     "taxNote": "התחזיות מיישמות משיכה יעילת-מס: משיכות נמשכות לפי סדר — חשבון חייב במס, קרן השתלמות, פנסיה — עם מס לפי הרישום.",
     "mcScenario": "מסלול לסימולציה",
     "baselinePath": "בסיס — המצב כפי שהוא היום",
-    "mcMeasured": "המסלול שנמדד"
+    "mcMeasured": "המסלול שנמדד",
+    "beyondHorizon": "מעבר לאופק הסימולציה — הגדילו את השנים",
+    "missingGoalData": "חסר תאריך יעד / מימון נדרש"
   },
   "monitoring": {
     "explainerTitle": "מה זה הטאב הזה?",

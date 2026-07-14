@@ -29,6 +29,16 @@ export interface WizardAnswers {
   feeImportance: 1 | 2;
   /** Loan size below which it's not worth a discussion (base currency). */
   largeLoanBase: number;
+  /** Dependence on a single managing institution bothers you: 1=a lot, 2=normal, 3=little. */
+  institutionDependence: 1 | 2 | 3;
+  /** Sensitivity to the mortgage payment rising over the years: 1=very, 2=normal, 3=not much. */
+  paymentRiseSensitivity: 1 | 2 | 3;
+  /** When data is incomplete, advice should: 1=refuse until complete, 2=balanced, 3=work with what exists. */
+  dataStrictness: 1 | 2 | 3;
+  /** How long has your taxable investment portfolio existed: 1=new, 2=a few years, 3=a decade+. */
+  taxablePortfolioAge: 1 | 2 | 3;
+  /** What matters most in recommendations: 1=safety, 2=tax savings, 3=growth toward goals, 4=balanced. */
+  advicePriority: 1 | 2 | 3 | 4;
 }
 
 export type WizardOutput = Array<{ key: string; value: number | Record<string, number> }>;
@@ -85,6 +95,38 @@ export function wizardAnswersToAssumptions(a: WizardAnswers): WizardOutput {
   out.push({ key: "management_fee_notice_by_type", value: feeMap });
 
   out.push({ key: "large_loan_notice_base", value: Math.max(0, Math.round(a.largeLoanBase)) });
+
+  out.push({
+    key: "concentration_institution_max_pct",
+    value: a.institutionDependence === 1 ? 40 : a.institutionDependence === 3 ? 60 : 50,
+  });
+
+  out.push({
+    key: "mortgage_cpi_linked_max_pct",
+    value: a.paymentRiseSensitivity === 1 ? 33 : a.paymentRiseSensitivity === 3 ? 60 : 50,
+  });
+
+  // Data strictness drives the strategy gate AND the allocation unknown-mix refusal ceiling.
+  out.push({ key: "strategy_min_completeness", value: a.dataStrictness === 1 ? 90 : a.dataStrictness === 3 ? 70 : 80 });
+  out.push({ key: "strategy_min_confidence", value: a.dataStrictness === 1 ? 70 : a.dataStrictness === 3 ? 50 : 60 });
+  out.push({ key: "allocation_mix_unknown_max_pct", value: a.dataStrictness === 1 ? 40 : a.dataStrictness === 3 ? 60 : 50 });
+
+  // Factual question, not preference: how seasoned the taxable portfolio is → assumed gain fraction.
+  out.push({ key: "taxable_gain_fraction", value: a.taxablePortfolioAge === 1 ? 0.2 : a.taxablePortfolioAge === 3 ? 0.6 : 0.4 });
+
+  // Nagging also tunes the refinance alert spread (alert-appetite, not a market number).
+  out.push({ key: "mortgage_refinance_notice_spread_pct", value: a.nagging === 1 ? 0.3 : a.nagging === 3 ? 0.7 : 0.5 });
+
+  // Fee importance also scales the global fallback threshold.
+  out.push({ key: "management_fee_notice_pct", value: a.feeImportance === 1 ? 0.7 : Number(defaultOf("management_fee_notice_pct")) });
+
+  const WEIGHT_PRESETS: Record<number, Record<string, number>> = {
+    1: { impact: 25, ease: 10, taxBenefit: 10, riskReduction: 35, goalContribution: 15, urgency: 5 }, // safety-first
+    2: { impact: 25, ease: 10, taxBenefit: 35, riskReduction: 10, goalContribution: 15, urgency: 5 }, // tax-first
+    3: { impact: 35, ease: 10, taxBenefit: 10, riskReduction: 10, goalContribution: 30, urgency: 5 }, // growth/goals-first
+    4: defaultOf("priority_weights") as Record<string, number>, // balanced = system default
+  };
+  out.push({ key: "priority_weights", value: WEIGHT_PRESETS[a.advicePriority]! });
 
   return out;
 }

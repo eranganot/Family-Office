@@ -30,6 +30,11 @@ export const registryRouter = router({
         driftSpeed: z.union([z.literal(1), z.literal(2), z.literal(3)]),
         feeImportance: z.union([z.literal(1), z.literal(2)]),
         largeLoanBase: z.number().min(0).max(100_000_000),
+        institutionDependence: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+        paymentRiseSensitivity: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+        dataStrictness: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+        taxablePortfolioAge: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+        advicePriority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
       }),
     )
     .mutation(async ({ ctx, input }) => {

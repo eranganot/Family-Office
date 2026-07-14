@@ -1,0 +1,333 @@
+diff --git a/STATUS.md b/STATUS.md
+index 47cbdd2..8f21e3b 100644
+--- a/STATUS.md
++++ b/STATUS.md
+@@ -2,6 +2,21 @@
+ 
+ > Read this first in any new session. Update after every meaningful change.
+ 
++## Current state (2026-07-15, session 2)
++
++- **M24 (wizard v2 + MC clarity) code-complete — delivered stacked on the M23 patch.** Wizard grows
++  10→15 questions and now drives 24 of 39 assumptions (institution concentration, CPI-mortgage share,
++  data-strictness → strategy gates + unknown-mix ceiling, taxable-portfolio age → taxable_gain_fraction
++  (factual, not preference), advice-priority → priority_weights presets each summing to 100; nagging
++  additionally tunes the refinance alert spread; fee importance also scales the global fee fallback).
++  Split is now: 24 wizard + 6 risk questionnaire + 9 expert-owned (returns ×2, inflation, goal return,
++  MC volatility, pension withdrawal tax, expensive-debt rate, prime spread, large-loan base is asked).
++  Monte Carlo goals now carry `notComputableReason` (BEYOND_HORIZON vs MISSING_DATA) and the scenarios
++  page prints the reason with a fix hint instead of a bare "not computable". Owner's stale "Monte Carlo"
++  card explained: pre-M23 saved run on a snapshot without goal funding; 2050 goals need horizon ≥ 25.
++  Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
++  Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
++
+ ## Current state (2026-07-15)
+ 
+ - **M23 (wizard + action checklists + audit + trust ladder) code-complete — delivered as a GIT PATCH
+diff --git a/apps/web/src/app/[locale]/(app)/registry/wizard/page.tsx b/apps/web/src/app/[locale]/(app)/registry/wizard/page.tsx
+index e73a235..52d0dc0 100644
+--- a/apps/web/src/app/[locale]/(app)/registry/wizard/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/registry/wizard/page.tsx
+@@ -12,6 +12,10 @@ const SCALE_QUESTIONS = [
+   { name: "homeView", opts: 3 },
+   { name: "driftSpeed", opts: 3 },
+   { name: "feeImportance", opts: 2 },
++  { name: "institutionDependence", opts: 3 },
++  { name: "paymentRiseSensitivity", opts: 3 },
++  { name: "dataStrictness", opts: 3 },
++  { name: "taxablePortfolioAge", opts: 3 },
+ ] as const;
+ 
+ export default async function AssumptionsWizardPage({
+@@ -56,6 +60,14 @@ export default async function AssumptionsWizardPage({
+           <TextInput name="largeLoanBase" inputMode="numeric" defaultValue="100000" />
+         </Field>
+ 
++        <Field label={t("advicePriority")}>
++          <Select name="advicePriority" defaultValue="4">
++            {[1, 2, 3, 4].map((v) => (
++              <option key={v} value={v}>{t(`advicePriority_${v}`)}</option>
++            ))}
++          </Select>
++        </Field>
++
+         <p className="text-xs text-neutral-400">{t("applyNote")}</p>
+         <SubmitButton label={t("apply")} />
+       </form>
+diff --git a/apps/web/src/app/[locale]/(app)/scenarios/page.tsx b/apps/web/src/app/[locale]/(app)/scenarios/page.tsx
+index 53d533d..7ab47f9 100644
+--- a/apps/web/src/app/[locale]/(app)/scenarios/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/scenarios/page.tsx
+@@ -16,7 +16,7 @@ interface MCShape {
+   monteCarlo: {
+     runs: number; volatilityPct: number;
+     years: Array<{ year: number; netWorthP10: number; netWorthP50: number; netWorthP90: number }>;
+-    goals: Array<{ goalId: string; name: string; targetYear: number | null; probabilityFunded: number | null }>;
++    goals: Array<{ goalId: string; name: string; targetYear: number | null; probabilityFunded: number | null; notComputableReason?: "BEYOND_HORIZON" | "MISSING_DATA" | null }>;
+     depletionProbability: number;
+   };
+ }
+@@ -133,7 +133,13 @@ export default async function ScenariosPage({
+                 {mc.goals.map((g) => (
+                   <li key={g.goalId} className="flex justify-between">
+                     <span dir="auto">{g.name}{g.targetYear ? ` (${g.targetYear})` : ""}</span>
+-                    <span className="font-medium">{g.probabilityFunded === null ? t("notComputable") : `${Math.round(g.probabilityFunded * 100)}%`}</span>
++                    <span className="font-medium">
++                      {g.probabilityFunded === null
++                        ? g.notComputableReason === "BEYOND_HORIZON"
++                          ? t("beyondHorizon")
++                          : t("missingGoalData")
++                        : `${Math.round(g.probabilityFunded * 100)}%`}
++                    </span>
+                   </li>
+                 ))}
+               </ul>
+diff --git a/apps/web/src/lib/actions/registry-actions.ts b/apps/web/src/lib/actions/registry-actions.ts
+index ad06e53..75ab8c6 100644
+--- a/apps/web/src/lib/actions/registry-actions.ts
++++ b/apps/web/src/lib/actions/registry-actions.ts
+@@ -46,6 +46,11 @@ export async function applyWizardAction(fd: FormData): Promise<void> {
+       driftSpeed: num("driftSpeed", 2) as never,
+       feeImportance: num("feeImportance", 2) as never,
+       largeLoanBase: num("largeLoanBase", 100000),
++      institutionDependence: num("institutionDependence", 2) as never,
++      paymentRiseSensitivity: num("paymentRiseSensitivity", 2) as never,
++      dataStrictness: num("dataStrictness", 2) as never,
++      taxablePortfolioAge: num("taxablePortfolioAge", 2) as never,
++      advicePriority: num("advicePriority", 4) as never,
+     });
+     redirect(`/${locale}/registry?wizardChanged=${encodeURIComponent(changed.join(","))}`);
+   } catch (e) {
+diff --git a/packages/api/src/routers/registry.ts b/packages/api/src/routers/registry.ts
+index 6bbe1fc..f27ebc4 100644
+--- a/packages/api/src/routers/registry.ts
++++ b/packages/api/src/routers/registry.ts
+@@ -30,6 +30,11 @@ export const registryRouter = router({
+         driftSpeed: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+         feeImportance: z.union([z.literal(1), z.literal(2)]),
+         largeLoanBase: z.number().min(0).max(100_000_000),
++        institutionDependence: z.union([z.literal(1), z.literal(2), z.literal(3)]),
++        paymentRiseSensitivity: z.union([z.literal(1), z.literal(2), z.literal(3)]),
++        dataStrictness: z.union([z.literal(1), z.literal(2), z.literal(3)]),
++        taxablePortfolioAge: z.union([z.literal(1), z.literal(2), z.literal(3)]),
++        advicePriority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+       }),
+     )
+     .mutation(async ({ ctx, input }) => {
+diff --git a/packages/engine-scenario/src/monte-carlo.ts b/packages/engine-scenario/src/monte-carlo.ts
+index b84d8bc..d982f6a 100644
+--- a/packages/engine-scenario/src/monte-carlo.ts
++++ b/packages/engine-scenario/src/monte-carlo.ts
+@@ -30,7 +30,9 @@ export interface MonteCarloGoal {
+   goalId: string;
+   name: string;
+   targetYear: number | null;
+-  probabilityFunded: number | null; // null = not computable in the horizon
++  probabilityFunded: number | null; // null = not computable — see reason
++  /** Why probabilityFunded is null: beyond the simulated horizon vs missing funding/date data. */
++  notComputableReason: "BEYOND_HORIZON" | "MISSING_DATA" | null;
+ }
+ 
+ export interface MonteCarloResult {
+@@ -120,13 +122,18 @@ export function projectMonteCarlo(
+     });
+   }
+ 
++  const lastSimYear = startYear + years;
+   const goals: MonteCarloGoal[] = snapshot.goals.map((g) => {
+     const computable = goalComputable.get(g.id) ?? 0;
++    const targetYear = g.targetDate ? new Date(g.targetDate).getFullYear() : null;
++    const missingData = !g.targetDate || g.requiredFundingBase === null;
+     return {
+       goalId: g.id,
+       name: g.name,
+-      targetYear: g.targetDate ? new Date(g.targetDate).getFullYear() : null,
++      targetYear,
+       probabilityFunded: computable > 0 ? (goalFundedCount.get(g.id) ?? 0) / computable : null,
++      notComputableReason:
++        computable > 0 ? null : missingData ? "MISSING_DATA" : targetYear !== null && targetYear > lastSimYear ? "BEYOND_HORIZON" : "MISSING_DATA",
+     };
+   });
+ 
+diff --git a/packages/i18n/messages/en.json b/packages/i18n/messages/en.json
+index 18d584e..13f0303 100644
+--- a/packages/i18n/messages/en.json
++++ b/packages/i18n/messages/en.json
+@@ -661,7 +661,28 @@
+       "applyNote": "You can refine any single value later on the registry page — the wizard and manual overrides use the same mechanism.",
+       "apply": "Apply answers",
+       "changedBanner": "Updated",
+-      "nothingChanged": "Your answers match the current values — nothing changed."
++      "nothingChanged": "Your answers match the current values — nothing changed.",
++      "institutionDependence": "Having most of your money managed by ONE institution bothers you…",
++      "institutionDependence_1": "A lot — spread it",
++      "institutionDependence_2": "Normal",
++      "institutionDependence_3": "Little — one login is convenient",
++      "paymentRiseSensitivity": "If your mortgage payment crept up over the years, that would be…",
++      "paymentRiseSensitivity_1": "A real problem — cap linkage",
++      "paymentRiseSensitivity_2": "Manageable",
++      "paymentRiseSensitivity_3": "Fine — cheaper today matters more",
++      "dataStrictness": "When some data is missing or stale, advice should…",
++      "dataStrictness_1": "Refuse until data is complete",
++      "dataStrictness_2": "Balanced",
++      "dataStrictness_3": "Work with what exists",
++      "taxablePortfolioAge": "Your taxable investments (brokerage) have existed…",
++      "taxablePortfolioAge_1": "Under ~2 years — mostly principal",
++      "taxablePortfolioAge_2": "A few years — some gains",
++      "taxablePortfolioAge_3": "A decade+ — large share is gains",
++      "advicePriority": "What matters most when ranking recommendations?",
++      "advicePriority_1": "Safety — reduce risks first",
++      "advicePriority_2": "Tax — capture benefits first",
++      "advicePriority_3": "Growth — progress toward goals first",
++      "advicePriority_4": "Balanced (default)"
+     }
+   },
+   "goals": {
+@@ -870,7 +891,9 @@
+     "taxNote": "Projections apply tax-aware withdrawals: drawdowns are pulled taxable → study-fund → pension, taxed per the registry.",
+     "mcScenario": "Simulated path",
+     "baselinePath": "Baseline — as things are today",
+-    "mcMeasured": "Simulated path"
++    "mcMeasured": "Simulated path",
++    "beyondHorizon": "Beyond the simulated horizon — raise the years",
++    "missingGoalData": "Missing target date / required funding"
+   },
+   "monitoring": {
+     "explainerTitle": "What is this tab?",
+diff --git a/packages/i18n/messages/he.json b/packages/i18n/messages/he.json
+index 662f4e4..1b1e1db 100644
+--- a/packages/i18n/messages/he.json
++++ b/packages/i18n/messages/he.json
+@@ -661,7 +661,28 @@
+       "applyNote": "כל ערך בודד אפשר לכוון אחר-כך בעמוד הרגיסטרי — האשף והדריסות הידניות משתמשים באותו מנגנון.",
+       "apply": "החלת התשובות",
+       "changedBanner": "עודכנו",
+-      "nothingChanged": "התשובות תואמות את הערכים הנוכחיים — שום דבר לא השתנה."
++      "nothingChanged": "התשובות תואמות את הערכים הנוכחיים — שום דבר לא השתנה.",
++      "institutionDependence": "שרוב הכסף מנוהל בגוף אחד — זה מפריע לכם…",
++      "institutionDependence_1": "מאוד — לפזר",
++      "institutionDependence_2": "רגיל",
++      "institutionDependence_3": "מעט — כניסה אחת זה נוח",
++      "paymentRiseSensitivity": "אם החזר המשכנתא יטפס עם השנים, זה יהיה…",
++      "paymentRiseSensitivity_1": "בעיה אמיתית — לתחום הצמדה",
++      "paymentRiseSensitivity_2": "נסבל",
++      "paymentRiseSensitivity_3": "בסדר — זול היום חשוב יותר",
++      "dataStrictness": "כשחסרים נתונים או שהם מיושנים, הייעוץ צריך…",
++      "dataStrictness_1": "לסרב עד שהנתונים מלאים",
++      "dataStrictness_2": "מאוזן",
++      "dataStrictness_3": "לעבוד עם מה שיש",
++      "taxablePortfolioAge": "תיק ההשקעות החייב במס (ברוקר) קיים…",
++      "taxablePortfolioAge_1": "פחות מ~שנתיים — בעיקר קרן",
++      "taxablePortfolioAge_2": "כמה שנים — יש רווחים",
++      "taxablePortfolioAge_3": "עשור+ — חלק גדול רווחים",
++      "advicePriority": "מה הכי חשוב בדירוג ההמלצות?",
++      "advicePriority_1": "ביטחון — קודם להקטין סיכונים",
++      "advicePriority_2": "מס — קודם למצות הטבות",
++      "advicePriority_3": "צמיחה — קודם התקדמות ליעדים",
++      "advicePriority_4": "מאוזן (ברירת המחדל)"
+     }
+   },
+   "goals": {
+@@ -870,7 +891,9 @@
+     "taxNote": "התחזיות מיישמות משיכה יעילת-מס: משיכות נמשכות לפי סדר — חשבון חייב במס, קרן השתלמות, פנסיה — עם מס לפי הרישום.",
+     "mcScenario": "מסלול לסימולציה",
+     "baselinePath": "בסיס — המצב כפי שהוא היום",
+-    "mcMeasured": "המסלול שנמדד"
++    "mcMeasured": "המסלול שנמדד",
++    "beyondHorizon": "מעבר לאופק הסימולציה — הגדילו את השנים",
++    "missingGoalData": "חסר תאריך יעד / מימון נדרש"
+   },
+   "monitoring": {
+     "explainerTitle": "מה זה הטאב הזה?",
+diff --git a/packages/registry/src/wizard.ts b/packages/registry/src/wizard.ts
+index 4abbc32..4e9d183 100644
+--- a/packages/registry/src/wizard.ts
++++ b/packages/registry/src/wizard.ts
+@@ -29,6 +29,16 @@ export interface WizardAnswers {
+   feeImportance: 1 | 2;
+   /** Loan size below which it's not worth a discussion (base currency). */
+   largeLoanBase: number;
++  /** Dependence on a single managing institution bothers you: 1=a lot, 2=normal, 3=little. */
++  institutionDependence: 1 | 2 | 3;
++  /** Sensitivity to the mortgage payment rising over the years: 1=very, 2=normal, 3=not much. */
++  paymentRiseSensitivity: 1 | 2 | 3;
++  /** When data is incomplete, advice should: 1=refuse until complete, 2=balanced, 3=work with what exists. */
++  dataStrictness: 1 | 2 | 3;
++  /** How long has your taxable investment portfolio existed: 1=new, 2=a few years, 3=a decade+. */
++  taxablePortfolioAge: 1 | 2 | 3;
++  /** What matters most in recommendations: 1=safety, 2=tax savings, 3=growth toward goals, 4=balanced. */
++  advicePriority: 1 | 2 | 3 | 4;
+ }
+ 
+ export type WizardOutput = Array<{ key: string; value: number | Record<string, number> }>;
+@@ -86,5 +96,37 @@ export function wizardAnswersToAssumptions(a: WizardAnswers): WizardOutput {
+ 
+   out.push({ key: "large_loan_notice_base", value: Math.max(0, Math.round(a.largeLoanBase)) });
+ 
++  out.push({
++    key: "concentration_institution_max_pct",
++    value: a.institutionDependence === 1 ? 40 : a.institutionDependence === 3 ? 60 : 50,
++  });
++
++  out.push({
++    key: "mortgage_cpi_linked_max_pct",
++    value: a.paymentRiseSensitivity === 1 ? 33 : a.paymentRiseSensitivity === 3 ? 60 : 50,
++  });
++
++  // Data strictness drives the strategy gate AND the allocation unknown-mix refusal ceiling.
++  out.push({ key: "strategy_min_completeness", value: a.dataStrictness === 1 ? 90 : a.dataStrictness === 3 ? 70 : 80 });
++  out.push({ key: "strategy_min_confidence", value: a.dataStrictness === 1 ? 70 : a.dataStrictness === 3 ? 50 : 60 });
++  out.push({ key: "allocation_mix_unknown_max_pct", value: a.dataStrictness === 1 ? 40 : a.dataStrictness === 3 ? 60 : 50 });
++
++  // Factual question, not preference: how seasoned the taxable portfolio is → assumed gain fraction.
++  out.push({ key: "taxable_gain_fraction", value: a.taxablePortfolioAge === 1 ? 0.2 : a.taxablePortfolioAge === 3 ? 0.6 : 0.4 });
++
++  // Nagging also tunes the refinance alert spread (alert-appetite, not a market number).
++  out.push({ key: "mortgage_refinance_notice_spread_pct", value: a.nagging === 1 ? 0.3 : a.nagging === 3 ? 0.7 : 0.5 });
++
++  // Fee importance also scales the global fallback threshold.
++  out.push({ key: "management_fee_notice_pct", value: a.feeImportance === 1 ? 0.7 : Number(defaultOf("management_fee_notice_pct")) });
++
++  const WEIGHT_PRESETS: Record<number, Record<string, number>> = {
++    1: { impact: 25, ease: 10, taxBenefit: 10, riskReduction: 35, goalContribution: 15, urgency: 5 }, // safety-first
++    2: { impact: 25, ease: 10, taxBenefit: 35, riskReduction: 10, goalContribution: 15, urgency: 5 }, // tax-first
++    3: { impact: 35, ease: 10, taxBenefit: 10, riskReduction: 10, goalContribution: 30, urgency: 5 }, // growth/goals-first
++    4: defaultOf("priority_weights") as Record<string, number>, // balanced = system default
++  };
++  out.push({ key: "priority_weights", value: WEIGHT_PRESETS[a.advicePriority]! });
++
+   return out;
+ }
+diff --git a/packages/registry/test/wizard.test.ts b/packages/registry/test/wizard.test.ts
+index 0a4f227..f6632f4 100644
+--- a/packages/registry/test/wizard.test.ts
++++ b/packages/registry/test/wizard.test.ts
+@@ -5,6 +5,8 @@ const base: WizardAnswers = {
+   bufferMonths: 6, spendRigidity: 2, nagging: 2, concentrationSensitivity: 2,
+   israelDependence: 2, regretType: 2, homeView: 2, driftSpeed: 2, feeImportance: 2,
+   largeLoanBase: 100_000,
++  institutionDependence: 2, paymentRiseSensitivity: 2, dataStrictness: 2,
++  taxablePortfolioAge: 2, advicePriority: 4,
+ };
+ const val = (out: ReturnType<typeof wizardAnswersToAssumptions>, key: string) =>
+   out.find((o) => o.key === key)!.value;
+@@ -45,6 +47,19 @@ describe("wizardAnswersToAssumptions", () => {
+     for (const v of Object.values(map)) expect(v).toBeLessThan(1);
+   });
+ 
++  it("v2 questions: strictness gates, portfolio age → gain fraction, priority presets sum to 100", () => {
++    const strict = wizardAnswersToAssumptions({ ...base, dataStrictness: 1, taxablePortfolioAge: 3, advicePriority: 1 });
++    expect(val(strict, "strategy_min_completeness")).toBe(90);
++    expect(val(strict, "allocation_mix_unknown_max_pct")).toBe(40);
++    expect(val(strict, "taxable_gain_fraction")).toBe(0.6);
++    const w = val(strict, "priority_weights") as Record<string, number>;
++    expect(Object.values(w).reduce((s, x) => s + x, 0)).toBe(100);
++    expect(w["riskReduction"]).toBe(35);
++    const neutral = wizardAnswersToAssumptions(base);
++    expect(val(neutral, "mortgage_refinance_notice_spread_pct")).toBe(0.5);
++    expect(val(neutral, "concentration_institution_max_pct")).toBe(50);
++  });
++
+   it("emergency months clamp to [3,12]", () => {
+     expect(val(wizardAnswersToAssumptions({ ...base, bufferMonths: 12, spendRigidity: 1 }), "emergency_fund_months")).toBe(12);
+     expect(val(wizardAnswersToAssumptions({ ...base, bufferMonths: 3, spendRigidity: 3 }), "emergency_fund_months")).toBe(3);

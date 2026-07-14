@@ -12,6 +12,10 @@ const SCALE_QUESTIONS = [
   { name: "homeView", opts: 3 },
   { name: "driftSpeed", opts: 3 },
   { name: "feeImportance", opts: 2 },
+  { name: "institutionDependence", opts: 3 },
+  { name: "paymentRiseSensitivity", opts: 3 },
+  { name: "dataStrictness", opts: 3 },
+  { name: "taxablePortfolioAge", opts: 3 },
 ] as const;
 
 export default async function AssumptionsWizardPage({
@@ -54,6 +58,14 @@ export default async function AssumptionsWizardPage({
 
         <Field label={t("largeLoanBase")}>
           <TextInput name="largeLoanBase" inputMode="numeric" defaultValue="100000" />
+        </Field>
+
+        <Field label={t("advicePriority")}>
+          <Select name="advicePriority" defaultValue="4">
+            {[1, 2, 3, 4].map((v) => (
+              <option key={v} value={v}>{t(`advicePriority_${v}`)}</option>
+            ))}
+          </Select>
         </Field>
 
         <p className="text-xs text-neutral-400">{t("applyNote")}</p>

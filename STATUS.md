@@ -2,6 +2,21 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-15, session 2)
+
+- **M24 (wizard v2 + MC clarity) code-complete — delivered stacked on the M23 patch.** Wizard grows
+  10→15 questions and now drives 24 of 39 assumptions (institution concentration, CPI-mortgage share,
+  data-strictness → strategy gates + unknown-mix ceiling, taxable-portfolio age → taxable_gain_fraction
+  (factual, not preference), advice-priority → priority_weights presets each summing to 100; nagging
+  additionally tunes the refinance alert spread; fee importance also scales the global fee fallback).
+  Split is now: 24 wizard + 6 risk questionnaire + 9 expert-owned (returns ×2, inflation, goal return,
+  MC volatility, pension withdrawal tax, expensive-debt rate, prime spread, large-loan base is asked).
+  Monte Carlo goals now carry `notComputableReason` (BEYOND_HORIZON vs MISSING_DATA) and the scenarios
+  page prints the reason with a fix hint instead of a bare "not computable". Owner's stale "Monte Carlo"
+  card explained: pre-M23 saved run on a snapshot without goal funding; 2050 goals need horizon ≥ 25.
+  Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
+  Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
+
 ## Current state (2026-07-15)
 
 - **M23 (wizard + action checklists + audit + trust ladder) code-complete — delivered as a GIT PATCH

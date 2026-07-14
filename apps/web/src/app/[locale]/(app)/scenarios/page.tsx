@@ -16,7 +16,7 @@ interface MCShape {
   monteCarlo: {
     runs: number; volatilityPct: number;
     years: Array<{ year: number; netWorthP10: number; netWorthP50: number; netWorthP90: number }>;
-    goals: Array<{ goalId: string; name: string; targetYear: number | null; probabilityFunded: number | null }>;
+    goals: Array<{ goalId: string; name: string; targetYear: number | null; probabilityFunded: number | null; notComputableReason?: "BEYOND_HORIZON" | "MISSING_DATA" | null }>;
     depletionProbability: number;
   };
 }
@@ -133,7 +133,13 @@ export default async function ScenariosPage({
                 {mc.goals.map((g) => (
                   <li key={g.goalId} className="flex justify-between">
                     <span dir="auto">{g.name}{g.targetYear ? ` (${g.targetYear})` : ""}</span>
-                    <span className="font-medium">{g.probabilityFunded === null ? t("notComputable") : `${Math.round(g.probabilityFunded * 100)}%`}</span>
+                    <span className="font-medium">
+                      {g.probabilityFunded === null
+                        ? g.notComputableReason === "BEYOND_HORIZON"
+                          ? t("beyondHorizon")
+                          : t("missingGoalData")
+                        : `${Math.round(g.probabilityFunded * 100)}%`}
+                    </span>
                   </li>
                 ))}
               </ul>

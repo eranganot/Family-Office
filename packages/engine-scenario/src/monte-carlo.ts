@@ -30,7 +30,9 @@ export interface MonteCarloGoal {
   goalId: string;
   name: string;
   targetYear: number | null;
-  probabilityFunded: number | null; // null = not computable in the horizon
+  probabilityFunded: number | null; // null = not computable — see reason
+  /** Why probabilityFunded is null: beyond the simulated horizon vs missing funding/date data. */
+  notComputableReason: "BEYOND_HORIZON" | "MISSING_DATA" | null;
 }
 
 export interface MonteCarloResult {
@@ -120,13 +122,18 @@ export function projectMonteCarlo(
     });
   }
 
+  const lastSimYear = startYear + years;
   const goals: MonteCarloGoal[] = snapshot.goals.map((g) => {
     const computable = goalComputable.get(g.id) ?? 0;
+    const targetYear = g.targetDate ? new Date(g.targetDate).getFullYear() : null;
+    const missingData = !g.targetDate || g.requiredFundingBase === null;
     return {
       goalId: g.id,
       name: g.name,
-      targetYear: g.targetDate ? new Date(g.targetDate).getFullYear() : null,
+      targetYear,
       probabilityFunded: computable > 0 ? (goalFundedCount.get(g.id) ?? 0) / computable : null,
+      notComputableReason:
+        computable > 0 ? null : missingData ? "MISSING_DATA" : targetYear !== null && targetYear > lastSimYear ? "BEYOND_HORIZON" : "MISSING_DATA",
     };
   });
 

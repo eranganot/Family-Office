@@ -46,6 +46,11 @@ export async function applyWizardAction(fd: FormData): Promise<void> {
       driftSpeed: num("driftSpeed", 2) as never,
       feeImportance: num("feeImportance", 2) as never,
       largeLoanBase: num("largeLoanBase", 100000),
+      institutionDependence: num("institutionDependence", 2) as never,
+      paymentRiseSensitivity: num("paymentRiseSensitivity", 2) as never,
+      dataStrictness: num("dataStrictness", 2) as never,
+      taxablePortfolioAge: num("taxablePortfolioAge", 2) as never,
+      advicePriority: num("advicePriority", 4) as never,
     });
     redirect(`/${locale}/registry?wizardChanged=${encodeURIComponent(changed.join(","))}`);
   } catch (e) {
