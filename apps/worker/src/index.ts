@@ -10,10 +10,19 @@
  * workflow phase — the re-evaluation flow (guarded, human-initiated) does that.
  */
 import { prisma } from "@wealthos/db";
-import { runMonitoringCycle } from "@wealthos/api";
+import { refreshFxFromBoi, runMonitoringCycle } from "@wealthos/api";
 
 async function main(): Promise<void> {
   const startedAt = Date.now();
+
+  // Daily FX refresh from Bank of Israel — non-fatal: monitoring proceeds on stale
+  // rates (the snapshot records which rates were used either way).
+  try {
+    const fx = await refreshFxFromBoi(prisma);
+    console.log(`[worker] BOI FX refresh: stored=${fx.stored} skipped=${fx.skipped} asOf=${fx.asOf}`);
+  } catch (err) {
+    console.error("[worker] BOI FX refresh FAILED (continuing with stored rates):", err);
+  }
   const households = await prisma.household.findMany({ select: { id: true, name: true } });
   if (households.length === 0) {
     console.log("[worker] no household bootstrapped; nothing to monitor.");

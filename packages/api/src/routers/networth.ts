@@ -49,6 +49,11 @@ export const networthRouter = router({
     ctx.db.fxRate.findMany({ orderBy: [{ from: "asc" }, { to: "asc" }, { asOf: "desc" }] }),
   ),
 
+  refreshFxFromBoi: protectedProcedure.mutation(async ({ ctx }) => {
+    const { refreshFxFromBoi } = await import("../services/fx-service");
+    return refreshFxFromBoi(ctx.db);
+  }),
+
   setFxRate: protectedProcedure
     .input(CurrencyPair.extend({ rate: DecimalString, asOf: z.coerce.date() }))
     .mutation(async ({ ctx, input }) => {

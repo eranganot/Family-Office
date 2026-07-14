@@ -79,7 +79,12 @@
     "noValuation": "no valuation",
     "close": "Close item",
     "addValuation": "Update value",
-    "needMembers": "Add family members before mapping items (ownership must be assigned)."
+    "needMembers": "Add family members before mapping items (ownership must be assigned).",
+    "suggestGrowth": "Auto-suggest growth share %",
+    "suggestGrowthHint": "Heuristic estimates from track names — flagged until you confirm.",
+    "growthEstimate": "Growth est.",
+    "confirmEstimate": "confirm",
+    "growthConfirmed": "Growth"
   },
   "kinds": {
     "ACCOUNT": "Accounts",
@@ -230,7 +235,9 @@
     "asOf": "Date",
     "set": "Set rate",
     "empty": "No rates yet. Foreign-currency items are excluded from totals until a rate exists.",
-    "source": "Source"
+    "source": "Source",
+    "refreshFromBoi": "Fetch today's Bank of Israel rates",
+    "refreshedBanner": "Rates updated from Bank of Israel."
   },
   "home": {
     "welcome": "Welcome",
@@ -335,7 +342,11 @@
     "year": "Tax year",
     "reviewed": "Owner-reviewed",
     "pendingReview": "PENDING OWNER REVIEW",
-    "sources": "Sources"
+    "sources": "Sources",
+    "explainerTitle": "What is this tab?",
+    "explainer1": "The registry holds every ASSUMPTION the engines use (emergency-fund target, expected returns, your risk answers, drift thresholds) and the Israeli TAX RULES (brackets, hishtalmut/pension ceilings) — deliberately outside the code, so you can see and control them.",
+    "explainer2": "Overriding a value creates a new VERSION. Recommendations are pinned to the exact versions they were built with — changing an assumption marks affected recommendations as invalidated, so advice never silently rests on outdated inputs.",
+    "explainer3": "Tax rules carry their sources and stay marked \"pending owner review\" until you confirm the figures match reality."
   },
   "goals": {
     "title": "Goals",
@@ -382,7 +393,11 @@
       "INHERITANCE": "Inheritance",
       "PHILANTHROPY": "Philanthropy",
       "OTHER": "Other"
-    }
+    },
+    "targetMonthlyIncome": "Desired monthly income",
+    "incomeModeHint": "FI/Retirement goals: capital target derived automatically",
+    "incomeModeBadge": "Income target",
+    "perMonth": "mo"
   },
   "strategy": {
     "title": "Strategy",
@@ -486,7 +501,11 @@
       "MORTGAGE_REFINANCE": "Mortgage refinance (-1pp all tracks)",
       "SAVINGS_RATE_UP": "Save ₪2,000/mo more",
       "SAVINGS_RATE_DOWN": "Save ₪2,000/mo less"
-    }
+    },
+    "explainerTitle": "What is this tab?",
+    "explainer1": "Scenarios answer \"what if\" questions: pick a situation (saving more, losing a job, refinancing) and a horizon, and the engine projects your net worth year by year in TODAY’s purchasing power — once as things are (baseline) and once with the scenario applied.",
+    "explainer2": "Reading the table: each column is projected net worth at that year; the Δ row is the scenario’s effect. \"Lowest point of liquid capital\" is the worst moment for accessible money; \"capital depleted\" warns if you would run out entirely (\"never\" is good).",
+    "explainer3": "\"Goal outcomes\" shows whether each goal ends up funded under each path. Nothing here changes your data — scenarios are safe experiments, saved for comparison."
   },
   "monitoring": {
     "title": "Monitoring",

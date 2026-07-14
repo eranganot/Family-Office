@@ -1,6 +1,6 @@
 import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
-import { addValuationAction, closeItemAction } from "../../../../lib/actions/mapping-actions";
+import { addValuationAction, closeItemAction, confirmGrowthShareAction, suggestGrowthSharesAction } from "../../../../lib/actions/mapping-actions";
 import { Card, ErrorBanner, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { Link } from "../../../../i18n/navigation";
@@ -54,6 +54,13 @@ export default async function MappingPage({
       <Card title={t("mapping.title")}>
         <ErrorBanner message={error ? `${t("forms.error")}: ${decodeURIComponent(error)}` : undefined} />
         {!hasMembers ? <p className="mb-3 text-sm text-amber-700">{t("mapping.needMembers")}</p> : null}
+        <form action={suggestGrowthSharesAction} className="mb-3">
+          <input type="hidden" name="locale" value={locale} />
+          <button type="submit" className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700">
+            {t("mapping.suggestGrowth")}
+          </button>
+          <span className="ms-2 text-xs text-neutral-400">{t("mapping.suggestGrowthHint")}</span>
+        </form>
         <div className="flex flex-wrap gap-2">
           {NEW_KINDS.map((k) => (
             <Link
@@ -80,6 +87,22 @@ export default async function MappingPage({
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-sm font-medium">{item.name}</span>
+                      {item.accountDetail?.growthSharePct != null ? (
+                        item.accountDetail.growthShareEstimated ? (
+                          <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                            {t("mapping.growthEstimate")}: {String(item.accountDetail.growthSharePct)}%
+                            <form action={confirmGrowthShareAction} className="inline">
+                              <input type="hidden" name="locale" value={locale} />
+                              <input type="hidden" name="id" value={item.id} />
+                              <button type="submit" className="font-medium underline">{t("mapping.confirmEstimate")}</button>
+                            </form>
+                          </span>
+                        ) : (
+                          <span className="ms-2 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
+                            {t("mapping.growthConfirmed")}: {String(item.accountDetail.growthSharePct)}%
+                          </span>
+                        )
+                      ) : null}
                       <span className="ms-2 text-xs text-neutral-400">
                         {item.latestValuation
                           ? `${t("mapping.latestValue")}: ${formatMoney(item.latestValuation.value.toString(), item.latestValuation.currency, locale as Locale)} (${t("mapping.asOf")} ${formatDate(item.latestValuation.asOf, locale as Locale)})`

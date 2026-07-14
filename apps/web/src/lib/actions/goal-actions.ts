@@ -14,6 +14,7 @@ export async function createGoalAction(fd: FormData): Promise<void> {
       priority: Number(opt(fd, "priority") ?? 5),
       targetDate: opt(fd, "targetDate") as never,
       requiredFunding: opt(fd, "requiredFunding"),
+      targetMonthlyIncome: opt(fd, "targetMonthlyIncome"),
       riskTolerance: (opt(fd, "riskTolerance") ?? "MEDIUM") as never,
       dependsOnGoalIds: fd.getAll("dependsOn").map(String).filter(Boolean),
     } as never);
@@ -42,6 +43,7 @@ export async function updateGoalAction(fd: FormData): Promise<void> {
       priority: Number(opt(fd, "priority") ?? 5),
       targetDate: opt(fd, "targetDate") as never,
       requiredFunding: opt(fd, "requiredFunding"),
+      targetMonthlyIncome: opt(fd, "targetMonthlyIncome"),
       riskTolerance: (opt(fd, "riskTolerance") ?? "MEDIUM") as never,
       dependsOnGoalIds: fd.getAll("dependsOn").map(String).filter(Boolean),
     } as never);

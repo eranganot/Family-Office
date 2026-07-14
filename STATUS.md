@@ -50,6 +50,23 @@
   ("nothing happens") though overrides persisted (prod showed derived target 85%) → saveRiskAction
   now redirects with ?savedRisk=1 and the strategy page shows a green "answers saved" banner.
   Recommendations remain English until owner clicks הרצה (by design; old rows fall back to en).
+- **M14 (owner requests batch) code-complete, NOT yet deployed.** (a) Income mode: Goal.targetMonthlyIncome
+  (FI/RETIREMENT only, enforced create+update); effective requiredFunding DERIVED at read time from
+  goal_projection_real_return_pct (perpetuity: monthly*12/rate) in BOTH the fundingGap route and the
+  snapshot builder — tracks assumption changes with zero sync jobs; goal UI field + income badge.
+  (b) Automatic FX: services/fx-service.ts fetches BOI PublicApi (USD/EUR/GBP/CHF→ILS, per-unit
+  normalized, defensive parsing, upsert on [from,to,asOf,source="BOI"]); worker runs it daily before
+  monitoring (non-fatal on failure); networth.refreshFxFromBoi mutation + FX-page button+banner.
+  Verified live against the real BOI endpoint from the sandbox. (c) Growth-share auto-suggest:
+  services/growth-heuristic.ts (Hebrew track-name keyword table + wrapper-type defaults; brokerage/IRA
+  deliberately return null — never guess); accounts.suggestGrowthShares fills unknowns as
+  growthShareEstimated=true; mapping-page bulk button + amber estimate badge + one-click confirm;
+  manual entry clears the flag; SnapshotItem.growthShareEstimated (additive, defaulted);
+  ALLOCATION_MIX_ESTIMATED INFO finding + bilingual generator (16 generators total).
+  (d) Explainer <details> blocks on scenarios + registry pages (he/en); docs/IMPROVEMENTS.md added
+  (prioritized owner-review backlog). Migration 20260713110000_m14_income_mode_fx_growth (Goal column +
+  AccountDetail.growthShareEstimated). Verified: prisma validate, tsc (api/web/worker/domain/engines),
+  engine tests 24+17+8. **Deploys with the same pending push.**
 - Owner direction for v1.1 (recorded 2026-07-13): (1) all recommendations in Hebrew — M10;
   (2) edit everything (goals/accounts/members/RE/mortgages/flows) — M11; (3) asset-allocation
   strategy: risk questionnaire as versioned assumptions, whole-net-worth target model with

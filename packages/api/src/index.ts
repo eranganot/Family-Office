@@ -42,3 +42,5 @@ export type AppRouter = typeof appRouter;
 export { runMonitoringCycle } from "./services/monitoring-service";
 export type { MonitoringCycleResult } from "./services/monitoring-service";
 export type { Context, Session } from "./context";
+export { refreshFxFromBoi } from "./services/fx-service";
+export type { FxRefreshResult } from "./services/fx-service";

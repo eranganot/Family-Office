@@ -64,6 +64,7 @@ export default async function GoalsPage({
                       <span className="ms-2 text-xs text-neutral-400">
                         {t(`types.${g.type}`)}
                         {g.targetDate ? ` · ${formatDate(g.targetDate, l)}` : ""}
+                        {g.targetMonthlyIncome ? ` · ${t("incomeModeBadge")}: ${formatMoney(String(g.targetMonthlyIncome), "ILS", l)}/${t("perMonth")}` : ""}
                         {g.dependsOn.length > 0 ? ` · ${t("dependsOn")}: ${g.dependsOn.map((d) => d.dependsOnGoal.name).join(", ")}` : ""}
                       </span>
                     </div>
@@ -115,6 +116,11 @@ export default async function GoalsPage({
                       <Field label={`${t("requiredFunding")} (${household.baseCurrency})`}>
                         <TextInput name="requiredFunding" inputMode="decimal" defaultValue={g.requiredFunding ? String(g.requiredFunding) : ""} />
                       </Field>
+                      {g.type === "FINANCIAL_INDEPENDENCE" || g.type === "RETIREMENT" ? (
+                        <Field label={`${t("targetMonthlyIncome")} (${household.baseCurrency})`}>
+                          <TextInput name="targetMonthlyIncome" inputMode="decimal" defaultValue={g.targetMonthlyIncome ? String(g.targetMonthlyIncome) : ""} />
+                        </Field>
+                      ) : null}
                       <Field label={t("riskTolerance")}>
                         <Select name="riskTolerance" defaultValue={g.riskTolerance}>
                           {(["LOW", "MEDIUM", "HIGH"] as const).map((rt) => <option key={rt} value={rt}>{t(rt)}</option>)}
@@ -158,6 +164,9 @@ export default async function GoalsPage({
           </Field>
           <Field label={`${t("requiredFunding")} (${household.baseCurrency})`}>
             <TextInput name="requiredFunding" inputMode="decimal" />
+          </Field>
+          <Field label={`${t("targetMonthlyIncome")} (${household.baseCurrency})`}>
+            <TextInput name="targetMonthlyIncome" inputMode="decimal" placeholder={t("incomeModeHint")} />
           </Field>
           <Field label={t("riskTolerance")}>
             <Select name="riskTolerance" defaultValue="MEDIUM">

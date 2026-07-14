@@ -21,7 +21,7 @@ function snap(items: SnapshotPayload["items"], goals: SnapshotPayload["goals"] =
 function acct(id: string, valueBase: number, accountType = "BANK_CHECKING"): SnapshotPayload["items"][number] {
   return {
     id, kind: "ACCOUNT", name: id, currency: "ILS", accountType, institutionName: "Bank",
-    liquidityClass: null, managementFeePct: null, growthSharePct: null, valueBase, valueAsOf: "2026-01-01",
+    liquidityClass: null, managementFeePct: null, growthSharePct: null, growthShareEstimated: false, valueBase, valueAsOf: "2026-01-01",
     verified: true, ownerMemberIds: [], mortgageTracks: null, cashFlow: null,
   };
 }
