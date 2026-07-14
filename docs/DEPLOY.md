@@ -48,3 +48,34 @@ created with `railway up --service wealthos-worker` (deploying with that config 
 deploy with `apps/worker/railway.json` in place of the root `railway.json`, or set the worker
 service's Config-file path to `apps/worker/railway.json` in the dashboard. `0 6 * * *` UTC â‰ˆ 09:00
 Asia/Jerusalem.
+
+## Database backups (D4) — the ledger is the family's financial memory
+
+WealthOS's Postgres is the canonical household ledger; it must be backed up.
+
+### 1. Native Railway backups (primary)
+
+In the Railway project -> **Postgres service -> Backups** tab:
+
+1. **Enable scheduled backups.** Set a **daily** schedule (retention >= 14 days). Railway
+   snapshots the volume; Point-in-Time Recovery keeps roughly the last 4 full backups
+   (~4-week restore window).
+2. Confirm the first snapshot appears before relying on it.
+3. **Restore drill:** from the Backups tab, "Restore" clones the snapshot to a new
+   volume/service -- restore into a *throwaway* service first, run
+   `npx prisma migrate status` + a row count against it, then cut over. Never restore
+   in-place onto the live service without a verified snapshot in hand.
+
+### 2. Offsite logical dump (secondary, recommended)
+
+Railway snapshots live in the same account; keep one copy elsewhere. Either add a small
+cron service (e.g. the "Postgres -> R2/S3 Backup" template: `RAILWAY_CRON_SCHEDULE="0 3 * * *"`,
+gzip + retention), or run a manual monthly `pg_dump` offsite:
+
+```bash
+pg_dump "$DATABASE_URL" --format=custom --file=wealthos-$(date +%Y%m%d).dump
+# restore into a scratch DB to verify: pg_restore --list wealthos-YYYYMMDD.dump
+```
+
+Because the schema is Prisma-migrated, a logical dump + `prisma migrate deploy` on a fresh
+DB fully reconstructs the ledger. Store dumps encrypted; they contain household financial data.
