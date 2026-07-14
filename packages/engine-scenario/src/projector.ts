@@ -71,8 +71,11 @@ export interface ProjectionResult {
 
 const round = (n: number) => Math.round(n);
 
-export function project(snapshot: SnapshotPayload, params: ProjectionParams): ProjectionResult {
-  const r = params.realReturnPct / 100;
+export function projectPath(
+  snapshot: SnapshotPayload,
+  params: ProjectionParams,
+  annualRealReturns: number[],
+): ProjectionResult {
 
   const RETIREMENT = new Set(["PENSION_COMPREHENSIVE", "PENSION_GENERAL", "KUPAT_GEMEL", "IRA_GEMEL", "FOREIGN_RETIREMENT"]);
   let investable = 0;
@@ -106,6 +109,7 @@ export function project(snapshot: SnapshotPayload, params: ProjectionParams): Pr
   let yearsToDepletion: number | null = null;
 
   for (let year = 1; year <= params.years; year++) {
+    const r = annualRealReturns[year - 1] ?? params.realReturnPct / 100;
     // Shocks at the start of the year
     if (params.marketShock && params.marketShock.year === year) {
       investable *= 1 - params.marketShock.drawdownPct / 100;
@@ -188,4 +192,10 @@ function normalizeMonthly(amount: number, frequency: string): number {
   if (frequency === "MONTHLY") return amount;
   if (frequency === "ANNUAL") return amount / 12;
   return 0; // ONE_TIME flows are not recurring
+}
+
+/** Deterministic projection: a constant real return every year. Monte Carlo reuses projectPath. */
+export function project(snapshot: SnapshotPayload, params: ProjectionParams): ProjectionResult {
+  const rConst = params.realReturnPct / 100;
+  return projectPath(snapshot, params, Array.from({ length: params.years }, () => rConst));
 }

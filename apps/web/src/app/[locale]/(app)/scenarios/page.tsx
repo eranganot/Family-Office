@@ -1,6 +1,6 @@
 import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
-import { runScenarioAction } from "../../../../lib/actions/scenario-actions";
+import { runMonteCarloAction, runScenarioAction } from "../../../../lib/actions/scenario-actions";
 import { Card, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { Link } from "../../../../i18n/navigation";
@@ -12,6 +12,14 @@ const TYPES = [
 
 interface ProjRows { rows: Array<{ year: number; netWorth: number; investable: number }>; terminalNetWorth: number; minInvestable: number; yearsToDepletion: number | null; goalOutcomes: Array<{ goalId: string; name: string; targetYear: number | null; funded: boolean | null }>; }
 interface ResultShape { baseline: ProjRows; scenario: ProjRows; years: number; }
+interface MCShape {
+  monteCarlo: {
+    runs: number; volatilityPct: number;
+    years: Array<{ year: number; netWorthP10: number; netWorthP50: number; netWorthP90: number }>;
+    goals: Array<{ goalId: string; name: string; targetYear: number | null; probabilityFunded: number | null }>;
+    depletionProbability: number;
+  };
+}
 
 export default async function ScenariosPage({
   params,
@@ -49,9 +57,14 @@ export default async function ScenariosPage({
 
   const saved = await trpc.scenarios.list();
   const selected = view ? await trpc.scenarios.get({ id: view }) : null;
-  const result = selected?.resultSnapshot as unknown as ResultShape | null;
+  const rs = (selected?.resultSnapshot ?? null) as unknown as (ResultShape & Partial<MCShape>) | null;
+  const mc = rs && "monteCarlo" in rs ? (rs as unknown as MCShape).monteCarlo : null;
+  const result = mc ? null : (rs as unknown as ResultShape | null);
   const milestoneYears = result
     ? [0, 4, 9, result.baseline.rows.length - 1].filter((i, n, a) => i >= 0 && a.indexOf(i) === n && i < result.baseline.rows.length)
+    : [];
+  const mcMilestones = mc
+    ? [0, 4, 9, mc.years.length - 1].filter((i, n, a) => i >= 0 && a.indexOf(i) === n && i < mc.years.length)
     : [];
   const nis = (n: number) => formatMoney(String(n), "ILS", l);
 
@@ -72,7 +85,52 @@ export default async function ScenariosPage({
           </Field>
           <SubmitButton label={t("run")} />
         </form>
+        <form action={runMonteCarloAction} className="mt-3 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="locale" value={locale} />
+          <Field label={t("years")}>
+            <TextInput name="years" type="number" min={5} max={50} defaultValue={20} />
+          </Field>
+          <SubmitButton label={t("runMonteCarlo")} />
+        </form>
       </Card>
+
+      {selected && mc ? (
+        <Card title={`${selected.name} · ${formatDate(selected.createdAt, l)}`}>
+          <p className="mb-3 text-xs text-neutral-500">{t("mcHint", { runs: mc.runs, vol: mc.volatilityPct })}</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-neutral-400">
+                <th className="pb-2 text-start"></th>
+                {mcMilestones.map((i) => <th key={i} className="pb-2 text-start">{t("netWorthAt")} {mc.years[i]!.year}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {([["netWorthP90", "p90"], ["netWorthP50", "p50"], ["netWorthP10", "p10"]] as const).map(([key, lab]) => (
+                <tr key={lab} className="border-t border-neutral-100">
+                  <td className="py-2 font-medium">{t(lab)}</td>
+                  {mcMilestones.map((i) => <td key={i} className="py-2">{nis(mc.years[i]![key])}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="mt-3 text-sm">
+            {t("depletionProbability")}: <span className="font-medium">{Math.round(mc.depletionProbability * 100)}%</span>
+          </div>
+          {mc.goals.length > 0 ? (
+            <div className="mt-4">
+              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400">{t("goalSuccess")}</div>
+              <ul className="flex flex-col gap-1 text-sm">
+                {mc.goals.map((g) => (
+                  <li key={g.goalId} className="flex justify-between">
+                    <span dir="auto">{g.name}{g.targetYear ? ` (${g.targetYear})` : ""}</span>
+                    <span className="font-medium">{g.probabilityFunded === null ? t("notComputable") : `${Math.round(g.probabilityFunded * 100)}%`}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
 
       {selected && result ? (
         <Card title={`${selected.name} · ${formatDate(selected.createdAt, l)}`}>

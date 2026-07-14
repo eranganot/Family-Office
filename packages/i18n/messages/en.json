@@ -582,7 +582,14 @@
     "explainerTitle": "What is this tab?",
     "explainer1": "Scenarios answer \"what if\" questions: pick a situation (saving more, losing a job, refinancing) and a horizon, and the engine projects your net worth year by year in TODAY’s purchasing power — once as things are (baseline) and once with the scenario applied.",
     "explainer2": "Reading the table: each column is projected net worth at that year; the Δ row is the scenario’s effect. \"Lowest point of liquid capital\" is the worst moment for accessible money; \"capital depleted\" warns if you would run out entirely (\"never\" is good).",
-    "explainer3": "\"Goal outcomes\" shows whether each goal ends up funded under each path. Nothing here changes your data — scenarios are safe experiments, saved for comparison."
+    "explainer3": "\"Goal outcomes\" shows whether each goal ends up funded under each path. Nothing here changes your data — scenarios are safe experiments, saved for comparison.",
+    "runMonteCarlo": "Monte Carlo",
+    "mcHint": "{runs} runs · annual volatility {vol}%",
+    "p10": "P10 (pessimistic)",
+    "p50": "Median (P50)",
+    "p90": "P90 (optimistic)",
+    "depletionProbability": "Probability of depletion",
+    "goalSuccess": "Goal-success probability"
   },
   "monitoring": {
     "explainerTitle": "What is this tab?",

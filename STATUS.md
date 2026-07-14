@@ -4,6 +4,17 @@
 
 ## Current state (2026-07-14)
 
+- **M17a (Monte Carlo projector, C2) code-complete, NOT yet deployed.** The M8 projector was refactored to
+  expose `projectPath(snapshot, params, annualRealReturns[])`; `project` is now a thin wrapper (constant
+  returns) so deterministic behavior + all 8 projector tests are UNCHANGED. New `monte-carlo.ts`:
+  `projectMonteCarlo` samples annual real returns ~ Normal(realReturnPct, volatilityPct) via a seeded
+  mulberry32 PRNG (fixed seed → reproducible bands), 1000 runs, reporting P10/P50/P90 net-worth bands per
+  year, per-goal success probabilities, and probability of depletion. New assumption `mc_return_volatility_pct`
+  = 12 (seeded in preDeploy — NO migration). tRPC `scenarios.runMonteCarlo` persists a MONTE_CARLO Scenario
+  row; the scenarios page gains a "מונטה קרלו" runner + a bands / goal-probability / depletion view. Verified:
+  engine-scenario 12 tests (4 new MC), registry/api/web tsc clean, i18n 599-key parity. C4 (tax-aware
+  drawdown) is the remaining M17 step. **Deploys with the push.**
+
 - **M20b (earmark accounts to goals, B7) code-complete, NOT yet deployed.** New `LedgerItem.earmarkedGoalId`
   (nullable FK → Goal, ON DELETE SET NULL; migration 20260714130000_m20b_earmark_accounts_to_goals). The
   funding-gap engine reserves an earmarked account for its goal FIRST (owner intent overrides the

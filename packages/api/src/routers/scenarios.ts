@@ -3,6 +3,7 @@ import {
   buildScenarioParams,
   CANNED_SCENARIOS,
   project,
+  projectMonteCarlo,
   type CannedScenarioType,
   type ProjectionParams,
 } from "@wealthos/engine-scenario";
@@ -57,6 +58,28 @@ export const scenariosRouter = router({
         },
       });
       return { scenarioId: row.id, baseline, scenario };
+    }),
+
+  runMonteCarlo: workflowGuard("STRATEGY")
+    .input(z.object({ years: z.number().int().min(1).max(60).default(20) }))
+    .mutation(async ({ ctx, input }) => {
+      const { snapshotId, payload } = await buildSnapshot(ctx.db, ctx.householdId, "MANUAL");
+      const reg = assumptionRegistry(ctx.db);
+      const realReturn = await reg.current("goal_projection_real_return_pct", ctx.householdId);
+      const vol = await reg.current("mc_return_volatility_pct", ctx.householdId);
+      const params = buildScenarioParams(input.years, realReturn.value as number, {});
+      const monteCarlo = projectMonteCarlo(payload, params, { runs: 1000, volatilityPct: vol.value as number, seed: 42 });
+      const row = await ctx.db.scenario.create({
+        data: {
+          householdId: ctx.householdId,
+          name: "Monte Carlo",
+          type: "MONTE_CARLO",
+          parameterOverrides: { years: input.years } as never,
+          resultSnapshot: { monteCarlo, realReturnPct: realReturn.value, years: input.years } as never,
+          baselineSnapshotId: snapshotId,
+        },
+      });
+      return { scenarioId: row.id, monteCarlo };
     }),
 
   list: workflowGuard("STRATEGY").query(({ ctx }) =>
