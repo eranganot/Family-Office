@@ -223,8 +223,8 @@
       "INSURANCE_PREMIUM": "Insurance premiums",
       "LOAN_PAYMENT": "Loan payments",
       "OTHER_EXPENSE": "Other expenses",
-        "HISHTALMUT_CONTRIBUTION": "Study-fund contribution",
-        "PENSION_CONTRIBUTION": "Pension contribution",
+      "HISHTALMUT_CONTRIBUTION": "Study-fund contribution",
+      "PENSION_CONTRIBUTION": "Pension contribution",
       "amount": "Amount",
       "frequency": "Frequency",
       "MONTHLY": "Monthly",
@@ -503,6 +503,14 @@
       "currentTarget": "Current target growth share",
       "save": "Save answers",
       "saved": "Answers saved — the target growth share above is updated."
+    },
+    "resolveTitle": "How to complete",
+    "resolve": {
+      "CLOSE_SURVIVOR_GAP": "Mapping → Insurance: add or edit a policy with type = Life for the insured member with adequate coverage, then re-run strategy.",
+      "ADD_DISABILITY_COVER": "Mapping → Insurance: add a policy with type = Disability for the earner, then re-run strategy.",
+      "CLOSE_MORTGAGE_LIFE_GAP": "Mapping → edit the mortgage policy: set type = Mortgage life with coverage ≥ the outstanding balance, then re-run strategy. A Property-type policy is not counted as life cover.",
+      "MAXIMIZE_HISHTALMUT_HEADROOM": "Mapping → Cash flow: add a Study-fund contribution flow for the member with the amount, then re-run strategy.",
+      "MAXIMIZE_PENSION_HEADROOM": "Mapping → Cash flow: add a Pension contribution flow for the member with the amount, then re-run strategy."
     }
   },
   "journal": {

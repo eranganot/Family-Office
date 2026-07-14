@@ -4,6 +4,16 @@
 
 ## Current state (2026-07-14)
 
+- **M16 fixes (post-deploy) — NOT yet deployed.** (1) Duplicate recommendations: rerunning strategy
+  after ACCEPTING a rec kept the accepted copy AND created a fresh PROPOSED duplicate. strategy-service
+  now skips generating a draft whose `type` already has an ACCEPTED recommendation, so a rerun
+  supersedes the stale PROPOSED and no longer recreates it. (2) Actionability: each recommendation type
+  that needs owner data now shows a bilingual "how to complete" hint on the strategy card (exact
+  tab + field + value), driven by `strategy.resolve.<type>` i18n — covers the insurance + tax recs.
+  Owner note: the mortgage-life gap counts only MORTGAGE_LIFE-typed policies; a policy typed "Property"
+  is NOT counted — set the mortgage policy's type to "Mortgage life" (coverage ≥ balance) and rerun.
+  Verified: api/web tsc clean; i18n he/en 576-key parity.
+
 - **M16a (insurance-gap analyzer, B2) code-complete, NOT yet deployed.** New pure analyzer
   `analyzers/insurance.ts` on the M6 finding→generator pattern: flags survivor-income gap (life
   cover vs household expenses × `insurance_survivor_expense_months`, default 60 months), missing

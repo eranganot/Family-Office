@@ -72,7 +72,14 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
     });
     supersededCount = superseded.count;
 
+    // Don't re-propose a finding the owner already ACCEPTED — that produced duplicate cards
+    // (an accepted copy plus a fresh proposed copy) on every rerun.
+    const acceptedTypes = new Set(
+      (await tx.recommendation.findMany({ where: { householdId, status: "ACCEPTED" }, select: { type: true } })).map((r) => r.type),
+    );
+
     for (const draft of drafts) {
+      if (acceptedTypes.has(draft.type)) continue;
       const confidence = Math.min(draft.confidence, gate.confidenceCap);
       const goalIds = draft.goalTypesImproved.flatMap((t) => goalsByType.get(t) ?? []);
       const pins = draft.assumptionKeysUsed

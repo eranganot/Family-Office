@@ -18,6 +18,14 @@ interface RationaleShape {
   expectedImpact: string;
 }
 
+const RESOLVE_HINT_TYPES = new Set([
+  "CLOSE_SURVIVOR_GAP",
+  "ADD_DISABILITY_COVER",
+  "CLOSE_MORTGAGE_LIFE_GAP",
+  "MAXIMIZE_HISHTALMUT_HEADROOM",
+  "MAXIMIZE_PENSION_HEADROOM",
+]);
+
 export default async function StrategyPage({
   params,
   searchParams,
@@ -173,6 +181,13 @@ export default async function StrategyPage({
                   </span>
                 ) : null}
               </div>
+
+              {RESOLVE_HINT_TYPES.has(rec.type) ? (
+                <div dir="auto" className="mt-3 rounded-lg bg-blue-50/60 px-3 py-2 text-sm text-blue-800">
+                  <span className="font-medium">{t("resolveTitle")}: </span>
+                  {t(`resolve.${rec.type}`)}
+                </div>
+              ) : null}
 
               {rec.status === "PROPOSED" ? (
                 <div className="mt-4 flex flex-wrap items-end gap-3">
