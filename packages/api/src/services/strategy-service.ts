@@ -46,10 +46,12 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
   if (!gate.pass) return { ran: false, snapshotId, dataGap: gate.report };
 
   const taxYear = new Date().getFullYear();
-  const hishtalmut = await taxRegistry(db).forYear(taxYear).get("HISHTALMUT_CEILINGS");
+  const taxReg = taxRegistry(db).forYear(taxYear);
+  const hishtalmut = await taxReg.get("HISHTALMUT_CEILINGS");
+  const pension = await taxReg.get("PENSION_CEILINGS");
   const ctx: AnalyzerContext = {
     assumptions,
-    taxRules: { HISHTALMUT_CEILINGS: hishtalmut.payload },
+    taxRules: { HISHTALMUT_CEILINGS: hishtalmut.payload, PENSION_CEILINGS: pension.payload },
   };
 
   const findings = runAnalyzers(payload, ctx);

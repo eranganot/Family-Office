@@ -19,6 +19,20 @@
   31 tests (7 new) + scenario 8 green. B3 (tax-year utilization) is the next M16 step (needs a
   contribution cash-flow type — schema migration). **Deploys with the pending push.**
 
+- **M16b (tax-year utilization tracker, B3) code-complete, NOT yet deployed.** New pure analyzer
+  `analyzers/tax-utilization.ts`: per adult member, compares mapped annual contributions to the
+  registry ceilings (hishtalmut exempt annual deposit; pension = qualifiedIncome × maxBenefitPct)
+  and flags unused headroom with months remaining in the tax year — deposits read from mapped
+  contribution cash flows only (never inferred; a member with none is not assessed). Requires a
+  MIGRATION: two new CashFlowType enum values `HISHTALMUT_CONTRIBUTION` / `PENSION_CONTRIBUTION`
+  (migration 20260714120000_m16b_tax_contribution_flows, `ALTER TYPE ADD VALUE` — applies on PG17);
+  cash-flow create/edit forms + router enum + forms.cashFlow labels (he/en) extended; direction
+  auto-derives OUT. strategy-service now passes PENSION_CEILINGS into the analyzer context. 2
+  bilingual NOTICE generators (MAXIMIZE_HISHTALMUT_HEADROOM / MAXIMIZE_PENSION_HEADROOM), ILS-only
+  (ceilings are ILS). Verified in sandbox: prisma validate + schema valid, domain/registry/
+  engine-strategy/api/web tsc clean, engine-strategy 38 tests (7 new B3) green, i18n he/en 569-key
+  parity. **Deploys with the pending push (migrate applies the enum values).**
+
 - **M15 (guided first-run & UX) code-complete, NOT yet deployed.** Web-only, no schema/engine change.
   A1: dashboard leads with a "מה עכשיו?" next-step card — current phase + blocking counts + one primary
   CTA — computed from `workflowState` + `verification.assessment` (+ `strategy.recommendations` in

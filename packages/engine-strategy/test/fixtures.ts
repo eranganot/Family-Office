@@ -54,7 +54,10 @@ export const CTX = {
     allocation_real_estate_max_pct: 60,
     allocation_mix_unknown_max_pct: 50,
   },
-  taxRules: { HISHTALMUT_CEILINGS: { selfEmployedExemptDepositAnnualILS: 20_566 } },
+  taxRules: {
+    HISHTALMUT_CEILINGS: { selfEmployedExemptDepositAnnualILS: 20_566 },
+    PENSION_CEILINGS: { qualifiedIncomeAnnualILS: 232_800, maxBenefitDepositPctOfQualified: 16.5 },
+  },
 };
 
 export const expense = (monthly: number) =>
@@ -102,4 +105,13 @@ export const mortgageItem = (principalRemaining: number) =>
     accountType: null,
     valueBase: -principalRemaining,
     mortgageTracks: [{ trackType: "PRIME", principalRemaining, annualRatePct: 5, cpiLinked: false, endDate: "2040-01-01" }],
+  });
+
+export const contribution = (monthly: number, flowType: string, ownerMemberIds = ["m1"]) =>
+  item({
+    kind: "CASH_FLOW",
+    accountType: null,
+    valueBase: null,
+    ownerMemberIds,
+    cashFlow: { flowType, direction: "OUT", amountBase: monthly, frequency: "MONTHLY" },
   });

@@ -223,6 +223,8 @@
       "INSURANCE_PREMIUM": "Insurance premiums",
       "LOAN_PAYMENT": "Loan payments",
       "OTHER_EXPENSE": "Other expenses",
+        "HISHTALMUT_CONTRIBUTION": "Study-fund contribution",
+        "PENSION_CONTRIBUTION": "Pension contribution",
       "amount": "Amount",
       "frequency": "Frequency",
       "MONTHLY": "Monthly",

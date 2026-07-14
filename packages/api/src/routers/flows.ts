@@ -17,6 +17,8 @@ const CreateCashFlowSchema = LedgerBaseSchema.extend({
     "INSURANCE_PREMIUM",
     "LOAN_PAYMENT",
     "OTHER_EXPENSE",
+    "HISHTALMUT_CONTRIBUTION",
+    "PENSION_CONTRIBUTION",
   ]),
   amount: PositiveDecimalString,
   frequency: z.enum(["MONTHLY", "ANNUAL", "ONE_TIME"]),

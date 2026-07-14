@@ -223,6 +223,8 @@
       "INSURANCE_PREMIUM": "פרמיות ביטוח",
       "LOAN_PAYMENT": "החזרי הלוואות",
       "OTHER_EXPENSE": "הוצאה אחרת",
+        "HISHTALMUT_CONTRIBUTION": "הפקדה לקרן השתלמות",
+        "PENSION_CONTRIBUTION": "הפקדה לפנסיה",
       "amount": "סכום",
       "frequency": "תדירות",
       "MONTHLY": "חודשי",
