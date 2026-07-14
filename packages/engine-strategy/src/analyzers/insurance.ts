@@ -53,6 +53,12 @@ export function analyzeInsurance(snapshot: SnapshotPayload, ctx: AnalyzerContext
     lifePoliciesFor(memberId).reduce((s, p) => s + (p.insurance!.coverageAmountBase ?? 0), 0);
   const hasDisability = (memberId: string) =>
     policies.some((p) => p.insurance!.policyType === "DISABILITY" && p.insurance!.insuredMemberId === memberId);
+  // Israeli comprehensive pension funds (קרן פנסיה מקיפה) EMBED disability (א.כ.ע) cover —
+  // a member with one mapped needs no standalone policy recommendation (owner decision, 2026-07-14).
+  const hasComprehensivePension = (memberId: string) =>
+    snapshot.items.some(
+      (i) => i.kind === "ACCOUNT" && i.accountType === "PENSION_COMPREHENSIVE" && i.ownerMemberIds.includes(memberId),
+    );
 
   for (const memberId of earnerIds) {
     const member = adults.get(memberId);
@@ -78,8 +84,8 @@ export function analyzeInsurance(snapshot: SnapshotPayload, ctx: AnalyzerContext
       }
     }
 
-    // (b) disability cover for an active earner.
-    if (!hasDisability(memberId)) {
+    // (b) disability cover for an active earner — comprehensive pension counts as covered.
+    if (!hasDisability(memberId) && !hasComprehensivePension(memberId)) {
       findings.push({
         code: "INSURANCE_DISABILITY_MISSING",
         severity: "WARNING",

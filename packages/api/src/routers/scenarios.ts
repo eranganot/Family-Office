@@ -74,22 +74,34 @@ export const scenariosRouter = router({
     }),
 
   runMonteCarlo: workflowGuard("STRATEGY")
-    .input(z.object({ years: z.number().int().min(1).max(60).default(20) }))
+    .input(
+      z.object({
+        years: z.number().int().min(1).max(60).default(20),
+        /** Which path to simulate: the as-is baseline or one of the canned scenarios. */
+        scenarioType: ScenarioTypeSchema.optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const { snapshotId, payload } = await buildSnapshot(ctx.db, ctx.householdId, "MANUAL");
       const reg = assumptionRegistry(ctx.db);
       const realReturn = await reg.current("goal_projection_real_return_pct", ctx.householdId);
       const vol = await reg.current("mc_return_volatility_pct", ctx.householdId);
       const taxDrawdown = await computeTaxDrawdown(ctx.db, ctx.householdId);
-      const params = buildScenarioParams(input.years, realReturn.value as number, { taxDrawdown });
+      const canned = input.scenarioType ? CANNED_SCENARIOS[input.scenarioType as CannedScenarioType] : {};
+      const params = buildScenarioParams(input.years, realReturn.value as number, { ...canned, taxDrawdown });
       const monteCarlo = projectMonteCarlo(payload, params, { runs: 1000, volatilityPct: vol.value as number, seed: 42 });
       const row = await ctx.db.scenario.create({
         data: {
           householdId: ctx.householdId,
-          name: "Monte Carlo",
+          name: input.scenarioType ? `MC · ${input.scenarioType}` : "MC · BASELINE",
           type: "MONTE_CARLO",
-          parameterOverrides: { years: input.years } as never,
-          resultSnapshot: { monteCarlo, realReturnPct: realReturn.value, years: input.years } as never,
+          parameterOverrides: { years: input.years, scenarioType: input.scenarioType ?? "BASELINE" } as never,
+          resultSnapshot: {
+            monteCarlo,
+            realReturnPct: realReturn.value,
+            years: input.years,
+            scenarioType: input.scenarioType ?? "BASELINE",
+          } as never,
           baselineSnapshotId: snapshotId,
         },
       });

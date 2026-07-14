@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { logout } from "../../../lib/auth-actions";
 import { serverCaller } from "../../../lib/trpc-server";
 import { Link } from "../../../i18n/navigation";
+import { NavLinks } from "../../../components/nav-links";
 
 export default async function AppLayout({
   children,
@@ -39,20 +40,48 @@ export default async function AppLayout({
           </form>
         </div>
       </header>
-      <nav className="mb-6 flex gap-4 border-b border-neutral-200 pb-3 text-sm">
-        <Link href="/" className="font-medium hover:underline">{t("nav.dashboard")}</Link>
-        <Link href="/mapping" className="font-medium hover:underline">{t("nav.mapping")}</Link>
-        <Link href="/documents" className="font-medium hover:underline">{t("nav.documents")}</Link>
-        <Link href="/verification" className="font-medium hover:underline">{t("nav.verification")}</Link>
-        <Link href="/goals" className="font-medium hover:underline">{t("nav.goals")}</Link>
-        <Link href="/strategy" className="font-medium hover:underline">{t("nav.strategy")}</Link>
-        <Link href="/scenarios" className="font-medium hover:underline">{t("nav.scenarios")}</Link>
-        <Link href="/journal" className="font-medium hover:underline">{t("nav.journal")}</Link>
-        <Link href="/monitoring" className="font-medium hover:underline">{t("nav.monitoring")}</Link>
-        <Link href="/household" className="font-medium hover:underline">{t("nav.household")}</Link>
-        <Link href="/fx" className="font-medium hover:underline">{t("nav.fx")}</Link>
-        <Link href="/registry" className="font-medium hover:underline">{t("nav.registry")}</Link>
-      </nav>
+      <NavLinks
+        items={[
+          { href: "/", label: t("nav.dashboard") },
+          { href: "/mapping", label: t("nav.mapping") },
+          { href: "/documents", label: t("nav.documents") },
+          { href: "/verification", label: t("nav.verification") },
+          { href: "/goals", label: t("nav.goals") },
+          { href: "/strategy", label: t("nav.strategy") },
+          { href: "/scenarios", label: t("nav.scenarios") },
+          { href: "/journal", label: t("nav.journal") },
+          { href: "/monitoring", label: t("nav.monitoring") },
+          { href: "/household", label: t("nav.household") },
+          { href: "/fx", label: t("nav.fx") },
+          { href: "/registry", label: t("nav.registry") },
+        ]}
+      />
+      {household ? (
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl bg-neutral-50 px-4 py-3 text-xs">
+          {(["MAPPING", "VERIFICATION", "STRATEGY", "MONITORING"] as const).map((phase, i) => {
+            const current = household.workflowState === phase;
+            const hrefs = { MAPPING: "/mapping", VERIFICATION: "/verification", STRATEGY: "/strategy", MONITORING: "/monitoring" } as const;
+            return (
+              <span key={phase} className="flex items-center gap-2">
+                {i > 0 ? <span className="text-neutral-300">←</span> : null}
+                <Link
+                  href={hrefs[phase]}
+                  className={
+                    current
+                      ? "rounded-full bg-blue-600 px-3 py-1 font-semibold text-white"
+                      : "rounded-full bg-white px-3 py-1 text-neutral-500 ring-1 ring-neutral-200 hover:text-neutral-800"
+                  }
+                >
+                  {i + 1}. {t(`phase.${phase}`)}
+                </Link>
+              </span>
+            );
+          })}
+          <span className="ms-2 text-neutral-500">
+            {t(`journey.${household.workflowState}`)}
+          </span>
+        </div>
+      ) : null}
       {children}
     </div>
   );

@@ -87,6 +87,12 @@ export default async function ScenariosPage({
         </form>
         <form action={runMonteCarloAction} className="mt-3 flex flex-wrap items-end gap-3">
           <input type="hidden" name="locale" value={locale} />
+          <Field label={t("mcScenario")}>
+            <Select name="scenarioType" defaultValue="">
+              <option value="">{t("baselinePath")}</option>
+              {TYPES.map((x) => <option key={x} value={x}>{t(`types.${x}`)}</option>)}
+            </Select>
+          </Field>
           <Field label={t("years")}>
             <TextInput name="years" type="number" min={5} max={50} defaultValue={20} />
           </Field>
@@ -97,6 +103,9 @@ export default async function ScenariosPage({
 
       {selected && mc ? (
         <Card title={`${selected.name} · ${formatDate(selected.createdAt, l)}`}>
+          <p className="mb-2 text-sm font-medium text-blue-700">
+            {t("mcMeasured")}: {rs && (rs as { scenarioType?: string }).scenarioType && (rs as { scenarioType?: string }).scenarioType !== "BASELINE" ? t(`types.${(rs as { scenarioType?: string }).scenarioType}`) : t("baselinePath")}
+          </p>
           <p className="mb-3 text-xs text-neutral-500">{t("mcHint", { runs: mc.runs, vol: mc.volatilityPct })}</p>
           <table className="w-full text-sm">
             <thead>

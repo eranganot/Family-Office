@@ -2,7 +2,35 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
-## Current state (2026-07-14)
+## Current state (2026-07-14, session 2)
+
+- **⚠️ MOUNT CORRUPTION INCIDENT:** the Windows-mount working tree was found TRUNCATED mid-line on 14
+  files (accounts.ts, allocation.ts, growth-heuristic.ts, …) while git HEAD was intact; `.git/index`
+  also has damage (null-sha1 cache entry + stuck index.lock). Recovered by restoring /tmp copies from
+  `git show HEAD:`. **Owner must repair the local clone before the next commit:** delete
+  `.git\index.lock`, then `git checkout -- .` and `git reset` (see chat instructions). All syncing
+  from the sandbox is now checksum-verified.
+- **M22 (owner feedback round 3) code-complete, NOT yet deployed. No new migrations.**
+  (a) Registry UX overhaul: 39 assumptions get Hebrew+English labels/descriptions/tuning guidance
+  (i18n `registry.meta.*`, fallback to DB description), grouped into 7 categories
+  (apps/web/src/lib/assumption-groups.ts), provenance badges ("נקבע על ידכם" vs "ברירת מחדל שמרנית").
+  (b) Journey bar in the app layout: 4 clickable phase pills with the current phase highlighted +
+  per-phase "עכשיו: …" one-liner (i18n `journey.*`); nav switched to a client NavLinks component with
+  active-tab underline (aria-current).
+  (c) Disability recommendation suppressed when the member has a mapped PENSION_COMPREHENSIVE (Israeli
+  mekifa embeds א.כ.ע — owner decision 2026-07-14); new test.
+  (d) Goals: plain-language guidance line per computable goal (amber "לחסוך כ-X בחודש" / green
+  "בכיוון הנכון").
+  (e) Monte Carlo: `runMonteCarlo` accepts optional `scenarioType` (canned overrides applied; named
+  `MC · <TYPE>`); UI gains a simulated-path select + "המסלול שנמדד" label on results.
+  (f) Risk questionnaire deepened 3→6 questions (drawdown reaction ±10/+5, experience ±5, spending
+  flexibility ±5 in deriveTargetGrowthPct; new defaults seeded risk_drawdown_reaction /
+  risk_investment_experience / risk_spending_flexibility, defaults=2 keep existing derivations
+  unchanged); strategy card + saveRiskAction extended.
+  Verified: engine-strategy 45 tests (insurance 9 incl. new pension-embeds case), api/web/registry
+  tsc, prisma valid, i18n 706-key parity. **Deploys with the next push (seed adds 3 assumptions).**
+
+## Previous state (2026-07-14)
 
 - **D5 (tax-matrix owner sign-off) code-complete, NOT yet deployed.** New `TaxRuleSet.ownerReviewed` column
   (migration 20260714150000_m18_tax_owner_reviewed) — a real review flag, separate from the immutable versioned

@@ -34,6 +34,16 @@ describe("insurance-gap analyzer (B2)", () => {
     expect(found).toContain("INSURANCE_DISABILITY_MISSING");
   });
 
+  it("comprehensive pension counts as disability cover (IL embeds א.כ.ע) — no standalone recommendation", () => {
+    const found = codes([
+      income(20_000, ["m1"]),
+      expense(10_000),
+      item({ accountType: "PENSION_COMPREHENSIVE", ownerMemberIds: ["m1"], valueBase: 100_000 }),
+      policy({ policyType: "LIFE", insuredMemberId: "m1", coverageAmountBase: 1_000_000 }),
+    ]);
+    expect(found).not.toContain("INSURANCE_DISABILITY_MISSING");
+  });
+
   it("does not assess earners who are not mapped as income owners (no earners → no findings)", () => {
     const found = codes([expense(10_000)]);
     expect(found).toHaveLength(0);

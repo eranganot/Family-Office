@@ -61,11 +61,17 @@ export default async function StrategyPage({
     lossTolerance: aVal("risk_loss_tolerance", 2),
     incomeStability: aVal("risk_income_stability", 2),
     horizonYears: aVal("risk_horizon_years", 20),
+    drawdownReaction: aVal("risk_drawdown_reaction", 2),
+    investmentExperience: aVal("risk_investment_experience", 2),
+    spendingFlexibility: aVal("risk_spending_flexibility", 2),
   };
   const targetGrowthPct = deriveTargetGrowthPct({
     risk_loss_tolerance: risk.lossTolerance,
     risk_income_stability: risk.incomeStability,
     risk_horizon_years: risk.horizonYears,
+    risk_drawdown_reaction: risk.drawdownReaction,
+    risk_investment_experience: risk.investmentExperience,
+    risk_spending_flexibility: risk.spendingFlexibility,
   });
 
   return (
@@ -120,6 +126,27 @@ export default async function StrategyPage({
           </Field>
           <Field label={t("risk.horizonYears")}>
             <TextInput name="risk_horizon_years" type="number" min={1} max={60} defaultValue={risk.horizonYears} />
+          </Field>
+          <Field label={t("risk.drawdownReaction")}>
+            <Select name="risk_drawdown_reaction" defaultValue={String(risk.drawdownReaction)}>
+              {[1, 2, 3].map((v) => (
+                <option key={v} value={v}>{t(`risk.drawdownReaction_${v}`)}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={t("risk.investmentExperience")}>
+            <Select name="risk_investment_experience" defaultValue={String(risk.investmentExperience)}>
+              {[1, 2, 3].map((v) => (
+                <option key={v} value={v}>{t(`risk.investmentExperience_${v}`)}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={t("risk.spendingFlexibility")}>
+            <Select name="risk_spending_flexibility" defaultValue={String(risk.spendingFlexibility)}>
+              {[1, 2, 3].map((v) => (
+                <option key={v} value={v}>{t(`risk.spendingFlexibility_${v}`)}</option>
+              ))}
+            </Select>
           </Field>
           <div className="col-span-3">
             <SubmitButton label={t("risk.save")} />

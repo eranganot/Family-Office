@@ -53,7 +53,7 @@ export async function saveRiskAction(fd: FormData): Promise<void> {
   try {
     const current = await trpc.registry.assumptions();
     const byKey = new Map(current.map((a) => [a.key, a.value]));
-    for (const key of ["risk_loss_tolerance", "risk_income_stability", "risk_horizon_years"] as const) {
+    for (const key of ["risk_loss_tolerance", "risk_income_stability", "risk_horizon_years", "risk_drawdown_reaction", "risk_investment_experience", "risk_spending_flexibility"] as const) {
       const raw = str(fd, key);
       if (raw === "") continue;
       const value = Number(raw);
