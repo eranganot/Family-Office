@@ -4,6 +4,7 @@ import { SnapshotPayloadSchema } from "@wealthos/domain";
 import {
   detectDrift,
   sweepStaleness,
+  sweepRecommendationReviews,
   MONITORING_ENGINE_VERSION,
   type DriftFinding,
   type DriftThresholds,
@@ -122,6 +123,37 @@ export async function runMonitoringCycle(
       titleHe: `${staleness.stale.length} אחזקות עם הערכות שווי מיושנות הדורשות אימות מחדש`,
       detail: { staleItems: staleness.stale, evaluated: staleness.evaluated },
       recommendedAction: "REVERIFY",
+    });
+  }
+
+  // Recommendation-review nudge (B4): accepted recs past their implementation date with no outcome.
+  const acceptedRecs = await db.recommendation.findMany({
+    where: { householdId, status: "ACCEPTED" },
+    select: {
+      id: true,
+      title: true,
+      titleHe: true,
+      journal: { orderBy: { decidedAt: "desc" }, take: 1, select: { implementationDate: true, actualOutcome: true } },
+    },
+  });
+  const recReview = sweepRecommendationReviews(
+    acceptedRecs.map((r) => ({
+      id: r.id,
+      title: r.title,
+      titleHe: r.titleHe,
+      implementationDate: r.journal[0]?.implementationDate ?? null,
+      hasActualOutcome: Boolean(r.journal[0]?.actualOutcome),
+    })),
+    now,
+  );
+  if (recReview.overdue.length > 0) {
+    alertDrafts.push({
+      kind: "RECOMMENDATION_REVIEW",
+      severity: "LOW",
+      title: `${recReview.overdue.length} accepted recommendation(s) are past their date without a recorded outcome`,
+      titleHe: `${recReview.overdue.length} המלצות שהתקבלו עברו את מועד היישום ללא תיעוד תוצאה`,
+      detail: { overdue: recReview.overdue, evaluated: recReview.evaluated },
+      recommendedAction: "REVIEW",
     });
   }
 

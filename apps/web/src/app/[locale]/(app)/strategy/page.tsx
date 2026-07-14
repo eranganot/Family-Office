@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { deriveTargetGrowthPct } from "@wealthos/engine-strategy";
-import { decideAction, dismissRecommendationAction, runStrategyAction, saveRiskAction } from "../../../../lib/actions/strategy-actions";
+import { decideAction, dismissRecommendationAction, markImplementedAction, runStrategyAction, saveRiskAction } from "../../../../lib/actions/strategy-actions";
 import { Card, Field, Select, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { Link } from "../../../../i18n/navigation";
@@ -219,11 +219,19 @@ export default async function StrategyPage({
               ) : null}
 
               {rec.status === "ACCEPTED" ? (
-                <form action={dismissRecommendationAction} className="mt-4">
-                  <input type="hidden" name="locale" value={locale} />
-                  <input type="hidden" name="id" value={rec.id} />
-                  <button type="submit" className="text-xs text-neutral-400 underline">{t("dismiss")}</button>
-                </form>
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <form action={markImplementedAction} className="flex items-end gap-2">
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="id" value={rec.id} />
+                    <TextInput name="actualOutcome" placeholder={t("outcomePlaceholder")} />
+                    <button type="submit" className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white">{t("markDone")}</button>
+                  </form>
+                  <form action={dismissRecommendationAction}>
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="id" value={rec.id} />
+                    <button type="submit" className="text-xs text-neutral-400 underline">{t("dismiss")}</button>
+                  </form>
+                </div>
               ) : null}
             </Card>
           );

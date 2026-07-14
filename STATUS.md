@@ -4,6 +4,15 @@
 
 ## Current state (2026-07-14)
 
+- **M20a (recommendation lifecycle, B4) code-complete, NOT yet deployed.** Closes the accept→implement
+  loop. (1) "סמן כבוצע" (Mark done) on ACCEPTED cards → status IMPLEMENTED + records the actual outcome on
+  the decision journal; the earlier "הסר מהרשימה" dismiss stays (→ SUPERSEDED). (2) New pure sweep
+  `sweepRecommendationReviews` (engine-monitoring) wired into the monitoring cycle: an ACCEPTED rec whose
+  implementation date has passed with no recorded outcome raises a LOW `RECOMMENDATION_REVIEW` alert
+  (action REVIEW) — a gentle nudge below the MEDIUM+ email threshold. No migration (IMPLEMENTED status
+  already existed). Verified: api/web tsc clean, engine-monitoring 21 tests (4 new), i18n 585-key parity.
+  B7 (earmark accounts to goals) is the remaining M20 step. **Deploys with the push.**
+
 - **M16 fixes round 2 (post-deploy) — NOT yet deployed.** (1) ACCEPTED recommendations had no way to be
   cleared once acted on (a resolved gap left a frozen accepted card). Added `strategy.dismiss` (sets
   SUPERSEDED; kept in history/journal) + a "הסר מהרשימה" button on ACCEPTED cards. (2) The mapping list

@@ -7,7 +7,8 @@
     "memberSaved": "Family member updated",
     "memberArchived": "Family member archived",
     "itemSaved": "Item saved",
-    "recDismissed": "Recommendation dismissed"
+    "recDismissed": "Recommendation dismissed",
+    "recImplemented": "Recommendation marked done"
   },
   "app": {
     "title": "WealthOS",
@@ -516,7 +517,9 @@
       "MAXIMIZE_HISHTALMUT_HEADROOM": "Mapping → Cash flow: add a Study-fund contribution flow for the member with the amount, then re-run strategy.",
       "MAXIMIZE_PENSION_HEADROOM": "Mapping → Cash flow: add a Pension contribution flow for the member with the amount, then re-run strategy."
     },
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "markDone": "Mark done",
+    "outcomePlaceholder": "What was actually done?"
   },
   "journal": {
     "explainerTitle": "What is this tab?",
@@ -624,7 +627,8 @@
       "ALLOCATION_DRIFT": "Allocation drift (growth share)",
       "ITEM_ADDED": "Holdings added",
       "ITEM_REMOVED": "Holdings removed",
-      "STALENESS": "Stale valuations"
+      "STALENESS": "Stale valuations",
+      "RECOMMENDATION_REVIEW": "Accepted recommendation awaiting outcome"
     }
   }
 }

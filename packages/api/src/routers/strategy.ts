@@ -56,4 +56,26 @@ export const strategyRouter = router({
     .mutation(({ ctx, input }) =>
       ctx.db.recommendation.update({ where: { id: input.id }, data: { status: "SUPERSEDED" } }),
     ),
+
+  /** Mark an ACCEPTED recommendation as IMPLEMENTED and record what actually happened.
+   *  Closes the loop so the monitoring review-nudge (B4) stops flagging it. */
+  markImplemented: workflowGuard("STRATEGY")
+    .input(z.object({ id: z.uuid(), actualOutcome: z.string().max(2000).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const rec = await ctx.db.recommendation.update({ where: { id: input.id }, data: { status: "IMPLEMENTED" } });
+      const latest = await ctx.db.decisionJournalEntry.findFirst({
+        where: { recommendationId: input.id },
+        orderBy: { decidedAt: "desc" },
+      });
+      if (latest) {
+        if (input.actualOutcome) {
+          await ctx.db.decisionJournalEntry.update({ where: { id: latest.id }, data: { actualOutcome: input.actualOutcome } });
+        }
+      } else {
+        await ctx.db.decisionJournalEntry.create({
+          data: { recommendationId: input.id, decision: "ACCEPTED", decidedBy: ctx.session.email, actualOutcome: input.actualOutcome ?? null },
+        });
+      }
+      return rec;
+    }),
 });

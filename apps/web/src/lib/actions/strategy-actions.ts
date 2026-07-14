@@ -40,6 +40,13 @@ export async function dismissRecommendationAction(fd: FormData): Promise<void> {
   redirect(`/${locale}/strategy?ok=recDismissed`);
 }
 
+export async function markImplementedAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  await trpc.strategy.markImplemented({ id: str(fd, "id"), actualOutcome: opt(fd, "actualOutcome") });
+  redirect(`/${locale}/strategy?ok=recImplemented`);
+}
+
 export async function saveRiskAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const trpc = await serverCaller();
