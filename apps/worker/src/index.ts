@@ -10,7 +10,7 @@
  * workflow phase — the re-evaluation flow (guarded, human-initiated) does that.
  */
 import { prisma } from "@wealthos/db";
-import { refreshFxFromBoi, runMonitoringCycle } from "@wealthos/api";
+import { refreshBoiRate, refreshFxFromBoi, runMonitoringCycle } from "@wealthos/api";
 
 async function main(): Promise<void> {
   const startedAt = Date.now();
@@ -22,6 +22,12 @@ async function main(): Promise<void> {
     console.log(`[worker] BOI FX refresh: stored=${fx.stored} skipped=${fx.skipped} asOf=${fx.asOf}`);
   } catch (err) {
     console.error("[worker] BOI FX refresh FAILED (continuing with stored rates):", err);
+  }
+  try {
+    const r = await refreshBoiRate(prisma);
+    console.log(`[worker] BOI policy rate refresh: ${r.value}% asOf=${r.asOf}`);
+  } catch (err) {
+    console.error("[worker] BOI rate refresh FAILED (continuing):", err);
   }
   const households = await prisma.household.findMany({ select: { id: true, name: true } });
   if (households.length === 0) {

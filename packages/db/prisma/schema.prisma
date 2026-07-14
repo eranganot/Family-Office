@@ -17,6 +17,18 @@ datasource db {
 // Core: Household, Members, Workflow state machine, Auth
 // ---------------------------------------------------------------------------
 
+
+model MarketIndicator {
+  id        String   @id @default(uuid())
+  key       String // BOI_RATE | CPI | MORTGAGE_AVG
+  value     Decimal  @db.Decimal(12, 6)
+  asOf      DateTime @db.Date
+  source    String // BOI
+  createdAt DateTime @default(now())
+
+  @@unique([key, asOf, source])
+}
+
 enum WorkflowState {
   MAPPING
   VERIFICATION

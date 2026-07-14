@@ -43,6 +43,8 @@ export const DEFAULT_ASSUMPTIONS: Array<{
   },
   { key: "mortgage_cpi_linked_max_pct", value: 60, unit: "PCT", description: "CPI-linked share of mortgage principal that triggers a notice" },
   { key: "expensive_debt_rate_pct", value: 8, unit: "PCT", description: "Debt rate above which early repayment is suggested" },
+  { key: "mortgage_prime_spread_pct", value: 1.5, unit: "PCT", description: "Israeli prime rate = BOI policy rate + this spread; anchors the mortgage refinance benchmark" },
+  { key: "mortgage_refinance_notice_spread_pct", value: 0.5, unit: "PCT", description: "Flag a variable/prime mortgage track when its rate exceeds the prime benchmark by this many points" },
   { key: "large_loan_notice_base", value: 100000, unit: "ILS", description: "Non-mortgage loan size that triggers review" },
   { key: "risk_loss_tolerance", value: 2, unit: "SCORE", description: "Questionnaire: tolerance for temporary losses (1=low, 2=medium, 3=high)" },
   { key: "risk_income_stability", value: 2, unit: "SCORE", description: "Questionnaire: household income stability (1=unstable, 2=mixed, 3=stable)" },

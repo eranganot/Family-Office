@@ -47,6 +47,8 @@ export const CTX = {
     management_fee_notice_by_type: { PENSION_COMPREHENSIVE: 0.5, KEREN_HISHTALMUT: 0.7, GEMEL_LEHASHKAA: 0.6 },
     mortgage_cpi_linked_max_pct: 60,
     expensive_debt_rate_pct: 8,
+    mortgage_prime_spread_pct: 1.5,
+    mortgage_refinance_notice_spread_pct: 0.5,
     large_loan_notice_base: 100_000,
     risk_loss_tolerance: 2,
     risk_income_stability: 2,
@@ -59,6 +61,7 @@ export const CTX = {
     HISHTALMUT_CEILINGS: { selfEmployedExemptDepositAnnualILS: 20_566 },
     PENSION_CEILINGS: { qualifiedIncomeAnnualILS: 232_800, maxBenefitDepositPctOfQualified: 16.5 },
   },
+  marketRates: { boiRatePct: 3.75 },
 };
 
 export const expense = (monthly: number) =>

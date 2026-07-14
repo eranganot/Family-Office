@@ -4,6 +4,18 @@
 
 ## Current state (2026-07-14)
 
+- **M21a (BOI rate feed + mortgage refinance signal, B6) code-complete, NOT yet deployed.** New `MarketIndicator`
+  table (migration 20260714140000_m21_market_indicator) stores fetched indicators; `boi-rate-service` fetches the
+  BOI policy rate from the verified PublicApi `GetInterest` endpoint (same family as the FX feed) and upserts
+  key=BOI_RATE; the worker refreshes it daily (non-fatal, alongside FX). New assumptions
+  `mortgage_prime_spread_pct` (1.5) + `mortgage_refinance_notice_spread_pct` (0.5). AnalyzerContext gains
+  `marketRates.boiRatePct`; the debt analyzer flags a variable/PRIME mortgage track priced above the live prime
+  benchmark (BOI + spread) → new bilingual `MORTGAGE_ABOVE_BENCHMARK` generator. FX page shows the current BOI
+  rate + manual refresh; `networth.boiRate` / `refreshBoiRate`. Verified live against GetInterest (3.75%); prisma
+  valid, api/web/worker/registry/engine tsc clean, engine-strategy 44 tests (4 new B6), i18n 604-key parity.
+  **C5 (CPI) deferred** — BOI CPI lives only in the SDMX series DB (no clean endpoint verifiable from sandbox).
+  C6 (custom scenario builder) remains for M21. **Deploys with the push (migrate creates MarketIndicator).**
+
 - **M19a (fee benchmark by product type, B5) code-complete, NOT yet deployed.** The single global
   `management_fee_notice_pct` is now backed by a per-type map `management_fee_notice_by_type` (pension mekifa
   0.5, pension general 0.6, gemel lehashkaa 0.6, hishtalmut/kupat gemel/IRA 0.7), falling back to the global

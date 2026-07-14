@@ -287,7 +287,11 @@
     "empty": "אין שערים עדיין. פריטים במט\"ח לא ייכללו בסיכום עד שיוגדר שער.",
     "source": "מקור",
     "refreshFromBoi": "משיכת שערי בנק ישראל להיום",
-    "refreshedBanner": "השערים עודכנו מבנק ישראל."
+    "refreshedBanner": "השערים עודכנו מבנק ישראל.",
+    "boiRateCurrent": "ריבית בנק ישראל",
+    "boiRateRefresh": "עדכון מבנק ישראל",
+    "boiRateRefreshed": "ריבית בנק ישראל עודכנה",
+    "boiRateNone": "טרם נמשכה"
   },
   "home": {
     "welcome": "ברוכים הבאים",

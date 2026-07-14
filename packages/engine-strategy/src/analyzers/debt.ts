@@ -5,6 +5,8 @@ export function analyzeDebt(snapshot: SnapshotPayload, ctx: AnalyzerContext): Fi
   const findings: Finding[] = [];
   const cpiMax = Number(ctx.assumptions["mortgage_cpi_linked_max_pct"] ?? 60);
   const expensiveRate = Number(ctx.assumptions["expensive_debt_rate_pct"] ?? 8);
+  const boiRate = ctx.marketRates?.boiRatePct ?? null;
+  const VARIABLE_TRACKS = new Set(["PRIME", "VARIABLE_LINKED", "VARIABLE_UNLINKED"]);
 
   for (const item of snapshot.items) {
     if (item.mortgageTracks && item.mortgageTracks.length > 0) {
@@ -27,6 +29,34 @@ export function analyzeDebt(snapshot: SnapshotPayload, ctx: AnalyzerContext): Fi
             metrics: { itemName: item.name, maxRatePct: maxRate, thresholdPct: expensiveRate },
             evidenceItemIds: [item.id],
           });
+        }
+
+        // Refinance signal (B6): a variable/prime track priced above the live BOI-derived prime benchmark.
+        if (boiRate !== null) {
+          const primeSpread = Number(ctx.assumptions["mortgage_prime_spread_pct"] ?? 1.5);
+          const refiNotice = Number(ctx.assumptions["mortgage_refinance_notice_spread_pct"] ?? 0.5);
+          const benchmark = boiRate + primeSpread;
+          const worst = item.mortgageTracks
+            .filter((t) => VARIABLE_TRACKS.has(t.trackType))
+            .reduce<{ trackType: string; annualRatePct: number } | null>(
+              (a, t) => (a === null || t.annualRatePct > a.annualRatePct ? t : a),
+              null,
+            );
+          if (worst && worst.annualRatePct > benchmark + refiNotice) {
+            findings.push({
+              code: "MORTGAGE_ABOVE_BENCHMARK",
+              severity: "NOTICE",
+              metrics: {
+                itemName: item.name,
+                trackType: worst.trackType,
+                trackRatePct: worst.annualRatePct,
+                benchmarkPct: Math.round(benchmark * 100) / 100,
+                boiRatePct: boiRate,
+                excessPct: Math.round((worst.annualRatePct - benchmark) * 100) / 100,
+              },
+              evidenceItemIds: [item.id],
+            });
+          }
         }
       }
     }

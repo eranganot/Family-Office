@@ -287,7 +287,11 @@
     "empty": "No rates yet. Foreign-currency items are excluded from totals until a rate exists.",
     "source": "Source",
     "refreshFromBoi": "Fetch today's Bank of Israel rates",
-    "refreshedBanner": "Rates updated from Bank of Israel."
+    "refreshedBanner": "Rates updated from Bank of Israel.",
+    "boiRateCurrent": "Bank of Israel rate",
+    "boiRateRefresh": "Refresh from BOI",
+    "boiRateRefreshed": "Bank of Israel rate updated",
+    "boiRateNone": "not fetched yet"
   },
   "home": {
     "welcome": "Welcome",

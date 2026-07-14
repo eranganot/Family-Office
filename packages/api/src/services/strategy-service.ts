@@ -11,6 +11,7 @@ import {
 } from "@wealthos/engine-strategy";
 import { assumptionRegistry, taxRegistry } from "@wealthos/registry";
 import { buildSnapshot } from "./snapshot-service";
+import { latestBoiRate } from "./boi-rate-service";
 
 export type StrategyRunResult =
   | { ran: true; snapshotId: string; created: number; supersededCount: number; unmappedFindings: string[] }
@@ -32,6 +33,7 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
     "concentration_single_asset_max_pct", "concentration_institution_max_pct",
     "currency_foreign_min_pct", "currency_foreign_max_pct", "management_fee_notice_pct", "management_fee_notice_by_type",
     "mortgage_cpi_linked_max_pct", "expensive_debt_rate_pct", "large_loan_notice_base",
+    "mortgage_prime_spread_pct", "mortgage_refinance_notice_spread_pct",
     "priority_weights", "strategy_min_completeness", "strategy_min_confidence",
   ];
   const assumptionRows = new Map(
@@ -49,9 +51,11 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
   const taxReg = taxRegistry(db).forYear(taxYear);
   const hishtalmut = await taxReg.get("HISHTALMUT_CEILINGS");
   const pension = await taxReg.get("PENSION_CEILINGS");
+  const boi = await latestBoiRate(db);
   const ctx: AnalyzerContext = {
     assumptions,
     taxRules: { HISHTALMUT_CEILINGS: hishtalmut.payload, PENSION_CEILINGS: pension.payload },
+    marketRates: { boiRatePct: boi?.value ?? null },
   };
 
   const findings = runAnalyzers(payload, ctx);

@@ -122,3 +122,28 @@ describe("fee benchmark by product type (B5)", () => {
     expect(codes).not.toContain("HIGH_MANAGEMENT_FEE");
   });
 });
+
+describe("mortgage refinance signal (B6)", () => {
+  const mortgage = (rate: number, trackType = "PRIME") =>
+    item({ kind: "MORTGAGE", accountType: null, valueBase: -1_000_000,
+      mortgageTracks: [{ trackType, principalRemaining: 1_000_000, annualRatePct: rate, cpiLinked: false, endDate: "2040-01-01" }] });
+
+  it("flags a variable track priced above the BOI-derived prime benchmark", () => {
+    // BOI 3.75 + spread 1.5 = 5.25 benchmark; +0.5 notice = 5.75. A 6.5% PRIME track is above.
+    const codes = analyzeDebt(snapshot([mortgage(6.5, "PRIME")]), CTX).map((f) => f.code);
+    expect(codes).toContain("MORTGAGE_ABOVE_BENCHMARK");
+  });
+  it("does not flag a track at or below the benchmark", () => {
+    const codes = analyzeDebt(snapshot([mortgage(5.5, "PRIME")]), CTX).map((f) => f.code);
+    expect(codes).not.toContain("MORTGAGE_ABOVE_BENCHMARK");
+  });
+  it("does not flag fixed tracks (not benchmarked to prime)", () => {
+    const codes = analyzeDebt(snapshot([mortgage(6.5, "FIXED_UNLINKED")]), CTX).map((f) => f.code);
+    expect(codes).not.toContain("MORTGAGE_ABOVE_BENCHMARK");
+  });
+  it("skips the signal when no BOI rate is available", () => {
+    const noBoi = { ...CTX, marketRates: { boiRatePct: null } };
+    const codes = analyzeDebt(snapshot([mortgage(6.5, "PRIME")]), noBoi).map((f) => f.code);
+    expect(codes).not.toContain("MORTGAGE_ABOVE_BENCHMARK");
+  });
+});

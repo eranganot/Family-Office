@@ -54,6 +54,16 @@ export const networthRouter = router({
     return refreshFxFromBoi(ctx.db);
   }),
 
+  boiRate: protectedProcedure.query(async ({ ctx }) => {
+    const { latestBoiRate } = await import("../services/boi-rate-service");
+    return latestBoiRate(ctx.db);
+  }),
+
+  refreshBoiRate: protectedProcedure.mutation(async ({ ctx }) => {
+    const { refreshBoiRate } = await import("../services/boi-rate-service");
+    return refreshBoiRate(ctx.db);
+  }),
+
   setFxRate: protectedProcedure
     .input(CurrencyPair.extend({ rate: DecimalString, asOf: z.coerce.date() }))
     .mutation(async ({ ctx, input }) => {

@@ -77,6 +77,17 @@ export async function updateMemberAction(fd: FormData): Promise<void> {
   redirect(`/${locale}/household?ok=memberSaved`);
 }
 
+export async function refreshBoiRateAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    await trpc.networth.refreshBoiRate();
+  } catch {
+    redirect(`/${locale}/fx?error=BOI_RATE_FETCH_FAILED`);
+  }
+  redirect(`/${locale}/fx?boiRefreshed=1`);
+}
+
 export async function refreshFxAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const trpc = await serverCaller();

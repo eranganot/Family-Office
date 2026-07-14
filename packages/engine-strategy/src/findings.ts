@@ -13,6 +13,8 @@ export interface Finding {
 export interface AnalyzerContext {
   assumptions: Record<string, unknown>;
   taxRules: Record<string, unknown>;
+  /** Fetched market indicators (B6): BOI policy rate anchors the mortgage refinance benchmark. */
+  marketRates?: { boiRatePct: number | null } | undefined;
 }
 
 export const ENGINE_VERSION = "strategy-engine/1.0.0";
