@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import {
+  earmarkAction,
   updateAccountAction,
   updateBaseAction,
   updateCashFlowAction,
@@ -53,6 +54,8 @@ export default async function EditItemPage({
   const household = await trpc.household.get();
   const members = (household?.members ?? []).map((m) => ({ id: m.id, name: m.name }));
   const properties = item.kind === "MORTGAGE" ? await trpc.ledger.list({ kind: "REAL_ESTATE" }) : [];
+  const earmarkable = item.kind === "ACCOUNT" || item.kind === "OTHER_ASSET";
+  const goals = earmarkable ? await trpc.goals.list() : [];
 
   const actions: Record<string, (fd: FormData) => Promise<void>> = {
     ACCOUNT: updateAccountAction,
@@ -74,6 +77,7 @@ export default async function EditItemPage({
   const loan = item.loanDetail;
 
   return (
+    <div className="flex flex-col gap-6">
     <Card title={`${t("editTitle")}: ${item.name}`}>
       <ErrorBanner message={error ? `${t("error")}: ${decodeURIComponent(error)}` : undefined} />
       <form action={action} className="flex max-w-2xl flex-col gap-4">
@@ -292,5 +296,22 @@ export default async function EditItemPage({
         <SubmitButton label={t("submit")} />
       </form>
     </Card>
+    {earmarkable && goals.length > 0 ? (
+      <Card title={t("earmark.title")}>
+        <p className="mb-3 text-xs text-neutral-500">{t("earmark.hint")}</p>
+        <form action={earmarkAction} className="flex max-w-md items-end gap-3">
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="id" value={item.id} />
+          <Field label={t("earmark.goal")}>
+            <Select name="goalId" defaultValue={item.earmarkedGoalId ?? ""}>
+              <option value="">{t("earmark.none")}</option>
+              {goals.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </Select>
+          </Field>
+          <SubmitButton label={t("earmark.save")} />
+        </form>
+      </Card>
+    ) : null}
+    </div>
   );
 }

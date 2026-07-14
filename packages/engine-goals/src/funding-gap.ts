@@ -34,6 +34,8 @@ export interface AssetInput {
   /** Latest verified valuation converted to ILS; null = excluded upstream. */
   valueILS: string | null;
   verified: boolean;
+  /** B7: if set, this asset is reserved for that goal (owner intent) and leaves the shared pools. */
+  earmarkedGoalId?: string | null;
 }
 
 export interface GoalGapResult {
@@ -42,6 +44,8 @@ export interface GoalGapResult {
   computable: boolean;
   reason?: "NO_TARGET_DATE" | "NO_REQUIRED_FUNDING" | "TARGET_IN_PAST" | undefined;
   allocatedNowILS?: string;
+  /** Portion of allocatedNow that came from accounts earmarked to this goal. */
+  earmarkedNowILS?: string;
   projectedValueILS?: string;
   requiredILS?: string;
   gapILS?: string;
@@ -75,10 +79,16 @@ export function computeFundingGaps(
   let retirement = new Decimal(0);
   let excludedUnverified = 0;
 
+  const earmarkedByGoal = new Map<string, Decimal>();
   for (const asset of assets) {
     const pool = classifyPool(asset);
     if (pool === null || asset.valueILS === null) continue;
     if (!asset.verified) { excludedUnverified += 1; continue; }
+    if (asset.earmarkedGoalId) {
+      // Pinned to a goal: reserved for it, not part of the shared pools (owner intent overrides pool policy).
+      earmarkedByGoal.set(asset.earmarkedGoalId, (earmarkedByGoal.get(asset.earmarkedGoalId) ?? new Decimal(0)).plus(asset.valueILS));
+      continue;
+    }
     if (pool === "RETIREMENT") retirement = retirement.plus(asset.valueILS);
     else liquid = liquid.plus(asset.valueILS);
   }
@@ -103,6 +113,10 @@ export function computeFundingGaps(
     // Allocate up to the PRESENT VALUE of the requirement (conservative: PV at the same real return).
     const presentValueNeeded = required.dividedBy(new Decimal(1).plus(r).pow(years));
     let allocated = new Decimal(0);
+    // Earmarked accounts fund their goal first, capped at the present value needed.
+    const earmarkAvailable = earmarkedByGoal.get(goal.id) ?? new Decimal(0);
+    const earmarkTake = Decimal.min(earmarkAvailable, presentValueNeeded);
+    allocated = allocated.plus(earmarkTake);
     for (const pool of drawOrder) {
       const take = Decimal.min(pools[pool], presentValueNeeded.minus(allocated));
       if (take.gt(0)) {
@@ -126,6 +140,7 @@ export function computeFundingGaps(
       name: goal.name,
       computable: true,
       allocatedNowILS: fix(allocated),
+      earmarkedNowILS: fix(earmarkTake),
       projectedValueILS: fix(projected),
       requiredILS: fix(required),
       gapILS: fix(gap),

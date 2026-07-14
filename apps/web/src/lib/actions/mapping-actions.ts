@@ -17,6 +17,15 @@ async function run(locale: string, backTo: string, fn: (trpc: Caller) => Promise
   redirect(`/${locale}/mapping?ok=itemSaved`);
 }
 
+export async function earmarkAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  const goalId = opt(fd, "goalId");
+  const trpc = await serverCaller();
+  await trpc.goals.earmarkAccount({ itemId: id, goalId: goalId && goalId.length > 0 ? goalId : null });
+  redirect(`/${locale}/mapping/edit/${id}`);
+}
+
 export async function createAccountAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   await run(locale, "/mapping/new/account", (trpc) =>

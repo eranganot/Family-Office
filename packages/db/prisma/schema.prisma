@@ -144,6 +144,10 @@ model LedgerItem {
   cashFlowDetail   CashFlowDetail?
   insuranceDetail  InsuranceDetail?
 
+  /** B7: owner pins this account/asset to a specific goal so funding-gap math matches intent. */
+  earmarkedGoalId  String?
+  earmarkedGoal    Goal?              @relation("GoalEarmark", fields: [earmarkedGoalId], references: [id], onDelete: SetNull)
+
   suspenseResolutions SuspenseItem[]     @relation("resolution")
   evidenceFor         RecommendationEvidence[]
 
@@ -515,6 +519,7 @@ model Goal {
   dependsOn    GoalDependency[] @relation("dependent")
   dependedOnBy GoalDependency[] @relation("prerequisite")
   impacts      RecommendationGoal[]
+  earmarkedItems LedgerItem[]     @relation("GoalEarmark")
 }
 
 model GoalDependency {

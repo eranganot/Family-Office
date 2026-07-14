@@ -85,3 +85,26 @@ describe("computeFundingGaps", () => {
     expect(Number(r.results[0]!.requiredMonthlySavingILS)).toBeCloseTo(1000, 0); // 60k over 60 months
   });
 });
+
+describe("earmarking (B7)", () => {
+  it("reserves an earmarked account for its goal, out of the shared pool", () => {
+    const g1 = goal({ id: "g1", priority: 1, requiredFundingILS: "500000" });
+    const g2 = goal({ id: "g2", priority: 2, requiredFundingILS: "500000" });
+    const earmarked = asset({ id: "a1", valueILS: "300000", earmarkedGoalId: "g2" });
+    const r = computeFundingGaps([g1, g2], [earmarked], 3, NOW);
+    const r1 = r.results.find((x) => x.goalId === "g1")!;
+    const r2 = r.results.find((x) => x.goalId === "g2")!;
+    expect(Number(r1.allocatedNowILS)).toBe(0); // higher priority, but the only asset is pinned elsewhere
+    expect(Number(r2.earmarkedNowILS)).toBeGreaterThan(0); // lower priority still gets its earmarked money
+    expect(Number(r2.allocatedNowILS)).toBeGreaterThan(0);
+    expect(r.pools.liquidILS).toBe("0.00"); // earmarked asset left the shared pool
+  });
+
+  it("without earmark, the higher-priority goal claims the pool first", () => {
+    const g1 = goal({ id: "g1", priority: 1, requiredFundingILS: "500000" });
+    const g2 = goal({ id: "g2", priority: 2, requiredFundingILS: "500000" });
+    const r = computeFundingGaps([g1, g2], [asset({ id: "a1", valueILS: "300000" })], 3, NOW);
+    expect(Number(r.results.find((x) => x.goalId === "g1")!.allocatedNowILS)).toBeGreaterThan(0);
+    expect(Number(r.results.find((x) => x.goalId === "g2")!.allocatedNowILS)).toBe(0);
+  });
+});

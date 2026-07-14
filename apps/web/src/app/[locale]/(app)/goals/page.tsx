@@ -96,6 +96,9 @@ export default async function GoalsPage({
                       <div className="grid grid-cols-5 gap-3 text-sm">
                         <Stat label={t("required")} value={formatMoney(r.requiredILS!, "ILS", l)} />
                         <Stat label={t("allocated")} value={formatMoney(r.allocatedNowILS!, "ILS", l)} />
+                        {Number(r.earmarkedNowILS ?? 0) > 0 ? (
+                          <Stat label={t("earmarked")} value={formatMoney(r.earmarkedNowILS!, "ILS", l)} />
+                        ) : null}
                         <Stat label={`${t("projected")} (${r.yearsToTarget} ${t("years")})`} value={formatMoney(r.projectedValueILS!, "ILS", l)} />
                         <Stat label={t("gap")} value={formatMoney(r.gapILS!, "ILS", l)} highlight={Number(r.gapILS) > 0} />
                         <Stat label={t("monthlySaving")} value={formatMoney(r.requiredMonthlySavingILS!, "ILS", l)} highlight={Number(r.requiredMonthlySavingILS) > 0} />

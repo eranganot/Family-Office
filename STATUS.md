@@ -4,6 +4,15 @@
 
 ## Current state (2026-07-14)
 
+- **M20b (earmark accounts to goals, B7) code-complete, NOT yet deployed.** New `LedgerItem.earmarkedGoalId`
+  (nullable FK → Goal, ON DELETE SET NULL; migration 20260714130000_m20b_earmark_accounts_to_goals). The
+  funding-gap engine reserves an earmarked account for its goal FIRST (owner intent overrides the
+  priority-pool policy) and removes it from the shared LIQUID/RETIREMENT pools; `GoalGapResult` gains
+  `earmarkedNowILS`. `goals.fundingGap` threads the field; new `goals.earmarkAccount` mutation
+  (household-scoped, validated, audited). UI: earmark select on the account/other-asset edit form; the goals
+  gap report shows the earmarked amount per goal. Verified: prisma valid, engine-goals 9 tests (2 new),
+  api/web tsc clean, i18n 592-key parity. **Deploys with the push (migrate adds the column + FK).**
+
 - **M20a (recommendation lifecycle, B4) code-complete, NOT yet deployed.** Closes the accept→implement
   loop. (1) "סמן כבוצע" (Mark done) on ACCEPTED cards → status IMPLEMENTED + records the actual outcome on
   the decision journal; the earlier "הסר מהרשימה" dismiss stays (→ SUPERSEDED). (2) New pure sweep

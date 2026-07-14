@@ -148,6 +148,7 @@ export const goalsRouter = router({
       accountType: i.accountDetail?.accountType,
       valueILS: i.latestValuation ? toILS(i.latestValuation.value.toString(), i.latestValuation.currency) : null,
       verified: i.verification === "VERIFIED",
+      earmarkedGoalId: i.earmarkedGoalId ?? null,
     }));
 
     const realReturn = await assumptionRegistry(ctx.db).current("goal_projection_real_return_pct", householdId);
@@ -172,4 +173,18 @@ export const goalsRouter = router({
   setStatus: protectedProcedure
     .input(z.object({ id: z.uuid(), status: z.enum(["ACTIVE", "ACHIEVED", "ABANDONED"]) }))
     .mutation(({ ctx, input }) => ctx.db.goal.update({ where: { id: input.id }, data: { status: input.status } })),
+
+  /** B7: pin (or unpin) an account/asset to a goal. */
+  earmarkAccount: protectedProcedure
+    .input(z.object({ itemId: z.uuid(), goalId: z.uuid().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const householdId = await requireHouseholdId(ctx.db);
+      const item = await ctx.db.ledgerItem.findFirst({ where: { id: input.itemId, householdId } });
+      if (!item) throw new TRPCError({ code: "NOT_FOUND" });
+      if (input.goalId) {
+        const goal = await ctx.db.goal.findFirst({ where: { id: input.goalId, householdId } });
+        if (!goal) throw new TRPCError({ code: "NOT_FOUND", message: "GOAL_NOT_FOUND" });
+      }
+      return ctx.db.ledgerItem.update({ where: { id: input.itemId }, data: { earmarkedGoalId: input.goalId } });
+    }),
 });

@@ -268,7 +268,14 @@
       "titleLiability": "New other liability"
     },
     "edit": "Edit",
-    "editTitle": "Edit item"
+    "editTitle": "Edit item",
+    "earmark": {
+      "title": "Earmark to a goal",
+      "hint": "Pin this account to a specific goal so the funding-gap math reflects how the family actually thinks.",
+      "goal": "Goal",
+      "none": "— not earmarked —",
+      "save": "Save earmark"
+    }
   },
   "fx": {
     "title": "FX rates (manual)",
@@ -447,7 +454,8 @@
     "targetMonthlyIncome": "Desired monthly income",
     "incomeModeHint": "FI/Retirement goals: capital target derived automatically",
     "incomeModeBadge": "Income target",
-    "perMonth": "mo"
+    "perMonth": "mo",
+    "earmarked": "Earmarked"
   },
   "strategy": {
     "explainerTitle": "What is this tab?",
