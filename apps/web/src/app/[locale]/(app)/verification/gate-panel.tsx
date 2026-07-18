@@ -62,16 +62,26 @@ export async function GatePanel({
         ) : null}
         {state === "VERIFICATION" ? (
           <>
-            <TransitionButton to="STRATEGY" label={t("advance", { state: tp("STRATEGY") })} primary={canEnterStrategy} />
+            <TransitionButton to="ALLOCATION" label={t("advance", { state: tp("ALLOCATION") })} primary={canEnterStrategy} />
             <TransitionButton to="MAPPING" label={t("backTo", { state: tp("MAPPING") })} />
           </>
         ) : null}
+        {state === "ALLOCATION" ? (
+          <>
+            <TransitionButton to="STRATEGY" label={t("advance", { state: tp("STRATEGY") })} primary />
+            <TransitionButton to="VERIFICATION" label={t("backTo", { state: tp("VERIFICATION") })} />
+          </>
+        ) : null}
         {state === "STRATEGY" ? (
-          <TransitionButton to="MONITORING" label={t("advance", { state: tp("MONITORING") })} primary />
+          <>
+            <TransitionButton to="MONITORING" label={t("advance", { state: tp("MONITORING") })} primary />
+            <TransitionButton to="ALLOCATION" label={t("backTo", { state: tp("ALLOCATION") })} />
+          </>
         ) : null}
         {state === "MONITORING" ? (
           <>
             <TransitionButton to="STRATEGY" label={t("advance", { state: tp("STRATEGY") })} primary />
+            <TransitionButton to="ALLOCATION" label={t("backTo", { state: tp("ALLOCATION") })} />
             <TransitionButton to="VERIFICATION" label={t("backTo", { state: tp("VERIFICATION") })} />
           </>
         ) : null}

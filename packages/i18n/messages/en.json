@@ -28,14 +28,16 @@
     "strategy": "Strategy",
     "journal": "Journal",
     "scenarios": "Scenarios",
-    "monitoring": "Monitoring"
+    "monitoring": "Monitoring",
+    "allocation": "Allocation"
   },
   "phase": {
     "label": "Current phase",
     "MAPPING": "Mapping",
     "VERIFICATION": "Verification",
     "STRATEGY": "Strategy",
-    "MONITORING": "Monitoring"
+    "MONITORING": "Monitoring",
+    "ALLOCATION": "Allocation"
   },
   "login": {
     "title": "Sign in to WealthOS",
@@ -67,7 +69,13 @@
       "strategyClearDetail": "You can move to ongoing monitoring.",
       "monitoringAlertsHead": "{count} open alerts",
       "monitoringClearHead": "No open alerts — all clear",
-      "monitoringClearDetail": "Keep tracking drift and updates."
+      "monitoringClearDetail": "Keep tracking drift and updates.",
+      "toAllocation": "To allocation",
+      "allocationRunHead": "Build the free-cash deployment plan",
+      "allocationRunDetail": "The engine orders every free shekel: buffer, expensive debt, tax ceilings, investing.",
+      "allocationPendingHead": "A deployment plan awaits your approval",
+      "allocationDoneHead": "Deployment plan approved",
+      "allocationDoneDetail": "Advance to strategy via the verification page gate."
     },
     "netWorth": "Net worth",
     "assets": "Total assets",
@@ -618,8 +626,8 @@
     "guideLabel": "How to tune",
     "wizard": {
       "title": "Plain-language setup wizard",
-      "cta": "Answer 10 simple questions instead →",
-      "intro1": "Ten questions, no financial knowledge needed. Your answers set the alert thresholds and safety targets; market numbers (returns, inflation) stay expert-maintained.",
+      "cta": "Answer a short plain-language questionnaire instead →",
+      "intro1": "Fifteen short questions, no financial knowledge needed. Your answers set the alert thresholds and safety targets; market numbers (returns, inflation) stay expert-maintained.",
       "intro2": "Only values that actually change are written; each change creates a new version and invalidates recommendations built on the old one.",
       "bufferMonths": "If your income stopped tomorrow, how many months would you need to reorganize without selling investments?",
       "bufferMonths_3": "3 months — we'd adjust fast",
@@ -948,12 +956,46 @@
       "ITEM_REMOVED": "Holdings removed",
       "STALENESS": "Stale valuations",
       "RECOMMENDATION_REVIEW": "Accepted recommendation awaiting outcome"
-    }
+    },
+    "toAllocation": "Rebuild the deployment plan"
   },
   "journey": {
     "MAPPING": "Now: map every account, property, mortgage, flow and policy. When the picture is complete — move to verification.",
     "VERIFICATION": "Now: confirm each item's value and resolve suspense. When everything is verified — the gate to strategy opens.",
     "STRATEGY": "Now: answer the risk questionnaire, set goals, run the engine, accept/reject recommendations — then move to monitoring.",
-    "MONITORING": "Now: the system watches drift daily. Handle alerts; re-enter strategy when something material changes."
+    "MONITORING": "Now: the system watches drift daily. Handle alerts; re-enter strategy when something material changes.",
+    "ALLOCATION": "Now: review the deployment plan for free cash — approve it (or adjust and rebuild) to open the strategy gate."
+  },
+  "allocation": {
+    "title": "Allocation — deploy your free money",
+    "intro": "The engine reviews your liquid assets, protects the emergency buffer, and orders every free shekel: expensive debt first (a guaranteed return), then unused tax ceilings, then investing toward your target mix. Approve the plan to unlock the strategy phase.",
+    "wrongPhase": "The household is not in the allocation phase. The plan is built after verification is complete.",
+    "goToGate": "Go to the phase gate",
+    "generate": "Build my deployment plan",
+    "regenerate": "Rebuild the plan (fresh snapshot)",
+    "planTitle": "Deployment plan",
+    "status": {
+      "PROPOSED": "Awaiting your approval",
+      "APPROVED": "Approved",
+      "SUPERSEDED": "Superseded"
+    },
+    "autoApproved": "Auto-approved — nothing to deploy.",
+    "cash": "Cash accounts",
+    "bufferTarget": "Emergency buffer target",
+    "freeCash": "Free to deploy",
+    "monthlyExpenses": "Monthly expenses",
+    "expensesUnknown": "Monthly expenses are not mapped, so the engine refuses to declare any cash 'free'. Map your expense flows in Mapping and rebuild.",
+    "noSteps": "No deployment steps — the buffer consumes all available cash.",
+    "kinds": {
+      "BUFFER_TOP_UP": "Buffer top-up",
+      "REPAY_EXPENSIVE_DEBT": "Repay expensive debt",
+      "TAX_CEILING_HISHTALMUT": "Hishtalmut ceiling",
+      "TAX_CEILING_PENSION": "Pension ceiling",
+      "INVEST_GROWTH": "Invest — growth",
+      "INVEST_DEFENSIVE": "Invest — defensive"
+    },
+    "approveNote": "Note (optional)",
+    "approve": "Approve the plan",
+    "approvedNext": "Plan approved — the gate to the strategy phase is open (verification page → advance)."
   }
 }

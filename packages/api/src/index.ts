@@ -1,4 +1,5 @@
 import { accountsRouter } from "./routers/accounts";
+import { allocationRouter } from "./routers/allocation";
 import { propertyRouter } from "./routers/property";
 import { flowsRouter } from "./routers/flows";
 import { networthRouter } from "./routers/networth";
@@ -23,6 +24,7 @@ export const appRouter = router({
   workflow: workflowRouter,
   ledger: ledgerRouter,
   accounts: accountsRouter,
+  allocation: allocationRouter,
   property: propertyRouter,
   flows: flowsRouter,
   networth: networthRouter,

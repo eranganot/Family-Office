@@ -1,0 +1,30 @@
+diff --git a/packages/i18n/messages/en.json b/packages/i18n/messages/en.json
+index 13f0303..7198880 100644
+--- a/packages/i18n/messages/en.json
++++ b/packages/i18n/messages/en.json
+@@ -618,8 +618,8 @@
+     "guideLabel": "How to tune",
+     "wizard": {
+       "title": "Plain-language setup wizard",
+-      "cta": "Answer 10 simple questions instead →",
+-      "intro1": "Ten questions, no financial knowledge needed. Your answers set the alert thresholds and safety targets; market numbers (returns, inflation) stay expert-maintained.",
++      "cta": "Answer a short plain-language questionnaire instead →",
++      "intro1": "Fifteen short questions, no financial knowledge needed. Your answers set the alert thresholds and safety targets; market numbers (returns, inflation) stay expert-maintained.",
+       "intro2": "Only values that actually change are written; each change creates a new version and invalidates recommendations built on the old one.",
+       "bufferMonths": "If your income stopped tomorrow, how many months would you need to reorganize without selling investments?",
+       "bufferMonths_3": "3 months — we'd adjust fast",
+diff --git a/packages/i18n/messages/he.json b/packages/i18n/messages/he.json
+index 1b1e1db..206b992 100644
+--- a/packages/i18n/messages/he.json
++++ b/packages/i18n/messages/he.json
+@@ -618,8 +618,8 @@
+     "guideLabel": "איך לכוון",
+     "wizard": {
+       "title": "אשף הגדרה בשפה פשוטה",
+-      "cta": "← עדיף לענות על 10 שאלות פשוטות",
+-      "intro1": "עשר שאלות, בלי צורך בידע פיננסי. התשובות קובעות את ספי ההתרעה ויעדי הביטחון; מספרי שוק (תשואות, אינפלציה) נשארים באחריות המערכת.",
++      "cta": "← עדיף לענות על שאלון קצר בשפה פשוטה",
++      "intro1": "חמש-עשרה שאלות קצרות, בלי צורך בידע פיננסי. התשובות קובעות את ספי ההתרעה ויעדי הביטחון; מספרי שוק (תשואות, אינפלציה) נשארים באחריות המערכת.",
+       "intro2": "רק ערכים שמשתנים בפועל נכתבים; כל שינוי יוצר גרסה חדשה ומבטל המלצות שנבנו על הישנה.",
+       "bufferMonths": "אם ההכנסה תיעצר מחר, כמה חודשים תצטרכו כדי להתארגן בלי למכור השקעות?",
+       "bufferMonths_3": "3 חודשים — נסתגל מהר",

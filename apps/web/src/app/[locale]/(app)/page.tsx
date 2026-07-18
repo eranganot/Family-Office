@@ -28,13 +28,24 @@ async function computeNextStep(trpc: Trpc, t: Translate, state: WorkflowState): 
 
   if (state === "VERIFICATION") {
     if (assessment.gate.canEnterStrategy) {
-      return { head: nx("verifyReadyHead"), detail: nx("verifyReadyDetail"), ctaLabel: nx("toStrategy"), href: "/strategy", tone: "ok" };
+      return { head: nx("verifyReadyHead"), detail: nx("verifyReadyDetail"), ctaLabel: nx("toAllocation"), href: "/verification", tone: "ok" };
     }
     const unverified = assessment.totalCount - assessment.verifiedCount;
     const parts: string[] = [];
     if (unverified > 0) parts.push(nx("verifyItems", { count: unverified }));
     if (assessment.pendingSuspense > 0) parts.push(nx("verifySuspense", { count: assessment.pendingSuspense }));
     return { head: parts.join(" · ") || nx("verifyItems", { count: unverified }), ctaLabel: nx("toVerify"), href: "/verification", tone: "action" };
+  }
+
+  if (state === "ALLOCATION") {
+    const plan = await trpc.allocation.latest();
+    if (!plan || plan.status === "SUPERSEDED") {
+      return { head: nx("allocationRunHead"), detail: nx("allocationRunDetail"), ctaLabel: nx("toAllocation"), href: "/allocation", tone: "action" };
+    }
+    if (plan.status === "PROPOSED") {
+      return { head: nx("allocationPendingHead"), ctaLabel: nx("toAllocation"), href: "/allocation", tone: "action" };
+    }
+    return { head: nx("allocationDoneHead"), detail: nx("allocationDoneDetail"), ctaLabel: nx("toAllocation"), href: "/allocation", tone: "ok" };
   }
 
   if (state === "STRATEGY") {

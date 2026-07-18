@@ -28,16 +28,22 @@ export const workflowRouter = router({
         const household = await tx.household.findFirst();
         if (!household) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No household" });
 
-        const [unverifiedCount, pendingSuspense] = await Promise.all([
+        const [unverifiedCount, pendingSuspense, latestPlan] = await Promise.all([
           tx.ledgerItem.count({
             where: { householdId: household.id, status: "ACTIVE", verification: { not: "VERIFIED" } },
           }),
           tx.suspenseItem.count({ where: { status: "PENDING" } }),
+          tx.allocationPlan.findFirst({
+            where: { householdId: household.id },
+            orderBy: { createdAt: "desc" },
+            select: { status: true },
+          }),
         ]);
 
         const result = evaluateTransition(household.workflowState, input.to, {
           verificationComplete: unverifiedCount === 0,
           suspenseEmpty: pendingSuspense === 0,
+          allocationPlanApproved: latestPlan?.status === "APPROVED",
         });
         if (!result.allowed) {
           throw new TRPCError({ code: "FORBIDDEN", message: result.reason });

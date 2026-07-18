@@ -62,7 +62,7 @@ export const monitoringRouter = router({
    * the client. Open alerts are resolved as the household acts on them.
    */
   reevaluate: protectedProcedure
-    .input(z.object({ target: z.enum(["VERIFICATION", "STRATEGY"]), reason: z.string().min(1).max(500) }))
+    .input(z.object({ target: z.enum(["VERIFICATION", "ALLOCATION", "STRATEGY"]), reason: z.string().min(1).max(500) }))
     .mutation(async ({ ctx, input }) => {
       return ctx.db.$transaction(async (tx) => {
         const household = await tx.household.findFirst();
@@ -76,9 +76,15 @@ export const monitoringRouter = router({
           tx.suspenseItem.count({ where: { status: "PENDING" } }),
         ]);
 
+        const latestPlan = await tx.allocationPlan.findFirst({
+          where: { householdId: household.id },
+          orderBy: { createdAt: "desc" },
+          select: { status: true },
+        });
         const result = evaluateTransition(household.workflowState, input.target, {
           verificationComplete: unverifiedCount === 0,
           suspenseEmpty: pendingSuspense === 0,
+          allocationPlanApproved: latestPlan?.status === "APPROVED",
         });
         if (!result.allowed) throw new TRPCError({ code: "FORBIDDEN", message: result.reason });
 

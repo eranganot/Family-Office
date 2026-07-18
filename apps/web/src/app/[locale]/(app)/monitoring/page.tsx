@@ -103,6 +103,13 @@ export default async function MonitoringPage({
               </form>
               <form action={reevaluateAction}>
                 <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="target" value="ALLOCATION" />
+                <button type="submit" className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+                  {t("toAllocation")}
+                </button>
+              </form>
+              <form action={reevaluateAction}>
+                <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="target" value="STRATEGY" />
                 <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
                   {t("toStrategy")}

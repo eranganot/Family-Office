@@ -32,8 +32,15 @@ model MarketIndicator {
 enum WorkflowState {
   MAPPING
   VERIFICATION
+  ALLOCATION
   STRATEGY
   MONITORING
+}
+
+enum AllocationPlanStatus {
+  PROPOSED
+  APPROVED
+  SUPERSEDED
 }
 
 model Household {
@@ -53,6 +60,7 @@ model Household {
   recommendations Recommendation[]
   scenarios       Scenario[]
   snapshots       HouseholdSnapshot[]
+  allocationPlans AllocationPlan[]
   transitions     WorkflowTransition[]
   auditEvents     AuditEvent[]
   assumptions     Assumption[]
@@ -646,6 +654,22 @@ enum SnapshotKind {
   MANUAL
 }
 
+model AllocationPlan {
+  id            String               @id @default(uuid())
+  householdId   String
+  household     Household            @relation(fields: [householdId], references: [id])
+  snapshotId    String
+  snapshot      HouseholdSnapshot    @relation(fields: [snapshotId], references: [id])
+  engineVersion String
+  plan          Json // full DeploymentPlan (steps bilingual, amounts in base currency)
+  status        AllocationPlanStatus @default(PROPOSED)
+  createdAt     DateTime             @default(now())
+  approvedAt    DateTime?
+  note          String?
+
+  @@index([householdId, createdAt])
+}
+
 model HouseholdSnapshot {
   id            String       @id @default(uuid())
   householdId   String
@@ -659,6 +683,7 @@ model HouseholdSnapshot {
   monitoringRuns  MonitoringRun[] @relation("monitoringSnapshot")
 
   @@index([householdId, takenAt])
+  allocationPlans AllocationPlan[]
 }
 
 model FxRate {

@@ -46,6 +46,7 @@ export default async function AppLayout({
           { href: "/mapping", label: t("nav.mapping") },
           { href: "/documents", label: t("nav.documents") },
           { href: "/verification", label: t("nav.verification") },
+          { href: "/allocation", label: t("nav.allocation") },
           { href: "/goals", label: t("nav.goals") },
           { href: "/strategy", label: t("nav.strategy") },
           { href: "/scenarios", label: t("nav.scenarios") },
@@ -58,9 +59,9 @@ export default async function AppLayout({
       />
       {household ? (
         <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl bg-neutral-50 px-4 py-3 text-xs">
-          {(["MAPPING", "VERIFICATION", "STRATEGY", "MONITORING"] as const).map((phase, i) => {
+          {(["MAPPING", "VERIFICATION", "ALLOCATION", "STRATEGY", "MONITORING"] as const).map((phase, i) => {
             const current = household.workflowState === phase;
-            const hrefs = { MAPPING: "/mapping", VERIFICATION: "/verification", STRATEGY: "/strategy", MONITORING: "/monitoring" } as const;
+            const hrefs = { MAPPING: "/mapping", VERIFICATION: "/verification", ALLOCATION: "/allocation", STRATEGY: "/strategy", MONITORING: "/monitoring" } as const;
             return (
               <span key={phase} className="flex items-center gap-2">
                 {i > 0 ? <span className="text-neutral-300">←</span> : null}

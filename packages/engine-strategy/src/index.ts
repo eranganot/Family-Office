@@ -7,6 +7,8 @@ export { RationaleSchema } from "./rationale";
 export type { Rationale, RecommendationDraft } from "./rationale";
 export { validateStrategyText } from "./validator";
 export { actionItemsFor } from "./action-items";
+export { computeDeploymentPlan } from "./deployment";
+export type { DeploymentPlan, DeploymentStep, DeploymentStepKind, DeploymentNote } from "./deployment";
 export type { ActionItems } from "./action-items";
 export { scorePriority } from "./scoring";
 export type { PriorityWeights } from "./scoring";

@@ -17,6 +17,36 @@
   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
 
+## Current state (2026-07-18)
+
+- **M25 (ALLOCATION — fifth workflow phase) code-complete — delivered as m25.patch on 599985b.**
+  Owner decisions: formal phase between VERIFICATION and STRATEGY; deployable = cash beyond the
+  emergency buffer; debt repayment math-driven (expensive_debt_rate_pct).
+  (a) Pure engine `engine-strategy/src/deployment.ts`: computeDeploymentPlan waterfall — buffer
+  (REFUSES when expenses unmapped: never guess the buffer; top-up step when cash < target) →
+  expensive mortgage tracks by rate desc → unused hishtalmut/pension ceilings per adult (same
+  contribution-flow accounting as tax-utilization) → invest split toward deriveTargetGrowthPct
+  (new-money-only; unsplit + note when unknown mix > ceiling); all strings product-validated;
+  6 new tests (engine-strategy 51 total).
+  (b) State machine v2 (5 states): VERIFICATION→ALLOCATION carries the old verification gate;
+  ALLOCATION→STRATEGY gated on ALLOCATION_PLAN_NOT_APPROVED; STRATEGY→ALLOCATION and
+  MONITORING→ALLOCATION allowed; exhaustive 5×5 matrix tests updated (domain 34 green).
+  (c) DB: WorkflowState + 'ALLOCATION' (PG12+ safe ADD VALUE), AllocationPlan model
+  (snapshot-pinned, engineVersion, PROPOSED/APPROVED/SUPERSEDED) — migration 20260716090000.
+  (d) API: allocation router (latest/generate/approve; generate supersedes proposed, AUTO-APPROVES
+  empty plans); workflow + monitoring transitions feed the new fact.
+  **(e) LATENT BUG FIX: strategy-service now loads ALL current assumptions (reg.all) — the old
+  hard-coded subset silently ignored questionnaire/wizard overrides (risk_*, allocation_*) at run
+  time while the UI displayed them. Engines now honor every override.**
+  (f) UI: /allocation page (free-cash stats, numbered bilingual steps, approve-with-note, auto-approve
+  notice), nav tab, 5-pill journey bar, gate panel rewired (VERIFICATION advances to ALLOCATION;
+  back-transitions everywhere), dashboard ALLOCATION next-step, monitoring re-eval → ALLOCATION button.
+  Verified: web/api/domain/registry/worker tsc exit 0, engine suites 51/34/21, prisma valid, i18n
+  parity. Sandbox note: killed npm slices TRUNCATE package files (rolldown binding SIGBUS, @types/node,
+  pdfjs-dist) — targeted reinstall fixes; check binaries when vitest bus-errors.
+  **Prod flow after deploy: household sits in STRATEGY/MONITORING — use the gate/re-eval buttons to
+  enter ALLOCATION, generate + approve the first plan, then advance back to STRATEGY.**
+
 ## Current state (2026-07-15)
 
 - **M23 (wizard + action checklists + audit + trust ladder) code-complete — delivered as a GIT PATCH
