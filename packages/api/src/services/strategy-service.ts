@@ -45,10 +45,16 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
   const hishtalmut = await taxReg.get("HISHTALMUT_CEILINGS");
   const pension = await taxReg.get("PENSION_CEILINGS");
   const boi = await latestBoiRate(db);
+
+  // M30 — align strategy with the household's APPROVED allocation plan: strategy won't
+  // re-recommend actions the household already committed to in the allocation phase.
+  const committedPlan = await buildCommittedPlan(db, householdId);
+
   const ctx: AnalyzerContext = {
     assumptions,
     taxRules: { HISHTALMUT_CEILINGS: hishtalmut.payload, PENSION_CEILINGS: pension.payload },
     marketRates: { boiRatePct: boi?.value ?? null },
+    committedPlan,
   };
 
   const findings = runAnalyzers(payload, ctx);
@@ -111,4 +117,31 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
   });
 
   return { ran: true, snapshotId, created, supersededCount, unmappedFindings };
+}
+
+
+interface CandidateLite { id: string; kind: string; evidenceItemIds: string[] }
+interface PlansLite { candidates?: CandidateLite[] }
+type WorkingPlanLite = Record<string, { enabled: boolean; amount: number }>;
+
+/** Summarize the latest APPROVED allocation plan into suppression flags for the analyzers. */
+async function buildCommittedPlan(db: PrismaClient, householdId: string) {
+  const row = await db.allocationPlan.findFirst({ where: { householdId, status: "APPROVED" }, orderBy: { approvedAt: "desc" } });
+  if (!row) return undefined;
+  const plan = row.plan as unknown as PlansLite;
+  if (!Array.isArray(plan.candidates)) return undefined;
+  const wp = (row.workingPlan ?? {}) as WorkingPlanLite;
+  const byId = new Map(plan.candidates.map((c) => [c.id, c]));
+  let deploysIdleCash = false, investsGrowth = false, taxDeposited = false;
+  const repaidTrackItemIds: string[] = [];
+  for (const [id, sel] of Object.entries(wp)) {
+    if (!sel.enabled || sel.amount <= 0) continue;
+    const c = byId.get(id);
+    if (!c) continue;
+    if (c.kind === "INVEST_GROWTH" || c.kind === "INVEST_DEFENSIVE") deploysIdleCash = true;
+    if (c.kind === "INVEST_GROWTH") investsGrowth = true;
+    if (c.kind === "TAX_CEILING_HISHTALMUT" || c.kind === "TAX_CEILING_PENSION") { deploysIdleCash = true; taxDeposited = true; }
+    if (c.kind === "REPAY_EXPENSIVE_DEBT" || c.kind === "REPAY_DEBT") { deploysIdleCash = true; repaidTrackItemIds.push(...c.evidenceItemIds); }
+  }
+  return { deploysIdleCash, investsGrowth, repaidTrackItemIds, taxDeposited };
 }

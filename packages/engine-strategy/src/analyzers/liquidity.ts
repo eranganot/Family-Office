@@ -39,8 +39,9 @@ export function analyzeLiquidity(snapshot: SnapshotPayload, ctx: AnalyzerContext
       evidenceItemIds: liquidItems.map((i) => i.id),
     });
   }
-  // Cash sitting far beyond the emergency target erodes to inflation.
-  if (cashMonths > targetMonths * 2) {
+  // Cash sitting far beyond the emergency target erodes to inflation — unless the approved
+  // allocation plan already deploys the surplus (M30 alignment).
+  if (cashMonths > targetMonths * 2 && !ctx.committedPlan?.deploysIdleCash) {
     findings.push({
       code: "EXCESS_IDLE_CASH",
       severity: "NOTICE",

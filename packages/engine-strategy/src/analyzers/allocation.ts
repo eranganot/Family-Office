@@ -126,7 +126,7 @@ export function analyzeAllocation(snapshot: SnapshotPayload, ctx: AnalyzerContex
     shiftBase: Math.round(shiftBase),
     horizonYears,
   };
-  if (gapPct > bandPct) {
+  if (gapPct > bandPct && !ctx.committedPlan?.investsGrowth) {
     findings.push({
       code: "ALLOCATION_GROWTH_BELOW_TARGET",
       severity: "WARNING",

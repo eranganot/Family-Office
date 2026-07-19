@@ -36,9 +36,12 @@ export default async function StrategyPage({
   const { locale } = await params;
   const sp = await searchParams;
   const t = await getTranslations("strategy");
+  const tAlloc = await getTranslations("allocation");
   const trpc = await serverCaller();
   const household = await trpc.household.get();
   if (!household) return null;
+  const approvedPlanEarly = await trpc.allocation.latest();
+  const basedOnPlan = approvedPlanEarly?.status === "APPROVED" ? approvedPlanEarly : null;
 
   if (household.workflowState !== "STRATEGY") {
     return (
@@ -78,6 +81,11 @@ export default async function StrategyPage({
     <div className="flex flex-col gap-6">
       <Explainer title={t("explainerTitle")} paragraphs={[t("explainer1"), t("explainer2"), t("explainer3")]} />
       <Card title={t("title")}>
+        {basedOnPlan ? (
+          <p className="mb-3 rounded-lg bg-blue-50/60 px-3 py-2 text-xs text-blue-800" dir="auto">
+            {tAlloc("basedOnPlan", { date: new Date(basedOnPlan.approvedAt ?? basedOnPlan.createdAt).toLocaleDateString(locale === "he" ? "he-IL" : "en-GB") })}
+          </p>
+        ) : null}
         {sp.error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{decodeURIComponent(sp.error)}</p> : null}
         {sp.ran ? (
           <p className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">

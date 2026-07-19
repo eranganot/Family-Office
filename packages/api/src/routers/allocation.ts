@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { computePlanImpact, deriveTargetGrowthPct, type DeploymentPlans, type PlanSelection } from "@wealthos/engine-strategy";
-import { SnapshotPayloadSchema } from "@wealthos/domain";
+import { SnapshotPayloadSchema, evaluateTransition } from "@wealthos/domain";
 import { assumptionRegistry } from "@wealthos/registry";
 import { z } from "zod";
 import { runAllocation } from "../services/allocation-service";
@@ -67,6 +67,85 @@ export const allocationRouter = router({
     }
     return { aggregate, perCandidate };
   }),
+
+  /** M30 — base numbers for the client cart to recompute impact locally as amounts change. */
+  impactBase: protectedProcedure.query(async ({ ctx }) => {
+    const householdId = await requireHouseholdId(ctx.db);
+    const row = await ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
+    if (!row) return null;
+    const plan = planOf(row);
+    if (!Array.isArray(plan.candidates)) return null;
+    const snap = await ctx.db.householdSnapshot.findUnique({ where: { id: row.snapshotId } });
+    if (!snap) return null;
+    const payload = SnapshotPayloadSchema.parse(snap.payload);
+    const assumptions = Object.fromEntries((await assumptionRegistry(ctx.db).all(householdId)).map((a) => [a.key, a.value]));
+    const num = (k: string, d: number) => Number(assumptions[k] ?? d);
+    const CASH = new Set(["BANK_CHECKING", "BANK_SAVINGS", "BANK_DEPOSIT", "CASH_OTHER"]);
+    const isCash = (i: { kind: string; accountType: string | null }) => i.kind === "ACCOUNT" && CASH.has(i.accountType ?? "");
+    let cashBase = 0, totalDebt = 0, annualInterest = 0, growth = 0, knownMix = 0, unknown = 0;
+    for (const i of payload.items) {
+      const v = i.valueBase ?? 0;
+      if (isCash(i) && i.valueBase !== null) cashBase += v;
+      if (i.kind === "MORTGAGE" && i.mortgageTracks) for (const tk of i.mortgageTracks) { totalDebt += tk.principalRemaining; annualInterest += (tk.principalRemaining * tk.annualRatePct) / 100; }
+      if (i.kind === "ACCOUNT" && i.valueBase !== null) {
+        if (i.growthSharePct !== null && i.growthSharePct !== undefined) { growth += (v * i.growthSharePct) / 100; knownMix += v; }
+        else if (isCash(i)) knownMix += v; else unknown += v;
+      }
+    }
+    const mixKnown = knownMix + unknown === 0 || unknown / (knownMix + unknown) <= 0.5;
+    const requiredTotal = payload.goals.filter((g) => g.requiredFundingBase !== null).reduce((t, g) => t + (g.requiredFundingBase ?? 0), 0);
+    const assetsTotal = payload.items.filter((i) => ["ACCOUNT", "REAL_ESTATE", "OTHER_ASSET"].includes(i.kind) && i.valueBase !== null).reduce((t, i) => t + (i.valueBase ?? 0), 0);
+    return {
+      horizonYears: Math.max(1, num("risk_horizon_years", 20)),
+      expectedReturnPct: num("expected_real_return_equity_pct", 4.5),
+      inflationPct: num("inflation_il_pct", 2.5),
+      targetGrowthPct: deriveTargetGrowthPct(assumptions),
+      cashBase: Math.round(cashBase),
+      totalDebt: Math.round(totalDebt),
+      annualInterest: Math.round(annualInterest),
+      currentGrowth: Math.round(growth),
+      currentKnownMix: Math.round(knownMix),
+      mixKnown,
+      goalGapBase: requiredTotal > 0 ? Math.round(Math.max(0, requiredTotal - assetsTotal)) : null,
+    };
+  }),
+
+  /** M30 — commit the chosen selections, approve, and advance to STRATEGY in one deliberate step. */
+  commitAndApprove: workflowGuard("ALLOCATION")
+    .input(z.object({
+      id: z.uuid(),
+      selections: z.array(z.object({ candidateId: z.string().min(1), amount: z.number().min(0) })),
+      note: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.allocationPlan.findUnique({ where: { id: input.id } });
+      if (!row || row.householdId !== ctx.householdId) throw new TRPCError({ code: "NOT_FOUND" });
+      if (row.status !== "PROPOSED") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PLAN_NOT_PROPOSED" });
+      const plan = planOf(row);
+      const byId = new Map(plan.candidates.map((c) => [c.id, c]));
+      const wp: WorkingPlan = {};
+      for (const c of plan.candidates) wp[c.id] = { enabled: c.kind === "TAX_VERIFY_PAYROLL", amount: c.suggestedAmount };
+      let total = 0;
+      for (const sel of input.selections) {
+        const c = byId.get(sel.candidateId);
+        if (!c) throw new TRPCError({ code: "BAD_REQUEST", message: "CANDIDATE_NOT_IN_PLAN" });
+        const amount = c.editable ? Math.min(Math.max(sel.amount, c.minAmount), c.maxAmount) : c.suggestedAmount;
+        wp[sel.candidateId] = { enabled: true, amount };
+        if (c.kind !== "TAX_VERIFY_PAYROLL") total += amount;
+      }
+      if (total > plan.freeCashBase + 1) throw new TRPCError({ code: "BAD_REQUEST", message: "OVER_ALLOCATED" });
+
+      return ctx.db.$transaction(async (tx) => {
+        await tx.allocationPlan.update({ where: { id: input.id }, data: { workingPlan: wp, status: "APPROVED", approvedAt: new Date(), note: input.note ?? null } });
+        const household = await tx.household.findFirstOrThrow();
+        const t = evaluateTransition(household.workflowState, "STRATEGY", { verificationComplete: true, suspenseEmpty: true, allocationPlanApproved: true });
+        if (t.allowed && household.workflowState === "ALLOCATION") {
+          await tx.workflowTransition.create({ data: { householdId: household.id, fromState: "ALLOCATION", toState: "STRATEGY", reason: "Allocation plan approved" } });
+          await tx.household.update({ where: { id: household.id }, data: { workflowState: "STRATEGY" } });
+        }
+        return { approved: true, advancedTo: t.allowed ? "STRATEGY" : household.workflowState };
+      });
+    }),
 
   generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => runAllocation(ctx.db, ctx.householdId)),
 

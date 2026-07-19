@@ -1,0 +1,844 @@
+diff --git a/STATUS.md b/STATUS.md
+index f1b396b..8e28e85 100644
+--- a/STATUS.md
++++ b/STATUS.md
+@@ -17,6 +17,26 @@
+   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
+   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
+ 
++## Current state (2026-07-20, session 4)
++
++- **M30 (allocation page redesign C + strategy alignment) code-complete — m30.patch. No migration.**
++  Owner picked cart/checkout, client-interactive, and the approved plan must feed strategy.
++  UI: new `apps/web/src/components/allocation-cart.tsx` ("use client") — catalog of recommended
++  actions (add to plan) + editable cart with live per-item AND total impact computed IN THE BROWSER
++  (mirrors impact.ts: real-rate debt, expected-return invest/tax, growth-share-after), running
++  allocated/remaining/liquidity/debt-left/growth totals, over-allocation block. Amount edits recompute
++  instantly (no reload) — fixes the M29 submit-button bug by removing the two-submit form entirely.
++  Approve = `allocation.commitAndApprove` (writes selections→workingPlan, status APPROVED, AND runs the
++  ALLOCATION→STRATEGY workflow transition in one tx) → `commitCartAction` redirects to /strategy. Presets
++  still seed via applyPreset. ALIGNMENT: AnalyzerContext gains `committedPlan`; strategy-service
++  `buildCommittedPlan` summarizes the latest APPROVED plan (deploysIdleCash / investsGrowth /
++  repaidTrackItemIds / taxDeposited); analyzers suppress the overlaps — EXCESS_IDLE_CASH,
++  ALLOCATION_GROWTH_BELOW_TARGET, MORTGAGE_EXPENSIVE_TRACK + MORTGAGE_ABOVE_BENCHMARK (per repaid track),
++  TAX_*_UNDERUTILIZED — so strategy never re-litigates decided actions. Strategy page shows a
++  "מבוסס על תוכנית ההקצאה המאושרת מ-<date>" banner. New router: impactBase (client projection inputs),
++  commitAndApprove. 2 alignment tests (engine-strategy 61). Verified: engine 61, eslint clean,
++  api/web/domain/registry tsc, prisma valid, i18n parity.
++
+ ## Current state (2026-07-20, session 3)
+ 
+ - **M29 (per-action impact + responsive simulation) code-complete — m29.patch on M28. No schema/migration.**
+diff --git a/apps/web/src/app/[locale]/(app)/allocation/page.tsx b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+index 5cfa6dd..a6cf5b3 100644
+--- a/apps/web/src/app/[locale]/(app)/allocation/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+@@ -1,16 +1,14 @@
+ import { formatMoney, type Locale } from "@wealthos/i18n";
+ import { getTranslations } from "next-intl/server";
+-import { applyPresetAction, approveWorkingPlanAction, generatePlanAction, setCandidateAction } from "../../../../lib/actions/allocation-actions";
+-import { Card, TextInput } from "../../../../components/fields";
++import { applyPresetAction, generatePlanAction } from "../../../../lib/actions/allocation-actions";
++import { AllocationCart, type CartCandidate, type ImpactBase } from "../../../../components/allocation-cart";
++import { Card } from "../../../../components/fields";
+ import { serverCaller } from "../../../../lib/trpc-server";
+ import { Link } from "../../../../i18n/navigation";
+ 
+-/** M28 — allocation page: editable working plan + before→after impact panel. */
+-
+ interface Candidate {
+   id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
+-  suggestedAmount: number; ratePct: number | null;
+-  detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
++  suggestedAmount: number; ratePct: number | null; detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
+ }
+ interface Variant {
+   key: "GROWTH" | "DEBT_FREE" | "BALANCED";
+@@ -21,23 +19,14 @@ interface Plans {
+   monthlyExpensesBase: number | null; bufferTargetBase: number | null;
+   cashBase: number; freeCashBase: number; candidates: Candidate[]; variants: Variant[]; notes: string[];
+ }
+-interface ImpactShape {
+-  horizonYears: number; liquidCashBefore: number; liquidCashAfter: number;
+-  growthPctBefore: number | null; growthPctAfter: number | null; targetGrowthPct: number;
+-  totalDebtBefore: number; totalDebtAfter: number; annualInterestBefore: number; annualInterestAfter: number;
+-  taxCeilingsCaptured: number; goalGapBefore: number | null; goalGapAfter: number | null;
+-  projectedExtraNetWorth: number; extraFromInvesting: number; extraFromDebt: number; extraFromTax: number;
+-}
+ type WP = Record<string, { enabled: boolean; amount: number }>;
+-type PerCand = Record<string, { amount: number; projectedExtraNetWorth: number; interestSavedYearBase: number; growthPctAfter: number | null; horizonYears: number }>;
+-type T = (k: string, v?: Record<string, string | number>) => string;
+ 
+ export default async function AllocationPage({
+   params, searchParams,
+ }: { params: Promise<{ locale: string }>; searchParams: Promise<{ error?: string }> }) {
+   const { locale } = await params;
+   const { error } = await searchParams;
+-  const t = (await getTranslations("allocation")) as unknown as T & { has: (k: string) => boolean };
++  const t = await getTranslations("allocation");
+   const trpc = await serverCaller();
+   const household = await trpc.household.get();
+   if (!household) return null;
+@@ -59,17 +48,34 @@ export default async function AllocationPage({
+   const isV3 = !!plan && Array.isArray(plan.candidates);
+   const wp = (latest?.workingPlan ?? {}) as WP;
+   const proposed = latest?.status === "PROPOSED";
+-  const allocatedTotal = isV3 ? Object.values(wp).reduce((s, e) => s + (e.enabled ? e.amount : 0), 0) : 0;
+-  const remaining = isV3 ? plan!.freeCashBase - allocatedTotal : 0;
+-  const sim = isV3 && Object.keys(wp).length > 0 ? await trpc.allocation.simulate() : null;
+-  const impact = (sim?.aggregate ?? null) as ImpactShape | null;
+-  const perCand = (sim?.perCandidate ?? {}) as PerCand;
++  const base = isV3 && proposed ? ((await trpc.allocation.impactBase()) as ImpactBase | null) : null;
++
++  const cartCandidates: CartCandidate[] = isV3
++    ? plan!.candidates.map((c) => ({
++        id: c.id, kind: c.kind, editable: c.editable, minAmount: c.minAmount, maxAmount: c.maxAmount,
++        suggestedAmount: c.suggestedAmount, ratePct: c.ratePct,
++        detail: he ? c.detailHe : c.detail, goalImpact: he ? c.goalImpactHe : c.goalImpact,
++      }))
++    : [];
++  const initial: Record<string, number> = {};
++  for (const [id, sel] of Object.entries(wp)) {
++    const c = isV3 ? plan!.candidates.find((x) => x.id === id) : undefined;
++    if (sel.enabled && c && c.kind !== "TAX_VERIFY_PAYROLL") initial[id] = sel.amount;
++  }
++
++  const labels = {
++    catalog: t("catalog"), myPlan: t("myPlan"), add: t("addToPlan"), remove: t("remove"), empty: t("cartEmpty"),
++    allocated: t("allocated"), remaining: t("remaining"), over: t("overAllocated"), projected: t("projectedTotal"), inYears: t("inHorizon"),
++    interestSaved: t("interestSavedShort"), liquidity: t("impLiquidity"), growthShare: t("growthVsTarget"), debtLeft: t("debtLeft"),
++    approve: t("approveAndContinue"), approveHint: t("approveHint2"), note: t("approveNote"), verifyDone: t("verifyReminder"), perYear: t("perYearShort"),
++  };
+ 
+   return (
+     <div className="flex flex-col gap-6">
+       <Card title={t("title")}>
+-        <p className="mb-3 text-sm text-neutral-600">{t("introV3")}</p>
+-        {error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{t.has(`errors.${decodeURIComponent(error)}`) ? t(`errors.${decodeURIComponent(error)}`) : decodeURIComponent(error)}</p> : null}
++        <p className="mb-2 text-sm text-neutral-600">{t("introCart")}</p>
++        <p className="mb-3 rounded-lg bg-blue-50/60 px-3 py-2 text-xs text-blue-800">{t("basisNote")}</p>
++        {error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{decodeURIComponent(error)}</p> : null}
+         <form action={generatePlanAction}>
+           <input type="hidden" name="locale" value={locale} />
+           <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{latest ? t("regenerate") : t("generate")}</button>
+@@ -80,19 +86,25 @@ export default async function AllocationPage({
+       {latest && isV3 && plan ? (
+         <>
+           <Card title={`${t("planTitle")} · ${new Date(latest.createdAt).toLocaleDateString(he ? "he-IL" : "en-GB")}`}>
+-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+-              <span className={`rounded-full px-2 py-0.5 font-medium ${latest.status === "APPROVED" ? "bg-green-50 text-green-700" : proposed ? "bg-amber-50 text-amber-700" : "bg-neutral-100 text-neutral-500"}`}>{t(`status.${latest.status}`)}</span>
+-              {latest.note === "AUTO_APPROVED_NOTHING_TO_DEPLOY" ? <span className="text-neutral-400">{t("autoApproved")}</span> : null}
++            <div className="mb-3">
++              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${latest.status === "APPROVED" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>{t(`status.${latest.status}`)}</span>
+             </div>
+             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+               <Stat label={t("cash")} value={nis(plan.cashBase)} />
+               <Stat label={t("bufferTarget")} value={plan.bufferTargetBase !== null ? nis(plan.bufferTargetBase) : "—"} />
+-              <Stat label={t("freeCash")} value={nis(plan.freeCashBase)} highlight={plan.freeCashBase > 0} />
++              <Stat label={t("freeCash")} value={nis(plan.freeCashBase)} highlight />
+               <Stat label={t("monthlyExpenses")} value={plan.monthlyExpensesBase !== null ? nis(plan.monthlyExpensesBase) : "—"} />
+             </div>
+             {plan.notes.includes("EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED") ? <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{t("expensesUnknown")}</p> : null}
+           </Card>
+ 
++          {latest.status === "APPROVED" ? (
++            <Card>
++              <p className="mb-3 text-sm text-green-700">{t("approvedAligned")}</p>
++              <Link href="/strategy" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("toStrategy")} →</Link>
++            </Card>
++          ) : null}
++
+           {proposed && plan.variants.length > 1 ? (
+             <div className="grid gap-4 lg:grid-cols-3">
+               {plan.variants.map((v) => (
+@@ -102,11 +114,8 @@ export default async function AllocationPage({
+                   <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+                     <Stat label={t("sumInvested")} value={nis(v.summary.investedBase)} />
+                     <Stat label={t("sumDebtRepaid")} value={nis(v.summary.debtRepaidBase)} />
+-                    <Stat label={t("sumInterestSaved")} value={`${nis(v.summary.interestSavedYearBase)}/${t("perYear")}`} />
+-                    <Stat label={t("sumCeilings")} value={nis(v.summary.ceilingDepositsBase)} />
+                   </div>
+                   <NList title={t("pros")} items={he ? v.prosHe : v.pros} tone="green" />
+-                  <NList title={t("cons")} items={he ? v.consHe : v.cons} tone="amber" />
+                   <NList title={t("risks")} items={he ? v.risksHe : v.risks} tone="red" />
+                   <form action={applyPresetAction} className="mt-auto pt-3">
+                     <input type="hidden" name="locale" value={locale} />
+@@ -119,134 +128,23 @@ export default async function AllocationPage({
+             </div>
+           ) : null}
+ 
+-          {Object.keys(wp).length > 0 ? (
++          {proposed && base ? (
+             <Card title={t("workingTitle")}>
+-              <p className="mb-2 text-xs text-neutral-500">{t("workingHint")}</p>
+-              <div className={`mb-4 flex flex-wrap gap-4 rounded-lg px-3 py-2 text-sm ${remaining < -1 ? "bg-red-50 text-red-700" : "bg-neutral-50"}`}>
+-                <span>{t("allocated")}: <b>{nis(allocatedTotal)}</b></span>
+-                <span>{t("remaining")}: <b>{nis(Math.max(0, remaining))}</b></span>
+-                {remaining < -1 ? <span className="font-medium">{t("overAllocated")}</span> : null}
+-              </div>
+-              {impact ? <ImpactPanel im={impact} nis={nis} t={t} /> : null}
+-              {(["enabled", "available"] as const).map((group) => {
+-                const rows = plan.candidates.filter((c) => {
+-                  const on = (wp[c.id] ?? { enabled: c.kind === "TAX_VERIFY_PAYROLL" }).enabled;
+-                  return group === "enabled" ? on : !on;
+-                });
+-                if (rows.length === 0) return null;
+-                return (
+-                  <div key={group} className="mb-4">
+-                    <h4 className={`mb-2 text-sm font-semibold ${group === "enabled" ? "text-green-700" : "text-neutral-500"}`}>{group === "enabled" ? t("groupInPlan") : t("groupAvailable")}</h4>
+-                    <ul className="flex flex-col gap-2">
+-                      {rows.map((c) => {
+-                        const st = wp[c.id] ?? { enabled: c.kind === "TAX_VERIFY_PAYROLL", amount: c.suggestedAmount };
+-                        const on = st.enabled;
+-                        return (
+-                          <li key={c.id} className={`rounded-lg border p-3 ${on ? "border-green-200 bg-green-50/30" : "border-neutral-100"}`}>
+-                            <div className="mb-1 flex flex-wrap items-center gap-2 text-xs">
+-                              <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{t(`kinds.${c.kind}`)}</span>
+-                              {c.ratePct !== null ? <span className="text-neutral-500">{c.ratePct}%</span> : null}
+-                              {c.kind !== "TAX_VERIFY_PAYROLL" ? <span className="text-neutral-400">{t("upTo")} {nis(c.maxAmount)}</span> : null}
+-                            </div>
+-                            <p className="text-sm text-neutral-700" dir="auto">{he ? c.detailHe : c.detail}</p>
+-                            <p className="mt-0.5 text-xs text-blue-700" dir="auto">◎ {he ? c.goalImpactHe : c.goalImpact}</p>
+-                            {perCand[c.id] ? (
+-                              <p className="mt-1 rounded bg-blue-50 px-2 py-1 text-xs text-blue-800" dir="auto">
+-                                📈 {t("perActionAt", { amount: nis(perCand[c.id]!.amount) })}: <b>+{nis(perCand[c.id]!.projectedExtraNetWorth)}</b> {t("perActionIn", { years: perCand[c.id]!.horizonYears })}
+-                                {perCand[c.id]!.interestSavedYearBase > 0 ? ` · ${t("perActionInterest", { amt: nis(perCand[c.id]!.interestSavedYearBase) })}` : ""}
+-                                {perCand[c.id]!.growthPctAfter !== null ? ` · ${t("perActionGrowth", { pct: perCand[c.id]!.growthPctAfter as number })}` : ""}
+-                              </p>
+-                            ) : null}
+-                            {proposed ? (
+-                              <div className="mt-2 flex flex-wrap items-center gap-2">
+-                                {c.editable ? (
+-                                  <form action={setCandidateAction} className="flex flex-wrap items-center gap-2">
+-                                    <input type="hidden" name="locale" value={locale} />
+-                                    <input type="hidden" name="id" value={latest.id} />
+-                                    <input type="hidden" name="candidateId" value={c.id} />
+-                                    <TextInput name="amount" inputMode="numeric" defaultValue={String(on ? st.amount : c.suggestedAmount || Math.min(c.maxAmount, plan.freeCashBase))} />
+-                                    <button type="submit" name="enabled" value="0" className="rounded border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700">{t("simulateBtn")}</button>
+-                                    <button type="submit" name="enabled" value="1" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
+-                                  </form>
+-                                ) : (
+-                                  <form action={setCandidateAction}>
+-                                    <input type="hidden" name="locale" value={locale} />
+-                                    <input type="hidden" name="id" value={latest.id} />
+-                                    <input type="hidden" name="candidateId" value={c.id} />
+-                                    <input type="hidden" name="enabled" value={on ? "0" : "1"} />
+-                                    <button type="submit" className={`rounded px-3 py-1.5 text-xs font-medium ${on ? "bg-green-600 text-white" : "border border-green-300 text-green-700"}`}>{on ? t("markDone") : t("confirm106")}</button>
+-                                  </form>
+-                                )}
+-                                {on && c.editable ? (
+-                                  <form action={setCandidateAction}>
+-                                    <input type="hidden" name="locale" value={locale} />
+-                                    <input type="hidden" name="id" value={latest.id} />
+-                                    <input type="hidden" name="candidateId" value={c.id} />
+-                                    <input type="hidden" name="enabled" value="0" />
+-                                    <input type="hidden" name="amount" value={String(st.amount)} />
+-                                    <button type="submit" className="rounded border border-neutral-300 px-3 py-1.5 text-xs text-neutral-500">{t("remove")}</button>
+-                                  </form>
+-                                ) : null}
+-                              </div>
+-                            ) : on ? <p className="mt-1 text-sm font-medium text-green-700">{c.kind === "TAX_VERIFY_PAYROLL" ? t("done") : nis(st.amount)}</p> : null}
+-                          </li>
+-                        );
+-                      })}
+-                    </ul>
+-                  </div>
+-                );
+-              })}
+-              {proposed ? (
+-                <form action={approveWorkingPlanAction} className="mt-4 flex flex-wrap items-end gap-3">
+-                  <input type="hidden" name="locale" value={locale} />
+-                  <input type="hidden" name="id" value={latest.id} />
+-                  <TextInput name="note" placeholder={t("approveNote")} />
+-                  <button type="submit" disabled={remaining < -1} className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${remaining < -1 ? "bg-neutral-300" : "bg-green-600"}`}>{t("approvePlan")}</button>
+-                </form>
+-              ) : <p className="mt-4 text-sm text-green-700">{t("approvedNext")}</p>}
++              <p className="mb-3 text-xs text-neutral-500">{t("cartHint")}</p>
++              <AllocationCart planId={latest.id} freeCash={plan.freeCashBase} candidates={cartCandidates} base={base} initial={initial} labels={labels} locale={locale} />
+             </Card>
+-          ) : proposed && plan.variants.length > 1 ? <p className="text-center text-sm text-neutral-500">{t("presetFirst")}</p> : null}
++          ) : null}
+         </>
+       ) : null}
+     </div>
+   );
+ }
+ 
+-function ImpactPanel({ im, nis, t }: { im: ImpactShape; nis: (n: number) => string; t: T }) {
+-  const Row = ({ label, before, after, good }: { label: string; before: string; after: string; good?: boolean }) => (
+-    <div className="flex items-center justify-between border-b border-neutral-100 py-1.5 text-sm last:border-0">
+-      <span className="text-neutral-600">{label}</span>
+-      <span className="flex items-center gap-2"><span className="text-neutral-400">{before}</span><span className="text-neutral-300">→</span><span className={`font-medium ${good ? "text-green-700" : ""}`}>{after}</span></span>
+-    </div>
+-  );
+-  return (
+-    <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+-      <div className="mb-2 text-sm font-semibold text-blue-800">{t("impactTitle")}</div>
+-      <Row label={t("impLiquidity")} before={nis(im.liquidCashBefore)} after={nis(im.liquidCashAfter)} />
+-      {im.growthPctBefore !== null && im.growthPctAfter !== null ? <Row label={t("impGrowth", { target: im.targetGrowthPct })} before={`${im.growthPctBefore}%`} after={`${im.growthPctAfter}%`} good /> : null}
+-      {im.totalDebtBefore > 0 ? <Row label={t("impDebt")} before={nis(im.totalDebtBefore)} after={nis(im.totalDebtAfter)} good={im.totalDebtAfter < im.totalDebtBefore} /> : null}
+-      {im.annualInterestBefore > 0 ? <Row label={t("impInterest")} before={`${nis(im.annualInterestBefore)}/${t("perYearShort")}`} after={`${nis(im.annualInterestAfter)}/${t("perYearShort")}`} good={im.annualInterestAfter < im.annualInterestBefore} /> : null}
+-      {im.taxCeilingsCaptured > 0 ? <Row label={t("impTax")} before={nis(0)} after={nis(im.taxCeilingsCaptured)} good /> : null}
+-      {im.goalGapBefore !== null ? <Row label={t("impGoalGap")} before={nis(im.goalGapBefore)} after={nis(im.goalGapAfter ?? im.goalGapBefore)} /> : null}
+-      <div className="mt-3 rounded-lg bg-white/70 px-3 py-2">
+-        <div className="text-xs text-neutral-500">{t("impProjectionLabel", { years: im.horizonYears })}</div>
+-        <div className="text-lg font-bold text-green-700">+{nis(im.projectedExtraNetWorth)}</div>
+-        <div className="mt-1 text-xs text-neutral-500">
+-          {im.extraFromInvesting > 0 ? `${t("impFromInvest")}: +${nis(im.extraFromInvesting)}  ` : ""}
+-          {im.extraFromDebt > 0 ? `${t("impFromDebt")}: +${nis(im.extraFromDebt)}  ` : ""}
+-          {im.extraFromTax > 0 ? `${t("impFromTax")}: +${nis(im.extraFromTax)}` : ""}
+-        </div>
+-        <div className="mt-1 text-xs text-neutral-400">{t("impNote")}</div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+ function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+   return <div><div className="text-xs text-neutral-400">{label}</div><div className={`font-medium ${highlight ? "text-blue-700" : ""}`}>{value}</div></div>;
+ }
+-function NList({ title, items, tone }: { title: string; items: string[]; tone: "green" | "amber" | "red" }) {
++function NList({ title, items, tone }: { title: string; items: string[]; tone: "green" | "red" }) {
+   if (items.length === 0) return null;
+-  const c = tone === "green" ? "text-green-700" : tone === "amber" ? "text-amber-700" : "text-red-700";
++  const c = tone === "green" ? "text-green-700" : "text-red-700";
+   return <div className="mb-2"><div className={`mb-0.5 text-xs font-semibold ${c}`}>{title}</div><ul className="list-inside list-disc text-xs text-neutral-600">{items.map((x, i) => <li key={i} dir="auto">{x}</li>)}</ul></div>;
+ }
+diff --git a/apps/web/src/app/[locale]/(app)/strategy/page.tsx b/apps/web/src/app/[locale]/(app)/strategy/page.tsx
+index 113ca22..f5ea030 100644
+--- a/apps/web/src/app/[locale]/(app)/strategy/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/strategy/page.tsx
+@@ -36,9 +36,12 @@ export default async function StrategyPage({
+   const { locale } = await params;
+   const sp = await searchParams;
+   const t = await getTranslations("strategy");
++  const tAlloc = await getTranslations("allocation");
+   const trpc = await serverCaller();
+   const household = await trpc.household.get();
+   if (!household) return null;
++  const approvedPlanEarly = await trpc.allocation.latest();
++  const basedOnPlan = approvedPlanEarly?.status === "APPROVED" ? approvedPlanEarly : null;
+ 
+   if (household.workflowState !== "STRATEGY") {
+     return (
+@@ -78,6 +81,11 @@ export default async function StrategyPage({
+     <div className="flex flex-col gap-6">
+       <Explainer title={t("explainerTitle")} paragraphs={[t("explainer1"), t("explainer2"), t("explainer3")]} />
+       <Card title={t("title")}>
++        {basedOnPlan ? (
++          <p className="mb-3 rounded-lg bg-blue-50/60 px-3 py-2 text-xs text-blue-800" dir="auto">
++            {tAlloc("basedOnPlan", { date: new Date(basedOnPlan.approvedAt ?? basedOnPlan.createdAt).toLocaleDateString(locale === "he" ? "he-IL" : "en-GB") })}
++          </p>
++        ) : null}
+         {sp.error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{decodeURIComponent(sp.error)}</p> : null}
+         {sp.ran ? (
+           <p className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+diff --git a/apps/web/src/components/allocation-cart.tsx b/apps/web/src/components/allocation-cart.tsx
+new file mode 100644
+index 0000000..be8904d
+--- /dev/null
++++ b/apps/web/src/components/allocation-cart.tsx
+@@ -0,0 +1,137 @@
++"use client";
++
++import { useMemo, useState } from "react";
++import { commitCartAction } from "../lib/actions/allocation-actions";
++
++export interface CartCandidate {
++  id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
++  suggestedAmount: number; ratePct: number | null; detail: string; goalImpact: string;
++}
++export interface ImpactBase {
++  horizonYears: number; expectedReturnPct: number; inflationPct: number; targetGrowthPct: number;
++  cashBase: number; totalDebt: number; annualInterest: number; currentGrowth: number;
++  currentKnownMix: number; mixKnown: boolean; goalGapBase: number | null;
++}
++export interface CartLabels {
++  catalog: string; myPlan: string; add: string; remove: string; empty: string;
++  allocated: string; remaining: string; over: string; projected: string; inYears: string;
++  interestSaved: string; liquidity: string; growthShare: string; debtLeft: string;
++  approve: string; approveHint: string; note: string; verifyDone: string; perYear: string;
++}
++const KIND_REPAY = new Set(["REPAY_EXPENSIVE_DEBT", "REPAY_DEBT"]);
++const KIND_INVEST = new Set(["INVEST_GROWTH", "INVEST_DEFENSIVE"]);
++
++export function AllocationCart({
++  planId, freeCash, candidates, base, initial, labels, locale,
++}: {
++  planId: string; freeCash: number; candidates: CartCandidate[]; base: ImpactBase;
++  initial: Record<string, number>; labels: CartLabels; locale: string;
++}) {
++  const verifyCands = candidates.filter((c) => c.kind === "TAX_VERIFY_PAYROLL");
++  const actionCands = candidates.filter((c) => c.kind !== "TAX_VERIFY_PAYROLL");
++  const [sel, setSel] = useState<Record<string, number>>(initial);
++
++  const nis = (n: number) => "₪" + Math.round(n).toLocaleString(locale === "he" ? "he-IL" : "en-US");
++  const H = base.horizonYears, r = base.expectedReturnPct / 100, infl = base.inflationPct / 100;
++  const grow = (amt: number, rate: number) => amt * (Math.pow(1 + rate, H) - 1);
++  const candById = useMemo(() => new Map(candidates.map((c) => [c.id, c])), [candidates]);
++
++  const perItem = (id: string, amount: number) => {
++    const c = candById.get(id)!;
++    if (KIND_REPAY.has(c.kind)) return { extra: grow(amount, Math.max(0, (c.ratePct ?? 0) / 100 - infl)), interest: (amount * (c.ratePct ?? 0)) / 100 };
++    return { extra: grow(amount, r), interest: 0 };
++  };
++
++  const inCart = actionCands.filter((c) => sel[c.id] !== undefined);
++  const inCatalog = actionCands.filter((c) => sel[c.id] === undefined);
++  const allocated = Object.entries(sel).reduce((t, [, a]) => t + a, 0);
++  const remaining = freeCash - allocated;
++  const totalExtra = Object.entries(sel).reduce((t, [id, a]) => t + perItem(id, a).extra, 0);
++  const investAdded = inCart.filter((c) => KIND_INVEST.has(c.kind)).reduce((t, c) => t + (sel[c.id] ?? 0), 0);
++  const growthAdded = inCart.filter((c) => c.kind === "INVEST_GROWTH").reduce((t, c) => t + (sel[c.id] ?? 0), 0);
++  const debtRepaid = inCart.filter((c) => KIND_REPAY.has(c.kind)).reduce((t, c) => t + (sel[c.id] ?? 0), 0);
++  const growthAfter = base.mixKnown && base.currentKnownMix + investAdded > 0
++    ? Math.round(((base.currentGrowth + growthAdded) / (base.currentKnownMix + investAdded)) * 1000) / 10 : null;
++
++  const add = (id: string) => setSel((s) => ({ ...s, [id]: candById.get(id)!.suggestedAmount || Math.min(candById.get(id)!.maxAmount, remaining) }));
++  const remove = (id: string) => setSel((s) => { const n = { ...s }; delete n[id]; return n; });
++  const setAmt = (id: string, v: string) => {
++    const c = candById.get(id)!;
++    const amt = Math.min(Math.max(Number(v.replace(/[^\d.]/g, "")) || 0, c.minAmount), c.maxAmount);
++    setSel((s) => ({ ...s, [id]: amt }));
++  };
++
++  const box: React.CSSProperties = { background: "var(--surface-2, #fff)", border: "0.5px solid var(--border, #e5e5e5)", borderRadius: 12, padding: "0.7rem 0.8rem", marginBottom: 8 };
++  const selectionsJson = JSON.stringify(inCart.map((c) => ({ candidateId: c.id, amount: sel[c.id] })));
++
++  return (
++    <div className="grid gap-4 lg:grid-cols-2">
++      <div>
++        <h4 className="mb-2 text-sm font-semibold text-neutral-600">{labels.catalog}</h4>
++        {inCatalog.length === 0 ? <p className="text-xs text-neutral-400">{labels.empty}</p> : null}
++        {inCatalog.map((c) => {
++          const pi = perItem(c.id, c.suggestedAmount || Math.min(c.maxAmount, Math.max(0, remaining)));
++          return (
++            <div key={c.id} style={box}>
++              <div className="mb-1 flex items-center gap-2 text-xs">
++                <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{c.kind.startsWith("REPAY") ? c.ratePct + "%" : ""}</span>
++              </div>
++              <p className="text-sm text-neutral-700" dir="auto">{c.detail}</p>
++              <p className="mt-1 text-xs text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}</p>
++              <button type="button" onClick={() => add(c.id)} className="mt-2 w-full rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700">+ {labels.add}</button>
++            </div>
++          );
++        })}
++      </div>
++
++      <div style={{ background: "var(--surface-1, #f7f7f5)", borderRadius: 12, padding: "0.8rem 0.9rem" }}>
++        <h4 className="mb-2 text-sm font-semibold">{labels.myPlan}</h4>
++        {inCart.length === 0 && verifyCands.length === 0 ? <p className="text-xs text-neutral-400">{labels.empty}</p> : null}
++        {inCart.map((c) => {
++          const amt = sel[c.id] ?? 0; const pi = perItem(c.id, amt);
++          return (
++            <div key={c.id} style={box}>
++              <div className="flex items-center justify-between">
++                <span className="text-sm font-medium">{c.detail.slice(0, 42)}{c.detail.length > 42 ? "…" : ""}</span>
++                <button type="button" onClick={() => remove(c.id)} aria-label={labels.remove} className="text-neutral-400">✕</button>
++              </div>
++              {c.editable ? (
++                <input value={String(amt)} onChange={(e) => setAmt(c.id, e.target.value)} inputMode="numeric"
++                  className="mt-1 h-8 w-full rounded border border-neutral-300 px-2 text-sm" />
++              ) : null}
++              <p className="mt-1 text-xs text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}{pi.interest > 0 ? ` · ${labels.interestSaved} ${nis(pi.interest)}/${labels.perYear}` : ""}</p>
++            </div>
++          );
++        })}
++        {verifyCands.map((c) => (
++          <div key={c.id} style={{ ...box, opacity: 0.8 }}>
++            <p className="text-xs text-neutral-600" dir="auto">{c.detail}</p>
++            <span className="text-xs font-medium text-green-700">✓ {labels.verifyDone}</span>
++          </div>
++        ))}
++
++        <div className="mt-2 border-t border-neutral-200 pt-2 text-sm">
++          <Row label={labels.allocated} value={nis(allocated)} />
++          <Row label={labels.remaining} value={nis(Math.max(0, remaining))} danger={remaining < -1} />
++          <Row label={labels.liquidity} value={nis(base.cashBase - debtRepaid - investAdded - inCart.filter((c) => c.kind.startsWith("TAX_CEILING")).reduce((t, c) => t + (sel[c.id] ?? 0), 0))} />
++          {base.totalDebt > 0 ? <Row label={labels.debtLeft} value={nis(base.totalDebt - debtRepaid)} /> : null}
++          {growthAfter !== null ? <Row label={labels.growthShare} value={`${growthAfter}% / ${base.targetGrowthPct}%`} /> : null}
++          <div className="mt-1 flex justify-between font-semibold text-green-700"><span>{labels.projected}</span><span>+{nis(totalExtra)}</span></div>
++        </div>
++
++        <form action={commitCartAction} className="mt-3">
++          <input type="hidden" name="locale" value={locale} />
++          <input type="hidden" name="id" value={planId} />
++          <input type="hidden" name="selections" value={selectionsJson} />
++          <input name="note" placeholder={labels.note} className="mb-2 h-9 w-full rounded border border-neutral-300 px-2 text-sm" />
++          <button type="submit" disabled={remaining < -1} className={`w-full rounded-lg px-4 py-2.5 text-sm font-medium text-white ${remaining < -1 ? "bg-neutral-300" : "bg-green-600"}`}>{labels.approve} →</button>
++          <p className="mt-1.5 text-center text-xs text-neutral-400">{labels.approveHint}</p>
++        </form>
++      </div>
++    </div>
++  );
++}
++
++function Row({ label, value, danger }: { label: string; value: string; danger?: boolean }) {
++  return <div className="flex justify-between py-0.5"><span className="text-neutral-500">{label}</span><span className={`font-medium ${danger ? "text-red-600" : ""}`}>{value}</span></div>;
++}
+diff --git a/apps/web/src/lib/actions/allocation-actions.ts b/apps/web/src/lib/actions/allocation-actions.ts
+index 14c84fb..0e8cbb9 100644
+--- a/apps/web/src/lib/actions/allocation-actions.ts
++++ b/apps/web/src/lib/actions/allocation-actions.ts
+@@ -42,3 +42,18 @@ export async function approveWorkingPlanAction(fd: FormData): Promise<void> {
+     trpc.allocation.approve({ id: str(fd, "id"), note: opt(fd, "note") }),
+   );
+ }
++
++export async function commitCartAction(fd: FormData): Promise<void> {
++  const locale = str(fd, "locale");
++  const trpc = await serverCaller();
++  let ok = false;
++  try {
++    const selections = JSON.parse(str(fd, "selections") || "[]") as { candidateId: string; amount: number }[];
++    await trpc.allocation.commitAndApprove({ id: str(fd, "id"), selections, note: opt(fd, "note") });
++    ok = true;
++  } catch (e) {
++    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 120)) : "UNKNOWN";
++    redirect(`/${locale}/allocation?error=${code}`);
++  }
++  if (ok) redirect(`/${locale}/strategy?fromAllocation=1`);
++}
+diff --git a/packages/api/src/routers/allocation.ts b/packages/api/src/routers/allocation.ts
+index d448d7c..07b5a66 100644
+--- a/packages/api/src/routers/allocation.ts
++++ b/packages/api/src/routers/allocation.ts
+@@ -1,6 +1,6 @@
+ import { TRPCError } from "@trpc/server";
+ import { computePlanImpact, deriveTargetGrowthPct, type DeploymentPlans, type PlanSelection } from "@wealthos/engine-strategy";
+-import { SnapshotPayloadSchema } from "@wealthos/domain";
++import { SnapshotPayloadSchema, evaluateTransition } from "@wealthos/domain";
+ import { assumptionRegistry } from "@wealthos/registry";
+ import { z } from "zod";
+ import { runAllocation } from "../services/allocation-service";
+@@ -68,6 +68,85 @@ export const allocationRouter = router({
+     return { aggregate, perCandidate };
+   }),
+ 
++  /** M30 — base numbers for the client cart to recompute impact locally as amounts change. */
++  impactBase: protectedProcedure.query(async ({ ctx }) => {
++    const householdId = await requireHouseholdId(ctx.db);
++    const row = await ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
++    if (!row) return null;
++    const plan = planOf(row);
++    if (!Array.isArray(plan.candidates)) return null;
++    const snap = await ctx.db.householdSnapshot.findUnique({ where: { id: row.snapshotId } });
++    if (!snap) return null;
++    const payload = SnapshotPayloadSchema.parse(snap.payload);
++    const assumptions = Object.fromEntries((await assumptionRegistry(ctx.db).all(householdId)).map((a) => [a.key, a.value]));
++    const num = (k: string, d: number) => Number(assumptions[k] ?? d);
++    const CASH = new Set(["BANK_CHECKING", "BANK_SAVINGS", "BANK_DEPOSIT", "CASH_OTHER"]);
++    const isCash = (i: { kind: string; accountType: string | null }) => i.kind === "ACCOUNT" && CASH.has(i.accountType ?? "");
++    let cashBase = 0, totalDebt = 0, annualInterest = 0, growth = 0, knownMix = 0, unknown = 0;
++    for (const i of payload.items) {
++      const v = i.valueBase ?? 0;
++      if (isCash(i) && i.valueBase !== null) cashBase += v;
++      if (i.kind === "MORTGAGE" && i.mortgageTracks) for (const tk of i.mortgageTracks) { totalDebt += tk.principalRemaining; annualInterest += (tk.principalRemaining * tk.annualRatePct) / 100; }
++      if (i.kind === "ACCOUNT" && i.valueBase !== null) {
++        if (i.growthSharePct !== null && i.growthSharePct !== undefined) { growth += (v * i.growthSharePct) / 100; knownMix += v; }
++        else if (isCash(i)) knownMix += v; else unknown += v;
++      }
++    }
++    const mixKnown = knownMix + unknown === 0 || unknown / (knownMix + unknown) <= 0.5;
++    const requiredTotal = payload.goals.filter((g) => g.requiredFundingBase !== null).reduce((t, g) => t + (g.requiredFundingBase ?? 0), 0);
++    const assetsTotal = payload.items.filter((i) => ["ACCOUNT", "REAL_ESTATE", "OTHER_ASSET"].includes(i.kind) && i.valueBase !== null).reduce((t, i) => t + (i.valueBase ?? 0), 0);
++    return {
++      horizonYears: Math.max(1, num("risk_horizon_years", 20)),
++      expectedReturnPct: num("expected_real_return_equity_pct", 4.5),
++      inflationPct: num("inflation_il_pct", 2.5),
++      targetGrowthPct: deriveTargetGrowthPct(assumptions),
++      cashBase: Math.round(cashBase),
++      totalDebt: Math.round(totalDebt),
++      annualInterest: Math.round(annualInterest),
++      currentGrowth: Math.round(growth),
++      currentKnownMix: Math.round(knownMix),
++      mixKnown,
++      goalGapBase: requiredTotal > 0 ? Math.round(Math.max(0, requiredTotal - assetsTotal)) : null,
++    };
++  }),
++
++  /** M30 — commit the chosen selections, approve, and advance to STRATEGY in one deliberate step. */
++  commitAndApprove: workflowGuard("ALLOCATION")
++    .input(z.object({
++      id: z.uuid(),
++      selections: z.array(z.object({ candidateId: z.string().min(1), amount: z.number().min(0) })),
++      note: z.string().max(500).optional(),
++    }))
++    .mutation(async ({ ctx, input }) => {
++      const row = await ctx.db.allocationPlan.findUnique({ where: { id: input.id } });
++      if (!row || row.householdId !== ctx.householdId) throw new TRPCError({ code: "NOT_FOUND" });
++      if (row.status !== "PROPOSED") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PLAN_NOT_PROPOSED" });
++      const plan = planOf(row);
++      const byId = new Map(plan.candidates.map((c) => [c.id, c]));
++      const wp: WorkingPlan = {};
++      for (const c of plan.candidates) wp[c.id] = { enabled: c.kind === "TAX_VERIFY_PAYROLL", amount: c.suggestedAmount };
++      let total = 0;
++      for (const sel of input.selections) {
++        const c = byId.get(sel.candidateId);
++        if (!c) throw new TRPCError({ code: "BAD_REQUEST", message: "CANDIDATE_NOT_IN_PLAN" });
++        const amount = c.editable ? Math.min(Math.max(sel.amount, c.minAmount), c.maxAmount) : c.suggestedAmount;
++        wp[sel.candidateId] = { enabled: true, amount };
++        if (c.kind !== "TAX_VERIFY_PAYROLL") total += amount;
++      }
++      if (total > plan.freeCashBase + 1) throw new TRPCError({ code: "BAD_REQUEST", message: "OVER_ALLOCATED" });
++
++      return ctx.db.$transaction(async (tx) => {
++        await tx.allocationPlan.update({ where: { id: input.id }, data: { workingPlan: wp, status: "APPROVED", approvedAt: new Date(), note: input.note ?? null } });
++        const household = await tx.household.findFirstOrThrow();
++        const t = evaluateTransition(household.workflowState, "STRATEGY", { verificationComplete: true, suspenseEmpty: true, allocationPlanApproved: true });
++        if (t.allowed && household.workflowState === "ALLOCATION") {
++          await tx.workflowTransition.create({ data: { householdId: household.id, fromState: "ALLOCATION", toState: "STRATEGY", reason: "Allocation plan approved" } });
++          await tx.household.update({ where: { id: household.id }, data: { workflowState: "STRATEGY" } });
++        }
++        return { approved: true, advancedTo: t.allowed ? "STRATEGY" : household.workflowState };
++      });
++    }),
++
+   generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => runAllocation(ctx.db, ctx.householdId)),
+ 
+   /** Seed the working plan from a named preset (does not approve). */
+diff --git a/packages/api/src/services/strategy-service.ts b/packages/api/src/services/strategy-service.ts
+index 27aaa78..83cae37 100644
+--- a/packages/api/src/services/strategy-service.ts
++++ b/packages/api/src/services/strategy-service.ts
+@@ -45,10 +45,16 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
+   const hishtalmut = await taxReg.get("HISHTALMUT_CEILINGS");
+   const pension = await taxReg.get("PENSION_CEILINGS");
+   const boi = await latestBoiRate(db);
++
++  // M30 — align strategy with the household's APPROVED allocation plan: strategy won't
++  // re-recommend actions the household already committed to in the allocation phase.
++  const committedPlan = await buildCommittedPlan(db, householdId);
++
+   const ctx: AnalyzerContext = {
+     assumptions,
+     taxRules: { HISHTALMUT_CEILINGS: hishtalmut.payload, PENSION_CEILINGS: pension.payload },
+     marketRates: { boiRatePct: boi?.value ?? null },
++    committedPlan,
+   };
+ 
+   const findings = runAnalyzers(payload, ctx);
+@@ -112,3 +118,30 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
+ 
+   return { ran: true, snapshotId, created, supersededCount, unmappedFindings };
+ }
++
++
++interface CandidateLite { id: string; kind: string; evidenceItemIds: string[] }
++interface PlansLite { candidates?: CandidateLite[] }
++type WorkingPlanLite = Record<string, { enabled: boolean; amount: number }>;
++
++/** Summarize the latest APPROVED allocation plan into suppression flags for the analyzers. */
++async function buildCommittedPlan(db: PrismaClient, householdId: string) {
++  const row = await db.allocationPlan.findFirst({ where: { householdId, status: "APPROVED" }, orderBy: { approvedAt: "desc" } });
++  if (!row) return undefined;
++  const plan = row.plan as unknown as PlansLite;
++  if (!Array.isArray(plan.candidates)) return undefined;
++  const wp = (row.workingPlan ?? {}) as WorkingPlanLite;
++  const byId = new Map(plan.candidates.map((c) => [c.id, c]));
++  let deploysIdleCash = false, investsGrowth = false, taxDeposited = false;
++  const repaidTrackItemIds: string[] = [];
++  for (const [id, sel] of Object.entries(wp)) {
++    if (!sel.enabled || sel.amount <= 0) continue;
++    const c = byId.get(id);
++    if (!c) continue;
++    if (c.kind === "INVEST_GROWTH" || c.kind === "INVEST_DEFENSIVE") deploysIdleCash = true;
++    if (c.kind === "INVEST_GROWTH") investsGrowth = true;
++    if (c.kind === "TAX_CEILING_HISHTALMUT" || c.kind === "TAX_CEILING_PENSION") { deploysIdleCash = true; taxDeposited = true; }
++    if (c.kind === "REPAY_EXPENSIVE_DEBT" || c.kind === "REPAY_DEBT") { deploysIdleCash = true; repaidTrackItemIds.push(...c.evidenceItemIds); }
++  }
++  return { deploysIdleCash, investsGrowth, repaidTrackItemIds, taxDeposited };
++}
+diff --git a/packages/engine-strategy/src/analyzers/allocation.ts b/packages/engine-strategy/src/analyzers/allocation.ts
+index 9ae8e34..457cba3 100644
+--- a/packages/engine-strategy/src/analyzers/allocation.ts
++++ b/packages/engine-strategy/src/analyzers/allocation.ts
+@@ -126,7 +126,7 @@ export function analyzeAllocation(snapshot: SnapshotPayload, ctx: AnalyzerContex
+     shiftBase: Math.round(shiftBase),
+     horizonYears,
+   };
+-  if (gapPct > bandPct) {
++  if (gapPct > bandPct && !ctx.committedPlan?.investsGrowth) {
+     findings.push({
+       code: "ALLOCATION_GROWTH_BELOW_TARGET",
+       severity: "WARNING",
+diff --git a/packages/engine-strategy/src/analyzers/debt.ts b/packages/engine-strategy/src/analyzers/debt.ts
+index 1205f63..ef73360 100644
+--- a/packages/engine-strategy/src/analyzers/debt.ts
++++ b/packages/engine-strategy/src/analyzers/debt.ts
+@@ -21,8 +21,9 @@ export function analyzeDebt(snapshot: SnapshotPayload, ctx: AnalyzerContext): Fi
+             evidenceItemIds: [item.id],
+           });
+         }
++        const repaidByPlan = ctx.committedPlan?.repaidTrackItemIds.includes(item.id) ?? false;
+         const maxRate = Math.max(...item.mortgageTracks.map((t) => t.annualRatePct));
+-        if (maxRate > expensiveRate) {
++        if (maxRate > expensiveRate && !repaidByPlan) {
+           findings.push({
+             code: "MORTGAGE_EXPENSIVE_TRACK",
+             severity: "NOTICE",
+@@ -42,7 +43,7 @@ export function analyzeDebt(snapshot: SnapshotPayload, ctx: AnalyzerContext): Fi
+               (a, t) => (a === null || t.annualRatePct > a.annualRatePct ? t : a),
+               null,
+             );
+-          if (worst && worst.annualRatePct > benchmark + refiNotice) {
++          if (worst && worst.annualRatePct > benchmark + refiNotice && !repaidByPlan) {
+             findings.push({
+               code: "MORTGAGE_ABOVE_BENCHMARK",
+               severity: "NOTICE",
+diff --git a/packages/engine-strategy/src/analyzers/liquidity.ts b/packages/engine-strategy/src/analyzers/liquidity.ts
+index 07ec5ff..ead5ab5 100644
+--- a/packages/engine-strategy/src/analyzers/liquidity.ts
++++ b/packages/engine-strategy/src/analyzers/liquidity.ts
+@@ -39,8 +39,9 @@ export function analyzeLiquidity(snapshot: SnapshotPayload, ctx: AnalyzerContext
+       evidenceItemIds: liquidItems.map((i) => i.id),
+     });
+   }
+-  // Cash sitting far beyond the emergency target erodes to inflation.
+-  if (cashMonths > targetMonths * 2) {
++  // Cash sitting far beyond the emergency target erodes to inflation — unless the approved
++  // allocation plan already deploys the surplus (M30 alignment).
++  if (cashMonths > targetMonths * 2 && !ctx.committedPlan?.deploysIdleCash) {
+     findings.push({
+       code: "EXCESS_IDLE_CASH",
+       severity: "NOTICE",
+diff --git a/packages/engine-strategy/src/analyzers/tax-utilization.ts b/packages/engine-strategy/src/analyzers/tax-utilization.ts
+index 1a7de0f..c162d00 100644
+--- a/packages/engine-strategy/src/analyzers/tax-utilization.ts
++++ b/packages/engine-strategy/src/analyzers/tax-utilization.ts
+@@ -70,8 +70,10 @@ export function analyzeTaxUtilization(snapshot: SnapshotPayload, ctx: AnalyzerCo
+   };
+ 
+   for (const adult of adults) {
+-    check(adult.name, depositsFor(adult.id, "HISHTALMUT_CONTRIBUTION"), hishCeiling, "TAX_HISHTALMUT_UNDERUTILIZED");
+-    check(adult.name, depositsFor(adult.id, "PENSION_CONTRIBUTION"), pensCeiling, "TAX_PENSION_UNDERUTILIZED");
++    if (!ctx.committedPlan?.taxDeposited) {
++      check(adult.name, depositsFor(adult.id, "HISHTALMUT_CONTRIBUTION"), hishCeiling, "TAX_HISHTALMUT_UNDERUTILIZED");
++      check(adult.name, depositsFor(adult.id, "PENSION_CONTRIBUTION"), pensCeiling, "TAX_PENSION_UNDERUTILIZED");
++    }
+   }
+ 
+   return findings;
+diff --git a/packages/engine-strategy/src/findings.ts b/packages/engine-strategy/src/findings.ts
+index 6a8ed2e..feb73ca 100644
+--- a/packages/engine-strategy/src/findings.ts
++++ b/packages/engine-strategy/src/findings.ts
+@@ -15,6 +15,14 @@ export interface AnalyzerContext {
+   taxRules: Record<string, unknown>;
+   /** Fetched market indicators (B6): BOI policy rate anchors the mortgage refinance benchmark. */
+   marketRates?: { boiRatePct: number | null } | undefined;
++  /** M30: the approved ALLOCATION-phase plan. Strategy analyzers suppress findings the household
++   *  already decided to act on, so strategy recommendations stay ALIGNED with the approved plan. */
++  committedPlan?: {
++    deploysIdleCash: boolean;
++    investsGrowth: boolean;
++    repaidTrackItemIds: string[];
++    taxDeposited: boolean;
++  } | undefined;
+ }
+ 
+ export const ENGINE_VERSION = "strategy-engine/1.0.0";
+diff --git a/packages/engine-strategy/test/alignment.test.ts b/packages/engine-strategy/test/alignment.test.ts
+new file mode 100644
+index 0000000..368410a
+--- /dev/null
++++ b/packages/engine-strategy/test/alignment.test.ts
+@@ -0,0 +1,38 @@
++import { describe, expect, it } from "vitest";
++import { runAnalyzers } from "../src/analyzers/index";
++import { CTX, expense, item, snapshot } from "./fixtures";
++
++const codes = (findings: { code: string }[]) => findings.map((f) => f.code);
++
++describe("M30 strategy↔allocation alignment", () => {
++  const rich = () => snapshot([
++    item({ accountType: "BANK_DEPOSIT", valueBase: 900_000 }), // huge idle cash
++    expense(10_000),
++    item({ accountType: "KEREN_HISHTALMUT", valueBase: 150_000, growthSharePct: 20 }),
++    item({
++      kind: "MORTGAGE", accountType: null, valueBase: 300_000,
++      mortgageTracks: [{ trackType: "PRIME", principalRemaining: 300_000, annualRatePct: 9.5, cpiLinked: false, endDate: "2040-01-01" }],
++    }),
++  ]);
++
++  it("without an approved plan, the overlapping findings fire", () => {
++    const f = codes(runAnalyzers(rich(), CTX));
++    expect(f).toContain("EXCESS_IDLE_CASH");
++    expect(f).toContain("MORTGAGE_EXPENSIVE_TRACK");
++  });
++
++  it("an approved plan that deploys cash + repays the track SUPPRESSES those findings", () => {
++    const mortgageId = rich().items.find((i) => i.kind === "MORTGAGE")!.id;
++    const ctx = {
++      ...CTX,
++      committedPlan: { deploysIdleCash: true, investsGrowth: true, repaidTrackItemIds: [mortgageId], taxDeposited: true },
++    };
++    // rebuild with a stable id so the repaid id matches
++    const s = rich();
++    const mid = s.items.find((i) => i.kind === "MORTGAGE")!.id;
++    const f = codes(runAnalyzers(s, { ...ctx, committedPlan: { ...ctx.committedPlan, repaidTrackItemIds: [mid] } }));
++    expect(f).not.toContain("EXCESS_IDLE_CASH");
++    expect(f).not.toContain("MORTGAGE_EXPENSIVE_TRACK");
++    expect(f).not.toContain("TAX_HISHTALMUT_UNDERUTILIZED");
++  });
++});
+diff --git a/packages/i18n/messages/en.json b/packages/i18n/messages/en.json
+index 95356d4..48a1993 100644
+--- a/packages/i18n/messages/en.json
++++ b/packages/i18n/messages/en.json
+@@ -1074,6 +1074,24 @@
+     "perActionAt": "At {amount}",
+     "perActionIn": "in {years}y",
+     "perActionInterest": "interest saved {amt}/yr",
+-    "perActionGrowth": "growth share → {pct}%"
++    "perActionGrowth": "growth share → {pct}%",
++    "introCart": "Browse the recommended actions and add the ones you want to your plan. Edit amounts — the impact updates live. When it fits your free cash, approve to lock it in and move to strategy.",
++    "basisNote": "This approved plan becomes the basis for your strategy — the strategy step won't re-recommend what you've already decided here.",
++    "catalog": "Recommended actions",
++    "myPlan": "My plan",
++    "addToPlan": "Add to plan",
++    "cartEmpty": "Nothing here yet",
++    "projectedTotal": "Extra net worth (real)",
++    "inHorizon": "over the horizon",
++    "interestSavedShort": "interest saved",
++    "growthVsTarget": "Growth share vs target",
++    "debtLeft": "Mortgage debt left",
++    "approveAndContinue": "Approve and continue to strategy",
++    "approveHint2": "Locks the plan and moves the household to the strategy phase.",
++    "verifyReminder": "Confirm from form 106",
++    "cartHint": "Add actions, set amounts, watch the impact. Approve when it fits your free cash.",
++    "approvedAligned": "Plan approved — it now feeds the strategy phase.",
++    "toStrategy": "Go to strategy",
++    "basedOnPlan": "Based on your approved allocation plan of {date} — deployment decisions are excluded from these recommendations."
+   }
+ }
+diff --git a/packages/i18n/messages/he.json b/packages/i18n/messages/he.json
+index 4145aa8..826b04b 100644
+--- a/packages/i18n/messages/he.json
++++ b/packages/i18n/messages/he.json
+@@ -1074,6 +1074,24 @@
+     "perActionAt": "בסכום {amount}",
+     "perActionIn": "בעוד {years} שנים",
+     "perActionInterest": "ריבית שנחסכת {amt}/שנה",
+-    "perActionGrowth": "רכיב צמיחה → {pct}%"
++    "perActionGrowth": "רכיב צמיחה → {pct}%",
++    "introCart": "עיינו בפעולות המומלצות והוסיפו לתוכנית את מה שתרצו. ערכו סכומים — ההשפעה מתעדכנת בזמן אמת. כשהתוכנית נכנסת בכסף הפנוי, אשרו כדי לנעול ולעבור לאסטרטגיה.",
++    "basisNote": "התוכנית המאושרת הזו היא הבסיס לאסטרטגיה — שלב האסטרטגיה לא ימליץ שוב על מה שכבר החלטתם כאן.",
++    "catalog": "פעולות מומלצות",
++    "myPlan": "התוכנית שלי",
++    "addToPlan": "הוספה לתוכנית",
++    "cartEmpty": "עדיין ריק",
++    "projectedTotal": "תוספת שווי (ריאלי)",
++    "inHorizon": "לאורך האופק",
++    "interestSavedShort": "ריבית שנחסכת",
++    "growthVsTarget": "רכיב צמיחה מול יעד",
++    "debtLeft": "יתרת חוב משכנתא",
++    "approveAndContinue": "אישור והמשך לאסטרטגיה",
++    "approveHint2": "נועל את התוכנית ומעביר את משק הבית לשלב האסטרטגיה.",
++    "verifyReminder": "אישור על סמך טופס 106",
++    "cartHint": "הוסיפו פעולות, קבעו סכומים, צפו בהשפעה. אשרו כשזה נכנס בכסף הפנוי.",
++    "approvedAligned": "התוכנית אושרה — היא מזינה כעת את שלב האסטרטגיה.",
++    "toStrategy": "מעבר לאסטרטגיה",
++    "basedOnPlan": "מבוסס על תוכנית ההקצאה המאושרת מ-{date} — החלטות הפריסה אינן נכללות בהמלצות אלה."
+   }
+ }

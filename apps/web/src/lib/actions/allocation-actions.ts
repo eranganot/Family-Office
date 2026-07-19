@@ -42,3 +42,18 @@ export async function approveWorkingPlanAction(fd: FormData): Promise<void> {
     trpc.allocation.approve({ id: str(fd, "id"), note: opt(fd, "note") }),
   );
 }
+
+export async function commitCartAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  let ok = false;
+  try {
+    const selections = JSON.parse(str(fd, "selections") || "[]") as { candidateId: string; amount: number }[];
+    await trpc.allocation.commitAndApprove({ id: str(fd, "id"), selections, note: opt(fd, "note") });
+    ok = true;
+  } catch (e) {
+    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 120)) : "UNKNOWN";
+    redirect(`/${locale}/allocation?error=${code}`);
+  }
+  if (ok) redirect(`/${locale}/strategy?fromAllocation=1`);
+}

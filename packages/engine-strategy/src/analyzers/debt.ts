@@ -21,8 +21,9 @@ export function analyzeDebt(snapshot: SnapshotPayload, ctx: AnalyzerContext): Fi
             evidenceItemIds: [item.id],
           });
         }
+        const repaidByPlan = ctx.committedPlan?.repaidTrackItemIds.includes(item.id) ?? false;
         const maxRate = Math.max(...item.mortgageTracks.map((t) => t.annualRatePct));
-        if (maxRate > expensiveRate) {
+        if (maxRate > expensiveRate && !repaidByPlan) {
           findings.push({
             code: "MORTGAGE_EXPENSIVE_TRACK",
             severity: "NOTICE",
@@ -42,7 +43,7 @@ export function analyzeDebt(snapshot: SnapshotPayload, ctx: AnalyzerContext): Fi
               (a, t) => (a === null || t.annualRatePct > a.annualRatePct ? t : a),
               null,
             );
-          if (worst && worst.annualRatePct > benchmark + refiNotice) {
+          if (worst && worst.annualRatePct > benchmark + refiNotice && !repaidByPlan) {
             findings.push({
               code: "MORTGAGE_ABOVE_BENCHMARK",
               severity: "NOTICE",

@@ -1074,6 +1074,24 @@
     "perActionAt": "At {amount}",
     "perActionIn": "in {years}y",
     "perActionInterest": "interest saved {amt}/yr",
-    "perActionGrowth": "growth share → {pct}%"
+    "perActionGrowth": "growth share → {pct}%",
+    "introCart": "Browse the recommended actions and add the ones you want to your plan. Edit amounts — the impact updates live. When it fits your free cash, approve to lock it in and move to strategy.",
+    "basisNote": "This approved plan becomes the basis for your strategy — the strategy step won't re-recommend what you've already decided here.",
+    "catalog": "Recommended actions",
+    "myPlan": "My plan",
+    "addToPlan": "Add to plan",
+    "cartEmpty": "Nothing here yet",
+    "projectedTotal": "Extra net worth (real)",
+    "inHorizon": "over the horizon",
+    "interestSavedShort": "interest saved",
+    "growthVsTarget": "Growth share vs target",
+    "debtLeft": "Mortgage debt left",
+    "approveAndContinue": "Approve and continue to strategy",
+    "approveHint2": "Locks the plan and moves the household to the strategy phase.",
+    "verifyReminder": "Confirm from form 106",
+    "cartHint": "Add actions, set amounts, watch the impact. Approve when it fits your free cash.",
+    "approvedAligned": "Plan approved — it now feeds the strategy phase.",
+    "toStrategy": "Go to strategy",
+    "basedOnPlan": "Based on your approved allocation plan of {date} — deployment decisions are excluded from these recommendations."
   }
 }

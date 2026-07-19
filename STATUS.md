@@ -42,6 +42,26 @@
   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
 
+## Current state (2026-07-20, session 4)
+
+- **M30 (allocation page redesign C + strategy alignment) code-complete — m30.patch. No migration.**
+  Owner picked cart/checkout, client-interactive, and the approved plan must feed strategy.
+  UI: new `apps/web/src/components/allocation-cart.tsx` ("use client") — catalog of recommended
+  actions (add to plan) + editable cart with live per-item AND total impact computed IN THE BROWSER
+  (mirrors impact.ts: real-rate debt, expected-return invest/tax, growth-share-after), running
+  allocated/remaining/liquidity/debt-left/growth totals, over-allocation block. Amount edits recompute
+  instantly (no reload) — fixes the M29 submit-button bug by removing the two-submit form entirely.
+  Approve = `allocation.commitAndApprove` (writes selections→workingPlan, status APPROVED, AND runs the
+  ALLOCATION→STRATEGY workflow transition in one tx) → `commitCartAction` redirects to /strategy. Presets
+  still seed via applyPreset. ALIGNMENT: AnalyzerContext gains `committedPlan`; strategy-service
+  `buildCommittedPlan` summarizes the latest APPROVED plan (deploysIdleCash / investsGrowth /
+  repaidTrackItemIds / taxDeposited); analyzers suppress the overlaps — EXCESS_IDLE_CASH,
+  ALLOCATION_GROWTH_BELOW_TARGET, MORTGAGE_EXPENSIVE_TRACK + MORTGAGE_ABOVE_BENCHMARK (per repaid track),
+  TAX_*_UNDERUTILIZED — so strategy never re-litigates decided actions. Strategy page shows a
+  "מבוסס על תוכנית ההקצאה המאושרת מ-<date>" banner. New router: impactBase (client projection inputs),
+  commitAndApprove. 2 alignment tests (engine-strategy 61). Verified: engine 61, eslint clean,
+  api/web/domain/registry tsc, prisma valid, i18n parity.
+
 ## Current state (2026-07-20, session 3)
 
 - **M29 (per-action impact + responsive simulation) code-complete — m29.patch on M28. No schema/migration.**

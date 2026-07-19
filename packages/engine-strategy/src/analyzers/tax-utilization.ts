@@ -70,8 +70,10 @@ export function analyzeTaxUtilization(snapshot: SnapshotPayload, ctx: AnalyzerCo
   };
 
   for (const adult of adults) {
-    check(adult.name, depositsFor(adult.id, "HISHTALMUT_CONTRIBUTION"), hishCeiling, "TAX_HISHTALMUT_UNDERUTILIZED");
-    check(adult.name, depositsFor(adult.id, "PENSION_CONTRIBUTION"), pensCeiling, "TAX_PENSION_UNDERUTILIZED");
+    if (!ctx.committedPlan?.taxDeposited) {
+      check(adult.name, depositsFor(adult.id, "HISHTALMUT_CONTRIBUTION"), hishCeiling, "TAX_HISHTALMUT_UNDERUTILIZED");
+      check(adult.name, depositsFor(adult.id, "PENSION_CONTRIBUTION"), pensCeiling, "TAX_PENSION_UNDERUTILIZED");
+    }
   }
 
   return findings;
