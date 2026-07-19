@@ -4,6 +4,7 @@ import { SnapshotPayloadSchema, evaluateTransition } from "@wealthos/domain";
 import { assumptionRegistry } from "@wealthos/registry";
 import { z } from "zod";
 import { runAllocation } from "../services/allocation-service";
+import { runStrategy } from "../services/strategy-service";
 import { protectedProcedure, router, workflowGuard } from "../trpc";
 import { requireHouseholdId } from "./ledger";
 
@@ -135,7 +136,7 @@ export const allocationRouter = router({
       }
       if (total > plan.freeCashBase + 1) throw new TRPCError({ code: "BAD_REQUEST", message: "OVER_ALLOCATED" });
 
-      return ctx.db.$transaction(async (tx) => {
+      const result = await ctx.db.$transaction(async (tx) => {
         await tx.allocationPlan.update({ where: { id: input.id }, data: { workingPlan: wp, status: "APPROVED", approvedAt: new Date(), note: input.note ?? null } });
         const household = await tx.household.findFirstOrThrow();
         const t = evaluateTransition(household.workflowState, "STRATEGY", { verificationComplete: true, suspenseEmpty: true, allocationPlanApproved: true });
@@ -143,9 +144,64 @@ export const allocationRouter = router({
           await tx.workflowTransition.create({ data: { householdId: household.id, fromState: "ALLOCATION", toState: "STRATEGY", reason: "Allocation plan approved" } });
           await tx.household.update({ where: { id: household.id }, data: { workflowState: "STRATEGY" } });
         }
-        return { approved: true, advancedTo: t.allowed ? "STRATEGY" : household.workflowState };
+        return { approved: true, advancedTo: (t.allowed ? "STRATEGY" : household.workflowState) as string };
       });
+      // M33 — auto-rerun strategy so recommendations realign with the just-approved plan (non-fatal).
+      if (result.advancedTo === "STRATEGY") {
+        try { await runStrategy(ctx.db, ctx.householdId); } catch { /* data gate / refusal is non-fatal here */ }
+      }
+      return result;
     }),
+
+  /** M33 — reopen the approved plan for editing: step back to ALLOCATION and mark it PROPOSED. */
+  reopenForEdit: protectedProcedure.mutation(async ({ ctx }) => {
+    const householdId = await requireHouseholdId(ctx.db);
+    return ctx.db.$transaction(async (tx) => {
+      const household = await tx.household.findFirstOrThrow();
+      if (household.workflowState !== "ALLOCATION") {
+        const t = evaluateTransition(household.workflowState, "ALLOCATION", { verificationComplete: true, suspenseEmpty: true, allocationPlanApproved: true });
+        if (!t.allowed) throw new TRPCError({ code: "FORBIDDEN", message: t.reason });
+        await tx.workflowTransition.create({ data: { householdId, fromState: household.workflowState, toState: "ALLOCATION", reason: "Reopen allocation plan for editing" } });
+        await tx.household.update({ where: { id: householdId }, data: { workflowState: "ALLOCATION" } });
+      }
+      const latest = await tx.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
+      if (latest && latest.status === "APPROVED") {
+        await tx.allocationPlan.update({ where: { id: latest.id }, data: { status: "PROPOSED", approvedAt: null } });
+      }
+      return { reopened: true };
+    });
+  }),
+
+  /** M33 — read-only review of the current plan's chosen actions + impact (any phase). */
+  approvedReview: protectedProcedure.query(async ({ ctx }) => {
+    const householdId = await requireHouseholdId(ctx.db);
+    const row = await ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
+    if (!row) return null;
+    const plan = planOf(row);
+    if (!Array.isArray(plan.candidates)) return null;
+    const wp = (row.workingPlan ?? {}) as WorkingPlan;
+    const snap = await ctx.db.householdSnapshot.findUnique({ where: { id: row.snapshotId } });
+    if (!snap) return null;
+    const payload = SnapshotPayloadSchema.parse(snap.payload);
+    const assumptions = Object.fromEntries((await assumptionRegistry(ctx.db).all(householdId)).map((a) => [a.key, a.value]));
+    const impactCtx = { assumptions, taxRules: {}, marketRates: { boiRatePct: null } };
+    const targetGrowthPct = deriveTargetGrowthPct(assumptions);
+    const buffer = plan.bufferTargetBase ?? 0;
+    const byId = new Map(plan.candidates.map((c) => [c.id, c]));
+    const chosen: Array<{ title: string; titleHe: string; kind: string; amountBase: number; projectedExtra: number; interestSaved: number }> = [];
+    let projectedExtra = 0, allocated = 0;
+    for (const [id, sel] of Object.entries(wp)) {
+      if (!sel.enabled) continue;
+      const c = byId.get(id);
+      if (!c) continue;
+      if (c.kind === "TAX_VERIFY_PAYROLL") { chosen.push({ title: c.title ?? c.kind, titleHe: c.titleHe ?? c.kind, kind: c.kind, amountBase: 0, projectedExtra: 0, interestSaved: 0 }); continue; }
+      const im = computePlanImpact(payload, impactCtx, [{ kind: c.kind, amount: sel.amount, ratePct: c.ratePct }], buffer, targetGrowthPct);
+      chosen.push({ title: c.title ?? c.kind, titleHe: c.titleHe ?? c.kind, kind: c.kind, amountBase: sel.amount, projectedExtra: im.projectedExtraNetWorth, interestSaved: im.annualInterestBefore - im.annualInterestAfter });
+      projectedExtra += im.projectedExtraNetWorth;
+      allocated += sel.amount;
+    }
+    return { status: row.status, createdAt: row.createdAt, approvedAt: row.approvedAt, freeCashBase: plan.freeCashBase, allocated, projectedExtra, chosen };
+  }),
 
   generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => runAllocation(ctx.db, ctx.householdId)),
 

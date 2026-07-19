@@ -1,6 +1,7 @@
 import { formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
-import { applyPresetAction, generatePlanAction } from "../../../../lib/actions/allocation-actions";
+import { applyPresetAction, editAllocationAction, generatePlanAction } from "../../../../lib/actions/allocation-actions";
+import { PhaseGate } from "../phase-gate";
 import { AllocationCart, type CartCandidate, type ImpactBase } from "../../../../components/allocation-cart";
 import { Card } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
@@ -35,11 +36,45 @@ export default async function AllocationPage({
   const nis = (n: number) => formatMoney(String(n), "ILS", l);
 
   if (household.workflowState !== "ALLOCATION") {
+    const review = await trpc.allocation.approvedReview();
     return (
-      <Card title={t("title")}>
-        <p className="mb-4 text-sm text-neutral-600">{t("wrongPhase")}</p>
-        <Link href="/verification" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("goToGate")}</Link>
-      </Card>
+      <div className="flex flex-col gap-6">
+        <Card title={t("title")}>
+          {review ? (
+            <>
+              <p className="mb-1 text-sm text-neutral-600">{t("reviewIntro")}</p>
+              <p className="mb-3 text-xs text-neutral-400">{t("reviewApprovedAt", { date: new Date(review.approvedAt ?? review.createdAt).toLocaleDateString(he ? "he-IL" : "en-GB") })}</p>
+              <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
+                <Stat label={t("allocated")} value={nis(review.allocated)} />
+                <Stat label={t("freeCash")} value={nis(review.freeCashBase)} />
+                <Stat label={t("projectedTotal")} value={`+${nis(review.projectedExtra)}`} highlight />
+              </div>
+              <ul className="mb-4 flex flex-col gap-2">
+                {review.chosen.map((c, i) => (
+                  <li key={i} className="rounded-lg border border-neutral-100 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-neutral-800" dir="auto">{he ? c.titleHe : c.title}</span>
+                      {c.amountBase > 0 ? <span className="text-sm font-medium">{nis(c.amountBase)}</span> : <span className="text-xs text-green-700">✓</span>}
+                    </div>
+                    {c.projectedExtra > 0 ? <p className="mt-1 text-xs text-blue-700">📈 +{nis(c.projectedExtra)} {t("inHorizon")}{c.interestSaved > 0 ? ` · ${t("interestSavedShort")} ${nis(c.interestSaved)}/${t("perYearShort")}` : ""}</p> : null}
+                  </li>
+                ))}
+              </ul>
+              <form action={editAllocationAction}>
+                <input type="hidden" name="locale" value={locale} />
+                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("editPlan")}</button>
+              </form>
+              <p className="mt-2 text-xs text-neutral-400">{t("editPlanHint")}</p>
+            </>
+          ) : (
+            <>
+              <p className="mb-4 text-sm text-neutral-600">{t("wrongPhase")}</p>
+              <Link href="/verification" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("goToGate")}</Link>
+            </>
+          )}
+        </Card>
+        <PhaseGate locale={locale} />
+      </div>
     );
   }
 
@@ -140,6 +175,7 @@ export default async function AllocationPage({
           ) : null}
         </>
       ) : null}
+      <PhaseGate locale={locale} />
     </div>
   );
 }

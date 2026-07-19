@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { PhaseGate } from "../phase-gate";
 import { deriveTargetGrowthPct } from "@wealthos/engine-strategy";
 import { decideAction, dismissRecommendationAction, markImplementedAction, runStrategyAction, saveRiskAction } from "../../../../lib/actions/strategy-actions";
 import { Card, Field, Select, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
@@ -286,6 +287,7 @@ export default async function StrategyPage({
           );
         })
       )}
+      <PhaseGate locale={locale} />
     </div>
   );
 }

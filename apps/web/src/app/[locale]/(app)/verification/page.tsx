@@ -1,10 +1,10 @@
 import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
+import { PhaseGate } from "../phase-gate";
 import { addValuationAction } from "../../../../lib/actions/mapping-actions";
 import { rejectItemAction, verifyItemAction } from "../../../../lib/actions/verification-actions";
 import { Card, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
-import { GatePanel } from "./gate-panel";
 
 export default async function VerificationPage({
   params,
@@ -22,7 +22,6 @@ export default async function VerificationPage({
   if (!household) return null;
 
   const { assessment, missingDocs } = await trpc.verification.assessment();
-  const workflow = await trpc.workflow.current();
   const items = await trpc.ledger.list();
   const itemById = new Map(items.map((i) => [i.id, i]));
   const needsReview = assessment.items.filter((a) => !a.verified);
@@ -45,12 +44,6 @@ export default async function VerificationPage({
         <Card title={t("confidence")}>
           <p className="text-2xl font-bold">{assessment.confidenceScore}</p>
         </Card>
-        <GatePanel
-          locale={locale}
-          state={workflow.state}
-          canEnterStrategy={assessment.gate.canEnterStrategy}
-          blockers={assessment.gate.blockers}
-        />
       </div>
 
       {missingDocs.expectations.length > 0 ? (
@@ -135,6 +128,7 @@ export default async function VerificationPage({
           </ul>
         )}
       </Card>
+      <PhaseGate locale={locale} />
     </div>
   );
 }

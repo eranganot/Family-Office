@@ -42,6 +42,25 @@
   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
 
+## Current state (2026-07-20, session 7)
+
+- **M33 (journey audit: per-page phase gate + allocation review/edit + auto-rerun) code-complete —
+  m33.patch. No migration.** Root cause found: the workflow-transition control (GatePanel) lived ONLY
+  on the verification page, so completing STRATEGY→MONITORING etc. sent users "back to the phase gate";
+  and leaving ALLOCATION made the approved plan unreachable.
+  Fix (both owner-recommended): (1) shared `(app)/phase-gate.tsx` server component rendered on EVERY
+  phase page (mapping/verification/allocation/strategy/monitoring) — shows the legal forward step +
+  what's blocking it (unverified count, suspense, "approve your plan") + back-transitions, driven by
+  new `workflow.gate` query. Old GatePanel + gate-panel.tsx removed (dedup). transitionAction now
+  redirects to the TARGET phase's page (was hard-coded to /verification).
+  (2) Allocation review always available: when not in ALLOCATION phase, the הקצאה tab shows the
+  approved plan READ-ONLY (chosen actions + amounts + per-item and total projected impact via
+  approvedReview query) with an "עריכת התוכנית" button → reopenForEdit mutation (steps back to
+  ALLOCATION + flips the plan to PROPOSED, preserving tuned amounts) → cart. (3) commitAndApprove now
+  AUTO-RERUNS runStrategy after advancing to STRATEGY (non-fatal) so recommendations realign with the
+  approved plan automatically. Verified: engine 61, eslint clean, api/web/domain tsc, prisma valid,
+  i18n parity (+gate.*).
+
 ## Current state (2026-07-20, session 6)
 
 - **M32 (cart title fallback for pre-M31 plans) code-complete — m32.patch on M31. No migration.**

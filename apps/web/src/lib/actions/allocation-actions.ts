@@ -57,3 +57,15 @@ export async function commitCartAction(fd: FormData): Promise<void> {
   }
   if (ok) redirect(`/${locale}/strategy?fromAllocation=1`);
 }
+
+export async function editAllocationAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    await trpc.allocation.reopenForEdit();
+  } catch (e) {
+    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 120)) : "UNKNOWN";
+    redirect(`/${locale}/allocation?error=${code}`);
+  }
+  redirect(`/${locale}/allocation`);
+}

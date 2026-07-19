@@ -1094,6 +1094,21 @@
     "toStrategy": "Go to strategy",
     "basedOnPlan": "Based on your approved allocation plan of {date} — deployment decisions are excluded from these recommendations.",
     "amountLabel": "Amount",
-    "rebuildForTitles": "This plan was built before the latest update — the action names below are generic. Click “Rebuild the plan” above for full descriptive titles."
+    "rebuildForTitles": "This plan was built before the latest update — the action names below are generic. Click “Rebuild the plan” above for full descriptive titles.",
+    "reviewIntro": "Your approved allocation plan. It feeds the strategy phase.",
+    "reviewApprovedAt": "Approved {date}",
+    "editPlan": "Edit plan",
+    "editPlanHint": "Editing reopens the allocation phase; after you re-approve, the strategy analysis re-runs automatically to stay aligned."
+  },
+  "gate": {
+    "footerTitle": "This phase",
+    "readyTo": "Ready to continue.",
+    "advanceTo": "Continue to {state}",
+    "blockedTo": "To continue to {state}, resolve:",
+    "blockUnverified": "{count} item(s) awaiting verification",
+    "blockSuspense": "{count} suspense item(s) to resolve",
+    "blockAllocation": "Approve your deployment plan below to continue",
+    "finalPhase": "This is the final phase — monitoring runs continuously.",
+    "orGoBack": "Or go back to"
   }
 }

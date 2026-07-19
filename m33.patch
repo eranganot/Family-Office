@@ -1,0 +1,596 @@
+diff --git a/STATUS.md b/STATUS.md
+index 23201bf..03fcfcf 100644
+--- a/STATUS.md
++++ b/STATUS.md
+@@ -17,6 +17,25 @@
+   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
+   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
+ 
++## Current state (2026-07-20, session 7)
++
++- **M33 (journey audit: per-page phase gate + allocation review/edit + auto-rerun) code-complete —
++  m33.patch. No migration.** Root cause found: the workflow-transition control (GatePanel) lived ONLY
++  on the verification page, so completing STRATEGY→MONITORING etc. sent users "back to the phase gate";
++  and leaving ALLOCATION made the approved plan unreachable.
++  Fix (both owner-recommended): (1) shared `(app)/phase-gate.tsx` server component rendered on EVERY
++  phase page (mapping/verification/allocation/strategy/monitoring) — shows the legal forward step +
++  what's blocking it (unverified count, suspense, "approve your plan") + back-transitions, driven by
++  new `workflow.gate` query. Old GatePanel + gate-panel.tsx removed (dedup). transitionAction now
++  redirects to the TARGET phase's page (was hard-coded to /verification).
++  (2) Allocation review always available: when not in ALLOCATION phase, the הקצאה tab shows the
++  approved plan READ-ONLY (chosen actions + amounts + per-item and total projected impact via
++  approvedReview query) with an "עריכת התוכנית" button → reopenForEdit mutation (steps back to
++  ALLOCATION + flips the plan to PROPOSED, preserving tuned amounts) → cart. (3) commitAndApprove now
++  AUTO-RERUNS runStrategy after advancing to STRATEGY (non-fatal) so recommendations realign with the
++  approved plan automatically. Verified: engine 61, eslint clean, api/web/domain tsc, prisma valid,
++  i18n parity (+gate.*).
++
+ ## Current state (2026-07-20, session 6)
+ 
+ - **M32 (cart title fallback for pre-M31 plans) code-complete — m32.patch on M31. No migration.**
+diff --git a/apps/web/src/app/[locale]/(app)/allocation/page.tsx b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+index 1977b2a..051e2b7 100644
+--- a/apps/web/src/app/[locale]/(app)/allocation/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+@@ -1,6 +1,7 @@
+ import { formatMoney, type Locale } from "@wealthos/i18n";
+ import { getTranslations } from "next-intl/server";
+-import { applyPresetAction, generatePlanAction } from "../../../../lib/actions/allocation-actions";
++import { applyPresetAction, editAllocationAction, generatePlanAction } from "../../../../lib/actions/allocation-actions";
++import { PhaseGate } from "../phase-gate";
+ import { AllocationCart, type CartCandidate, type ImpactBase } from "../../../../components/allocation-cart";
+ import { Card } from "../../../../components/fields";
+ import { serverCaller } from "../../../../lib/trpc-server";
+@@ -35,11 +36,45 @@ export default async function AllocationPage({
+   const nis = (n: number) => formatMoney(String(n), "ILS", l);
+ 
+   if (household.workflowState !== "ALLOCATION") {
++    const review = await trpc.allocation.approvedReview();
+     return (
+-      <Card title={t("title")}>
+-        <p className="mb-4 text-sm text-neutral-600">{t("wrongPhase")}</p>
+-        <Link href="/verification" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("goToGate")}</Link>
+-      </Card>
++      <div className="flex flex-col gap-6">
++        <Card title={t("title")}>
++          {review ? (
++            <>
++              <p className="mb-1 text-sm text-neutral-600">{t("reviewIntro")}</p>
++              <p className="mb-3 text-xs text-neutral-400">{t("reviewApprovedAt", { date: new Date(review.approvedAt ?? review.createdAt).toLocaleDateString(he ? "he-IL" : "en-GB") })}</p>
++              <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
++                <Stat label={t("allocated")} value={nis(review.allocated)} />
++                <Stat label={t("freeCash")} value={nis(review.freeCashBase)} />
++                <Stat label={t("projectedTotal")} value={`+${nis(review.projectedExtra)}`} highlight />
++              </div>
++              <ul className="mb-4 flex flex-col gap-2">
++                {review.chosen.map((c, i) => (
++                  <li key={i} className="rounded-lg border border-neutral-100 p-3">
++                    <div className="flex items-center justify-between">
++                      <span className="text-sm font-semibold text-neutral-800" dir="auto">{he ? c.titleHe : c.title}</span>
++                      {c.amountBase > 0 ? <span className="text-sm font-medium">{nis(c.amountBase)}</span> : <span className="text-xs text-green-700">✓</span>}
++                    </div>
++                    {c.projectedExtra > 0 ? <p className="mt-1 text-xs text-blue-700">📈 +{nis(c.projectedExtra)} {t("inHorizon")}{c.interestSaved > 0 ? ` · ${t("interestSavedShort")} ${nis(c.interestSaved)}/${t("perYearShort")}` : ""}</p> : null}
++                  </li>
++                ))}
++              </ul>
++              <form action={editAllocationAction}>
++                <input type="hidden" name="locale" value={locale} />
++                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("editPlan")}</button>
++              </form>
++              <p className="mt-2 text-xs text-neutral-400">{t("editPlanHint")}</p>
++            </>
++          ) : (
++            <>
++              <p className="mb-4 text-sm text-neutral-600">{t("wrongPhase")}</p>
++              <Link href="/verification" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("goToGate")}</Link>
++            </>
++          )}
++        </Card>
++        <PhaseGate locale={locale} />
++      </div>
+     );
+   }
+ 
+@@ -140,6 +175,7 @@ export default async function AllocationPage({
+           ) : null}
+         </>
+       ) : null}
++      <PhaseGate locale={locale} />
+     </div>
+   );
+ }
+diff --git a/apps/web/src/app/[locale]/(app)/mapping/page.tsx b/apps/web/src/app/[locale]/(app)/mapping/page.tsx
+index 8826f54..6852e23 100644
+--- a/apps/web/src/app/[locale]/(app)/mapping/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/mapping/page.tsx
+@@ -1,5 +1,6 @@
+ import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
+ import { getTranslations } from "next-intl/server";
++import { PhaseGate } from "../phase-gate";
+ import { addValuationAction, closeItemAction, confirmGrowthShareAction, suggestGrowthSharesAction } from "../../../../lib/actions/mapping-actions";
+ import { Card, ErrorBanner, SubmitButton, TextInput, SuccessBanner } from "../../../../components/fields";
+ import { serverCaller } from "../../../../lib/trpc-server";
+@@ -154,6 +155,7 @@ export default async function MappingPage({
+           </Card>
+         ))
+       )}
++      <PhaseGate locale={locale} />
+     </div>
+   );
+ }
+diff --git a/apps/web/src/app/[locale]/(app)/monitoring/page.tsx b/apps/web/src/app/[locale]/(app)/monitoring/page.tsx
+index 8a37199..54e0ac5 100644
+--- a/apps/web/src/app/[locale]/(app)/monitoring/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/monitoring/page.tsx
+@@ -1,5 +1,6 @@
+ import { formatDate, type Locale } from "@wealthos/i18n";
+ import { getTranslations } from "next-intl/server";
++import { PhaseGate } from "../phase-gate";
+ import { Card, ErrorBanner, SubmitButton, Explainer } from "../../../../components/fields";
+ import { serverCaller } from "../../../../lib/trpc-server";
+ import { acknowledgeAlertAction, reevaluateAction, runMonitoringAction } from "../../../../lib/actions/monitoring-actions";
+@@ -192,6 +193,7 @@ export default async function MonitoringPage({
+           </div>
+         </Card>
+       ) : null}
++      <PhaseGate locale={locale} />
+     </div>
+   );
+ }
+diff --git a/apps/web/src/app/[locale]/(app)/phase-gate.tsx b/apps/web/src/app/[locale]/(app)/phase-gate.tsx
+new file mode 100644
+index 0000000..6092aca
+--- /dev/null
++++ b/apps/web/src/app/[locale]/(app)/phase-gate.tsx
+@@ -0,0 +1,67 @@
++import { getTranslations } from "next-intl/server";
++import { transitionAction } from "../../../lib/actions/workflow-actions";
++
++/** M33 — shared phase footer: shows the legal next step(s) for the current phase + what's blocking.
++ *  Rendered on every phase page so you complete each phase from within it. */
++export async function PhaseGate({ locale }: { locale: string }) {
++  const t = await getTranslations("gate");
++  const tp = await getTranslations("phase");
++  const { serverCaller } = await import("../../../lib/trpc-server");
++  const trpc = await serverCaller();
++  const g = await trpc.workflow.gate();
++  const state = g.state as "MAPPING" | "VERIFICATION" | "ALLOCATION" | "STRATEGY" | "MONITORING";
++
++  const FORWARD: Record<string, string | null> = {
++    MAPPING: "VERIFICATION", VERIFICATION: "ALLOCATION", ALLOCATION: "STRATEGY", STRATEGY: "MONITORING", MONITORING: null,
++  };
++  const forward = FORWARD[state];
++
++  const forwardBlocked =
++    (state === "VERIFICATION" && (!g.verificationComplete || !g.suspenseEmpty)) ||
++    (state === "ALLOCATION" && !g.allocationPlanApproved);
++
++  const blockers: string[] = [];
++  if (state === "VERIFICATION") {
++    if (g.unverifiedCount > 0) blockers.push(t("blockUnverified", { count: g.unverifiedCount }));
++    if (g.pendingSuspense > 0) blockers.push(t("blockSuspense", { count: g.pendingSuspense }));
++  }
++  if (state === "ALLOCATION" && !g.allocationPlanApproved) blockers.push(t("blockAllocation"));
++
++  const Btn = ({ to, label, primary }: { to: string; label: string; primary?: boolean }) => (
++    <form action={transitionAction} className="inline">
++      <input type="hidden" name="locale" value={locale} />
++      <input type="hidden" name="from" value={state} />
++      <input type="hidden" name="to" value={to} />
++      <button type="submit" className={primary ? "rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white" : "rounded-lg border border-neutral-300 px-3 py-2 text-sm"}>{label}</button>
++    </form>
++  );
++
++  return (
++    <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
++      <div className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">{t("footerTitle")}</div>
++      {forward ? (
++        forwardBlocked ? (
++          <div>
++            <p className="mb-1 text-sm text-amber-700">{t("blockedTo", { state: tp(forward) })}</p>
++            <ul className="text-xs text-neutral-500">{blockers.map((b) => <li key={b}>• {b}</li>)}</ul>
++          </div>
++        ) : (
++          <div className="flex flex-wrap items-center gap-2">
++            <p className="me-2 text-sm text-neutral-600">{t("readyTo", { state: tp(forward) })}</p>
++            <Btn to={forward} label={t("advanceTo", { state: tp(forward) })} primary />
++          </div>
++        )
++      ) : (
++        <p className="text-sm text-neutral-600">{t("finalPhase")}</p>
++      )}
++      {g.legalTargets.filter((x) => x !== forward).length > 0 ? (
++        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-3">
++          <span className="text-xs text-neutral-400">{t("orGoBack")}:</span>
++          {g.legalTargets.filter((x) => x !== forward).map((to) => (
++            <Btn key={to} to={to} label={tp(to)} />
++          ))}
++        </div>
++      ) : null}
++    </div>
++  );
++}
+diff --git a/apps/web/src/app/[locale]/(app)/strategy/page.tsx b/apps/web/src/app/[locale]/(app)/strategy/page.tsx
+index f5ea030..811ea2e 100644
+--- a/apps/web/src/app/[locale]/(app)/strategy/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/strategy/page.tsx
+@@ -1,4 +1,5 @@
+ import { getTranslations } from "next-intl/server";
++import { PhaseGate } from "../phase-gate";
+ import { deriveTargetGrowthPct } from "@wealthos/engine-strategy";
+ import { decideAction, dismissRecommendationAction, markImplementedAction, runStrategyAction, saveRiskAction } from "../../../../lib/actions/strategy-actions";
+ import { Card, Field, Select, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
+@@ -286,6 +287,7 @@ export default async function StrategyPage({
+           );
+         })
+       )}
++      <PhaseGate locale={locale} />
+     </div>
+   );
+ }
+diff --git a/apps/web/src/app/[locale]/(app)/verification/gate-panel.tsx b/apps/web/src/app/[locale]/(app)/verification/gate-panel.tsx
+deleted file mode 100644
+index 4982da0..0000000
+--- a/apps/web/src/app/[locale]/(app)/verification/gate-panel.tsx
++++ /dev/null
+@@ -1,91 +0,0 @@
+-import { getTranslations } from "next-intl/server";
+-import { transitionAction } from "../../../../lib/actions/workflow-actions";
+-import { Card } from "../../../../components/fields";
+-
+-/** Gate status + the ONLY UI that moves the workflow state machine. */
+-export async function GatePanel({
+-  locale,
+-  state,
+-  canEnterStrategy,
+-  blockers,
+-}: {
+-  locale: string;
+-  state: string;
+-  canEnterStrategy: boolean;
+-  blockers: string[];
+-}) {
+-  const t = await getTranslations("verification");
+-  const tp = await getTranslations("phase");
+-
+-  const TransitionButton = ({ to, label, primary }: { to: string; label: string; primary?: boolean }) => (
+-    <form action={transitionAction}>
+-      <input type="hidden" name="locale" value={locale} />
+-      <input type="hidden" name="to" value={to} />
+-      <button
+-        type="submit"
+-        className={
+-          primary
+-            ? "rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
+-            : "rounded-lg border border-neutral-300 px-3 py-1.5 text-sm"
+-        }
+-      >
+-        {label}
+-      </button>
+-    </form>
+-  );
+-
+-  return (
+-    <Card title={t("gate")}>
+-      <p className="mb-1 text-xs text-neutral-400">
+-        {tp("label")}: {tp(state)}
+-      </p>
+-      {canEnterStrategy ? (
+-        <p className="mb-2 text-sm font-medium text-green-700">{t("gateOpen")}</p>
+-      ) : (
+-        <>
+-          <p className="mb-1 text-sm text-red-700">{t("gateBlocked")}</p>
+-          <ul className="mb-2 text-xs text-neutral-500">
+-            {blockers.map((b) => {
+-              const [code, count] = b.split(":");
+-              return (
+-                <li key={b}>
+-                  • {t(`blockers.${code}`)}{count ? `: ${count}` : ""}
+-                </li>
+-              );
+-            })}
+-          </ul>
+-        </>
+-      )}
+-      <div className="flex flex-wrap gap-2">
+-        {state === "MAPPING" ? (
+-          <TransitionButton to="VERIFICATION" label={t("advance", { state: tp("VERIFICATION") })} primary />
+-        ) : null}
+-        {state === "VERIFICATION" ? (
+-          <>
+-            <TransitionButton to="ALLOCATION" label={t("advance", { state: tp("ALLOCATION") })} primary={canEnterStrategy} />
+-            <TransitionButton to="MAPPING" label={t("backTo", { state: tp("MAPPING") })} />
+-          </>
+-        ) : null}
+-        {state === "ALLOCATION" ? (
+-          <>
+-            <TransitionButton to="STRATEGY" label={t("advance", { state: tp("STRATEGY") })} primary />
+-            <TransitionButton to="VERIFICATION" label={t("backTo", { state: tp("VERIFICATION") })} />
+-          </>
+-        ) : null}
+-        {state === "STRATEGY" ? (
+-          <>
+-            <TransitionButton to="MONITORING" label={t("advance", { state: tp("MONITORING") })} primary />
+-            <TransitionButton to="ALLOCATION" label={t("backTo", { state: tp("ALLOCATION") })} />
+-          </>
+-        ) : null}
+-        {state === "MONITORING" ? (
+-          <>
+-            <TransitionButton to="STRATEGY" label={t("advance", { state: tp("STRATEGY") })} primary />
+-            <TransitionButton to="ALLOCATION" label={t("backTo", { state: tp("ALLOCATION") })} />
+-            <TransitionButton to="VERIFICATION" label={t("backTo", { state: tp("VERIFICATION") })} />
+-          </>
+-        ) : null}
+-      </div>
+-    </Card>
+-  );
+-}
+diff --git a/apps/web/src/app/[locale]/(app)/verification/page.tsx b/apps/web/src/app/[locale]/(app)/verification/page.tsx
+index e1f48d3..a0665f0 100644
+--- a/apps/web/src/app/[locale]/(app)/verification/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/verification/page.tsx
+@@ -1,10 +1,10 @@
+ import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
+ import { getTranslations } from "next-intl/server";
++import { PhaseGate } from "../phase-gate";
+ import { addValuationAction } from "../../../../lib/actions/mapping-actions";
+ import { rejectItemAction, verifyItemAction } from "../../../../lib/actions/verification-actions";
+ import { Card, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
+ import { serverCaller } from "../../../../lib/trpc-server";
+-import { GatePanel } from "./gate-panel";
+ 
+ export default async function VerificationPage({
+   params,
+@@ -22,7 +22,6 @@ export default async function VerificationPage({
+   if (!household) return null;
+ 
+   const { assessment, missingDocs } = await trpc.verification.assessment();
+-  const workflow = await trpc.workflow.current();
+   const items = await trpc.ledger.list();
+   const itemById = new Map(items.map((i) => [i.id, i]));
+   const needsReview = assessment.items.filter((a) => !a.verified);
+@@ -45,12 +44,6 @@ export default async function VerificationPage({
+         <Card title={t("confidence")}>
+           <p className="text-2xl font-bold">{assessment.confidenceScore}</p>
+         </Card>
+-        <GatePanel
+-          locale={locale}
+-          state={workflow.state}
+-          canEnterStrategy={assessment.gate.canEnterStrategy}
+-          blockers={assessment.gate.blockers}
+-        />
+       </div>
+ 
+       {missingDocs.expectations.length > 0 ? (
+@@ -135,6 +128,7 @@ export default async function VerificationPage({
+           </ul>
+         )}
+       </Card>
++      <PhaseGate locale={locale} />
+     </div>
+   );
+ }
+diff --git a/apps/web/src/lib/actions/allocation-actions.ts b/apps/web/src/lib/actions/allocation-actions.ts
+index 0e8cbb9..22c2519 100644
+--- a/apps/web/src/lib/actions/allocation-actions.ts
++++ b/apps/web/src/lib/actions/allocation-actions.ts
+@@ -57,3 +57,15 @@ export async function commitCartAction(fd: FormData): Promise<void> {
+   }
+   if (ok) redirect(`/${locale}/strategy?fromAllocation=1`);
+ }
++
++export async function editAllocationAction(fd: FormData): Promise<void> {
++  const locale = str(fd, "locale");
++  const trpc = await serverCaller();
++  try {
++    await trpc.allocation.reopenForEdit();
++  } catch (e) {
++    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 120)) : "UNKNOWN";
++    redirect(`/${locale}/allocation?error=${code}`);
++  }
++  redirect(`/${locale}/allocation`);
++}
+diff --git a/apps/web/src/lib/actions/workflow-actions.ts b/apps/web/src/lib/actions/workflow-actions.ts
+index 89e2173..4a600f1 100644
+--- a/apps/web/src/lib/actions/workflow-actions.ts
++++ b/apps/web/src/lib/actions/workflow-actions.ts
+@@ -4,18 +4,20 @@ import { redirect } from "next/navigation";
+ import { serverCaller } from "../trpc-server";
+ import { str } from "./form-helpers";
+ 
++const PAGE: Record<string, string> = {
++  MAPPING: "mapping", VERIFICATION: "verification", ALLOCATION: "allocation", STRATEGY: "strategy", MONITORING: "monitoring",
++};
++
+ export async function transitionAction(fd: FormData): Promise<void> {
+   const locale = str(fd, "locale");
+   const to = str(fd, "to");
++  const from = str(fd, "from") || "verification";
+   const trpc = await serverCaller();
+   try {
+-    await trpc.workflow.transition({
+-      to: to as never,
+-      reason: str(fd, "reason") || `UI transition to ${to}`,
+-    });
++    await trpc.workflow.transition({ to: to as never, reason: str(fd, "reason") || `UI transition to ${to}` });
+   } catch (e) {
+     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "UNKNOWN";
+-    redirect(`/${locale}/verification?error=${code}`);
++    redirect(`/${locale}/${PAGE[from] ?? "verification"}?error=${code}`);
+   }
+-  redirect(`/${locale}/verification`);
++  redirect(`/${locale}/${PAGE[to] ?? "verification"}`);
+ }
+diff --git a/packages/api/src/routers/allocation.ts b/packages/api/src/routers/allocation.ts
+index 07b5a66..f565e0c 100644
+--- a/packages/api/src/routers/allocation.ts
++++ b/packages/api/src/routers/allocation.ts
+@@ -4,6 +4,7 @@ import { SnapshotPayloadSchema, evaluateTransition } from "@wealthos/domain";
+ import { assumptionRegistry } from "@wealthos/registry";
+ import { z } from "zod";
+ import { runAllocation } from "../services/allocation-service";
++import { runStrategy } from "../services/strategy-service";
+ import { protectedProcedure, router, workflowGuard } from "../trpc";
+ import { requireHouseholdId } from "./ledger";
+ 
+@@ -135,7 +136,7 @@ export const allocationRouter = router({
+       }
+       if (total > plan.freeCashBase + 1) throw new TRPCError({ code: "BAD_REQUEST", message: "OVER_ALLOCATED" });
+ 
+-      return ctx.db.$transaction(async (tx) => {
++      const result = await ctx.db.$transaction(async (tx) => {
+         await tx.allocationPlan.update({ where: { id: input.id }, data: { workingPlan: wp, status: "APPROVED", approvedAt: new Date(), note: input.note ?? null } });
+         const household = await tx.household.findFirstOrThrow();
+         const t = evaluateTransition(household.workflowState, "STRATEGY", { verificationComplete: true, suspenseEmpty: true, allocationPlanApproved: true });
+@@ -143,10 +144,65 @@ export const allocationRouter = router({
+           await tx.workflowTransition.create({ data: { householdId: household.id, fromState: "ALLOCATION", toState: "STRATEGY", reason: "Allocation plan approved" } });
+           await tx.household.update({ where: { id: household.id }, data: { workflowState: "STRATEGY" } });
+         }
+-        return { approved: true, advancedTo: t.allowed ? "STRATEGY" : household.workflowState };
++        return { approved: true, advancedTo: (t.allowed ? "STRATEGY" : household.workflowState) as string };
+       });
++      // M33 — auto-rerun strategy so recommendations realign with the just-approved plan (non-fatal).
++      if (result.advancedTo === "STRATEGY") {
++        try { await runStrategy(ctx.db, ctx.householdId); } catch { /* data gate / refusal is non-fatal here */ }
++      }
++      return result;
+     }),
+ 
++  /** M33 — reopen the approved plan for editing: step back to ALLOCATION and mark it PROPOSED. */
++  reopenForEdit: protectedProcedure.mutation(async ({ ctx }) => {
++    const householdId = await requireHouseholdId(ctx.db);
++    return ctx.db.$transaction(async (tx) => {
++      const household = await tx.household.findFirstOrThrow();
++      if (household.workflowState !== "ALLOCATION") {
++        const t = evaluateTransition(household.workflowState, "ALLOCATION", { verificationComplete: true, suspenseEmpty: true, allocationPlanApproved: true });
++        if (!t.allowed) throw new TRPCError({ code: "FORBIDDEN", message: t.reason });
++        await tx.workflowTransition.create({ data: { householdId, fromState: household.workflowState, toState: "ALLOCATION", reason: "Reopen allocation plan for editing" } });
++        await tx.household.update({ where: { id: householdId }, data: { workflowState: "ALLOCATION" } });
++      }
++      const latest = await tx.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
++      if (latest && latest.status === "APPROVED") {
++        await tx.allocationPlan.update({ where: { id: latest.id }, data: { status: "PROPOSED", approvedAt: null } });
++      }
++      return { reopened: true };
++    });
++  }),
++
++  /** M33 — read-only review of the current plan's chosen actions + impact (any phase). */
++  approvedReview: protectedProcedure.query(async ({ ctx }) => {
++    const householdId = await requireHouseholdId(ctx.db);
++    const row = await ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
++    if (!row) return null;
++    const plan = planOf(row);
++    if (!Array.isArray(plan.candidates)) return null;
++    const wp = (row.workingPlan ?? {}) as WorkingPlan;
++    const snap = await ctx.db.householdSnapshot.findUnique({ where: { id: row.snapshotId } });
++    if (!snap) return null;
++    const payload = SnapshotPayloadSchema.parse(snap.payload);
++    const assumptions = Object.fromEntries((await assumptionRegistry(ctx.db).all(householdId)).map((a) => [a.key, a.value]));
++    const impactCtx = { assumptions, taxRules: {}, marketRates: { boiRatePct: null } };
++    const targetGrowthPct = deriveTargetGrowthPct(assumptions);
++    const buffer = plan.bufferTargetBase ?? 0;
++    const byId = new Map(plan.candidates.map((c) => [c.id, c]));
++    const chosen: Array<{ title: string; titleHe: string; kind: string; amountBase: number; projectedExtra: number; interestSaved: number }> = [];
++    let projectedExtra = 0, allocated = 0;
++    for (const [id, sel] of Object.entries(wp)) {
++      if (!sel.enabled) continue;
++      const c = byId.get(id);
++      if (!c) continue;
++      if (c.kind === "TAX_VERIFY_PAYROLL") { chosen.push({ title: c.title ?? c.kind, titleHe: c.titleHe ?? c.kind, kind: c.kind, amountBase: 0, projectedExtra: 0, interestSaved: 0 }); continue; }
++      const im = computePlanImpact(payload, impactCtx, [{ kind: c.kind, amount: sel.amount, ratePct: c.ratePct }], buffer, targetGrowthPct);
++      chosen.push({ title: c.title ?? c.kind, titleHe: c.titleHe ?? c.kind, kind: c.kind, amountBase: sel.amount, projectedExtra: im.projectedExtraNetWorth, interestSaved: im.annualInterestBefore - im.annualInterestAfter });
++      projectedExtra += im.projectedExtraNetWorth;
++      allocated += sel.amount;
++    }
++    return { status: row.status, createdAt: row.createdAt, approvedAt: row.approvedAt, freeCashBase: plan.freeCashBase, allocated, projectedExtra, chosen };
++  }),
++
+   generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => runAllocation(ctx.db, ctx.householdId)),
+ 
+   /** Seed the working plan from a named preset (does not approve). */
+diff --git a/packages/api/src/routers/workflow.ts b/packages/api/src/routers/workflow.ts
+index b4982c6..044e716 100644
+--- a/packages/api/src/routers/workflow.ts
++++ b/packages/api/src/routers/workflow.ts
+@@ -6,6 +6,26 @@ import { protectedProcedure, router } from "../trpc";
+ const WorkflowStateSchema = z.enum(WorkflowStates);
+ 
+ export const workflowRouter = router({
++  /** M33 — current phase + gate facts, for the shared phase-gate footer on every page. */
++  gate: protectedProcedure.query(async ({ ctx }) => {
++    const household = await ctx.db.household.findFirst({ select: { id: true, workflowState: true } });
++    if (!household) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No household" });
++    const [unverified, pendingSuspense, approvedPlan] = await Promise.all([
++      ctx.db.ledgerItem.count({ where: { householdId: household.id, status: "ACTIVE", verification: { not: "VERIFIED" } } }),
++      ctx.db.suspenseItem.count({ where: { status: "PENDING" } }),
++      ctx.db.allocationPlan.findFirst({ where: { householdId: household.id }, orderBy: { createdAt: "desc" }, select: { status: true } }),
++    ]);
++    return {
++      state: household.workflowState,
++      legalTargets: legalTargets(household.workflowState),
++      verificationComplete: unverified === 0,
++      suspenseEmpty: pendingSuspense === 0,
++      unverifiedCount: unverified,
++      pendingSuspense,
++      allocationPlanApproved: approvedPlan?.status === "APPROVED",
++    };
++  }),
++
+   current: protectedProcedure.query(async ({ ctx }) => {
+     const household = await ctx.db.household.findFirst({
+       select: { workflowState: true },
+diff --git a/packages/i18n/messages/en.json b/packages/i18n/messages/en.json
+index 859e68e..a3b0035 100644
+--- a/packages/i18n/messages/en.json
++++ b/packages/i18n/messages/en.json
+@@ -1094,6 +1094,21 @@
+     "toStrategy": "Go to strategy",
+     "basedOnPlan": "Based on your approved allocation plan of {date} — deployment decisions are excluded from these recommendations.",
+     "amountLabel": "Amount",
+-    "rebuildForTitles": "This plan was built before the latest update — the action names below are generic. Click “Rebuild the plan” above for full descriptive titles."
++    "rebuildForTitles": "This plan was built before the latest update — the action names below are generic. Click “Rebuild the plan” above for full descriptive titles.",
++    "reviewIntro": "Your approved allocation plan. It feeds the strategy phase.",
++    "reviewApprovedAt": "Approved {date}",
++    "editPlan": "Edit plan",
++    "editPlanHint": "Editing reopens the allocation phase; after you re-approve, the strategy analysis re-runs automatically to stay aligned."
++  },
++  "gate": {
++    "footerTitle": "This phase",
++    "readyTo": "Ready to continue.",
++    "advanceTo": "Continue to {state}",
++    "blockedTo": "To continue to {state}, resolve:",
++    "blockUnverified": "{count} item(s) awaiting verification",
++    "blockSuspense": "{count} suspense item(s) to resolve",
++    "blockAllocation": "Approve your deployment plan below to continue",
++    "finalPhase": "This is the final phase — monitoring runs continuously.",
++    "orGoBack": "Or go back to"
+   }
+ }
+diff --git a/packages/i18n/messages/he.json b/packages/i18n/messages/he.json
+index f2e2860..0f43e4b 100644
+--- a/packages/i18n/messages/he.json
++++ b/packages/i18n/messages/he.json
+@@ -1094,6 +1094,21 @@
+     "toStrategy": "מעבר לאסטרטגיה",
+     "basedOnPlan": "מבוסס על תוכנית ההקצאה המאושרת מ-{date} — החלטות הפריסה אינן נכללות בהמלצות אלה.",
+     "amountLabel": "סכום",
+-    "rebuildForTitles": "התוכנית הזו נבנתה לפני העדכון האחרון — שמות הפעולות למטה כלליים. לחצו “בנייה מחדש” למעלה לקבלת כותרות מלאות ומפורטות."
++    "rebuildForTitles": "התוכנית הזו נבנתה לפני העדכון האחרון — שמות הפעולות למטה כלליים. לחצו “בנייה מחדש” למעלה לקבלת כותרות מלאות ומפורטות.",
++    "reviewIntro": "תוכנית ההקצאה המאושרת שלכם. היא מזינה את שלב האסטרטגיה.",
++    "reviewApprovedAt": "אושרה ב-{date}",
++    "editPlan": "עריכת התוכנית",
++    "editPlanHint": "עריכה פותחת מחדש את שלב ההקצאה; לאחר אישור מחדש, ניתוח האסטרטגיה יורץ אוטומטית כדי לשמור על התאמה."
++  },
++  "gate": {
++    "footerTitle": "השלב הנוכחי",
++    "readyTo": "מוכן להמשך.",
++    "advanceTo": "המשך ל{state}",
++    "blockedTo": "כדי להמשיך ל{state}, יש לטפל ב:",
++    "blockUnverified": "{count} פריטים ממתינים לאימות",
++    "blockSuspense": "{count} פריטים תלויים לפתרון",
++    "blockAllocation": "אשרו את תוכנית הפריסה למטה כדי להמשיך",
++    "finalPhase": "זהו השלב האחרון — הניטור פועל ברציפות.",
++    "orGoBack": "או חזרה ל"
+   }
+ }

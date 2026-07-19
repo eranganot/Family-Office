@@ -1,5 +1,6 @@
 import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
+import { PhaseGate } from "../phase-gate";
 import { addValuationAction, closeItemAction, confirmGrowthShareAction, suggestGrowthSharesAction } from "../../../../lib/actions/mapping-actions";
 import { Card, ErrorBanner, SubmitButton, TextInput, SuccessBanner } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
@@ -154,6 +155,7 @@ export default async function MappingPage({
           </Card>
         ))
       )}
+      <PhaseGate locale={locale} />
     </div>
   );
 }

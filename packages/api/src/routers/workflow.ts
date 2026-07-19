@@ -6,6 +6,26 @@ import { protectedProcedure, router } from "../trpc";
 const WorkflowStateSchema = z.enum(WorkflowStates);
 
 export const workflowRouter = router({
+  /** M33 — current phase + gate facts, for the shared phase-gate footer on every page. */
+  gate: protectedProcedure.query(async ({ ctx }) => {
+    const household = await ctx.db.household.findFirst({ select: { id: true, workflowState: true } });
+    if (!household) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No household" });
+    const [unverified, pendingSuspense, approvedPlan] = await Promise.all([
+      ctx.db.ledgerItem.count({ where: { householdId: household.id, status: "ACTIVE", verification: { not: "VERIFIED" } } }),
+      ctx.db.suspenseItem.count({ where: { status: "PENDING" } }),
+      ctx.db.allocationPlan.findFirst({ where: { householdId: household.id }, orderBy: { createdAt: "desc" }, select: { status: true } }),
+    ]);
+    return {
+      state: household.workflowState,
+      legalTargets: legalTargets(household.workflowState),
+      verificationComplete: unverified === 0,
+      suspenseEmpty: pendingSuspense === 0,
+      unverifiedCount: unverified,
+      pendingSuspense,
+      allocationPlanApproved: approvedPlan?.status === "APPROVED",
+    };
+  }),
+
   current: protectedProcedure.query(async ({ ctx }) => {
     const household = await ctx.db.household.findFirst({
       select: { workflowState: true },
