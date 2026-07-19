@@ -1093,6 +1093,7 @@
     "approvedAligned": "Plan approved — it now feeds the strategy phase.",
     "toStrategy": "Go to strategy",
     "basedOnPlan": "Based on your approved allocation plan of {date} — deployment decisions are excluded from these recommendations.",
-    "amountLabel": "Amount"
+    "amountLabel": "Amount",
+    "rebuildForTitles": "This plan was built before the latest update — the action names below are generic. Click “Rebuild the plan” above for full descriptive titles."
   }
 }

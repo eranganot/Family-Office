@@ -42,6 +42,17 @@
   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
 
+## Current state (2026-07-20, session 6)
+
+- **M32 (cart title fallback for pre-M31 plans) code-complete — m32.patch on M31. No migration.**
+  Root cause of "empty titles": the AllocationPlan JSON in the DB was generated before M31, so its
+  stored candidates carry no title/titleHe — the cart rendered blank headers. Fix: page derives a
+  fallback title when the stored candidate lacks one — `${t(kinds.<KIND>)} · <rate>%` (kind label +
+  rate for debt, kind label otherwise) — so existing plans are readable immediately; regenerating gives
+  the full M31 titles (property name + Hebrew track type). Page Candidate.title/titleHe made optional;
+  amber "rebuild for full titles" hint shown when any candidate lacks a rich title. Verified: web tsc,
+  eslint clean, i18n parity (+rebuildForTitles).
+
 ## Current state (2026-07-20, session 5)
 
 - **M31 (readable cart labels) code-complete — m31.patch on M30. No migration.** Fix: cart rows showed

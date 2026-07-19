@@ -1,0 +1,80 @@
+diff --git a/STATUS.md b/STATUS.md
+index 7a73b76..23201bf 100644
+--- a/STATUS.md
++++ b/STATUS.md
+@@ -17,6 +17,17 @@
+   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
+   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
+ 
++## Current state (2026-07-20, session 6)
++
++- **M32 (cart title fallback for pre-M31 plans) code-complete — m32.patch on M31. No migration.**
++  Root cause of "empty titles": the AllocationPlan JSON in the DB was generated before M31, so its
++  stored candidates carry no title/titleHe — the cart rendered blank headers. Fix: page derives a
++  fallback title when the stored candidate lacks one — `${t(kinds.<KIND>)} · <rate>%` (kind label +
++  rate for debt, kind label otherwise) — so existing plans are readable immediately; regenerating gives
++  the full M31 titles (property name + Hebrew track type). Page Candidate.title/titleHe made optional;
++  amber "rebuild for full titles" hint shown when any candidate lacks a rich title. Verified: web tsc,
++  eslint clean, i18n parity (+rebuildForTitles).
++
+ ## Current state (2026-07-20, session 5)
+ 
+ - **M31 (readable cart labels) code-complete — m31.patch on M30. No migration.** Fix: cart rows showed
+diff --git a/apps/web/src/app/[locale]/(app)/allocation/page.tsx b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+index aae2cc3..1977b2a 100644
+--- a/apps/web/src/app/[locale]/(app)/allocation/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+@@ -8,7 +8,7 @@ import { Link } from "../../../../i18n/navigation";
+ 
+ interface Candidate {
+   id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
+-  suggestedAmount: number; ratePct: number | null; title: string; titleHe: string; detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
++  suggestedAmount: number; ratePct: number | null; title?: string; titleHe?: string; detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
+ }
+ interface Variant {
+   key: "GROWTH" | "DEBT_FREE" | "BALANCED";
+@@ -54,7 +54,7 @@ export default async function AllocationPage({
+     ? plan!.candidates.map((c) => ({
+         id: c.id, kind: c.kind, editable: c.editable, minAmount: c.minAmount, maxAmount: c.maxAmount,
+         suggestedAmount: c.suggestedAmount, ratePct: c.ratePct,
+-        title: he ? c.titleHe : c.title,
++        title: (he ? c.titleHe : c.title) || (c.ratePct !== null ? `${t(`kinds.${c.kind}`)} · ${c.ratePct}%` : t(`kinds.${c.kind}`)),
+         detail: he ? c.detailHe : c.detail, goalImpact: he ? c.goalImpactHe : c.goalImpact,
+       }))
+     : [];
+@@ -132,6 +132,9 @@ export default async function AllocationPage({
+           {proposed && base ? (
+             <Card title={t("workingTitle")}>
+               <p className="mb-3 text-xs text-neutral-500">{t("cartHint")}</p>
++              {plan.candidates.some((c) => !(he ? c.titleHe : c.title)) ? (
++                <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{t("rebuildForTitles")}</p>
++              ) : null}
+               <AllocationCart planId={latest.id} freeCash={plan.freeCashBase} candidates={cartCandidates} base={base} initial={initial} labels={labels} locale={locale} />
+             </Card>
+           ) : null}
+diff --git a/packages/i18n/messages/en.json b/packages/i18n/messages/en.json
+index 9b27bcc..859e68e 100644
+--- a/packages/i18n/messages/en.json
++++ b/packages/i18n/messages/en.json
+@@ -1093,6 +1093,7 @@
+     "approvedAligned": "Plan approved — it now feeds the strategy phase.",
+     "toStrategy": "Go to strategy",
+     "basedOnPlan": "Based on your approved allocation plan of {date} — deployment decisions are excluded from these recommendations.",
+-    "amountLabel": "Amount"
++    "amountLabel": "Amount",
++    "rebuildForTitles": "This plan was built before the latest update — the action names below are generic. Click “Rebuild the plan” above for full descriptive titles."
+   }
+ }
+diff --git a/packages/i18n/messages/he.json b/packages/i18n/messages/he.json
+index 7ee96f9..f2e2860 100644
+--- a/packages/i18n/messages/he.json
++++ b/packages/i18n/messages/he.json
+@@ -1093,6 +1093,7 @@
+     "approvedAligned": "התוכנית אושרה — היא מזינה כעת את שלב האסטרטגיה.",
+     "toStrategy": "מעבר לאסטרטגיה",
+     "basedOnPlan": "מבוסס על תוכנית ההקצאה המאושרת מ-{date} — החלטות הפריסה אינן נכללות בהמלצות אלה.",
+-    "amountLabel": "סכום"
++    "amountLabel": "סכום",
++    "rebuildForTitles": "התוכנית הזו נבנתה לפני העדכון האחרון — שמות הפעולות למטה כלליים. לחצו “בנייה מחדש” למעלה לקבלת כותרות מלאות ומפורטות."
+   }
+ }

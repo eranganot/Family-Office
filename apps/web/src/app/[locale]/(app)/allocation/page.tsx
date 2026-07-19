@@ -8,7 +8,7 @@ import { Link } from "../../../../i18n/navigation";
 
 interface Candidate {
   id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
-  suggestedAmount: number; ratePct: number | null; title: string; titleHe: string; detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
+  suggestedAmount: number; ratePct: number | null; title?: string; titleHe?: string; detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
 }
 interface Variant {
   key: "GROWTH" | "DEBT_FREE" | "BALANCED";
@@ -54,7 +54,7 @@ export default async function AllocationPage({
     ? plan!.candidates.map((c) => ({
         id: c.id, kind: c.kind, editable: c.editable, minAmount: c.minAmount, maxAmount: c.maxAmount,
         suggestedAmount: c.suggestedAmount, ratePct: c.ratePct,
-        title: he ? c.titleHe : c.title,
+        title: (he ? c.titleHe : c.title) || (c.ratePct !== null ? `${t(`kinds.${c.kind}`)} · ${c.ratePct}%` : t(`kinds.${c.kind}`)),
         detail: he ? c.detailHe : c.detail, goalImpact: he ? c.goalImpactHe : c.goalImpact,
       }))
     : [];
@@ -132,6 +132,9 @@ export default async function AllocationPage({
           {proposed && base ? (
             <Card title={t("workingTitle")}>
               <p className="mb-3 text-xs text-neutral-500">{t("cartHint")}</p>
+              {plan.candidates.some((c) => !(he ? c.titleHe : c.title)) ? (
+                <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{t("rebuildForTitles")}</p>
+              ) : null}
               <AllocationCart planId={latest.id} freeCash={plan.freeCashBase} candidates={cartCandidates} base={base} initial={initial} labels={labels} locale={locale} />
             </Card>
           ) : null}
