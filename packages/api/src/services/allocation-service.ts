@@ -1,19 +1,20 @@
 import type { PrismaClient } from "@wealthos/db";
-import { computeDeploymentPlan, ENGINE_VERSION, type AnalyzerContext, type DeploymentPlan } from "@wealthos/engine-strategy";
+import { computeDeploymentPlans, ENGINE_VERSION, type AnalyzerContext, type DeploymentPlans } from "@wealthos/engine-strategy";
 import { assumptionRegistry, taxRegistry } from "@wealthos/registry";
 import { buildSnapshot } from "./snapshot-service";
 import { latestBoiRate } from "./boi-rate-service";
 
 /**
- * M25 — ALLOCATION phase service: builds a fresh snapshot, computes the free-cash
- * deployment waterfall, and persists it as the household's current PROPOSED plan
- * (previous proposed plans are superseded; approved history is kept).
- * A plan with nothing to deploy is auto-approved — there is nothing to decide.
+ * M26 — ALLOCATION service v2: builds a fresh snapshot, computes THREE deployment
+ * variants, persists as the current PROPOSED plan (older proposed superseded).
+ * A plan with nothing decidable (no steps in any variant) auto-approves.
+ * Approval now happens step-by-step via the router; the plan flips to APPROVED
+ * when every step of the CHOSEN variant is decided.
  */
 export interface AllocationRunResult {
   planId: string;
   snapshotId: string;
-  plan: DeploymentPlan;
+  plan: DeploymentPlans;
   status: "PROPOSED" | "APPROVED";
 }
 
@@ -34,8 +35,8 @@ export async function runAllocation(db: PrismaClient, householdId: string): Prom
     marketRates: { boiRatePct: boi?.value ?? null },
   };
 
-  const plan = computeDeploymentPlan(payload, ctx);
-  const nothingToDecide = plan.steps.length === 0 || plan.notes.includes("NO_FREE_CASH");
+  const plan = computeDeploymentPlans(payload, ctx);
+  const nothingToDecide = plan.variants.every((v) => v.steps.length === 0);
   const status = nothingToDecide ? "APPROVED" : "PROPOSED";
 
   const row = await db.$transaction(async (tx) => {

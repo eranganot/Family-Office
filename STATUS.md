@@ -2,6 +2,31 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-19)
+
+- **PRODUCT-STRATEGY.md rewritten as v2 — combined WealthOS × InvestWise Pro strategy** (docs
+  only, no code). Owner decisions locked: InvestWise Pro is the household-only self-directed
+  execution companion (advisor never touches products/orders — firewall codified in §0); the
+  advisor buys and bundles both; integration v1 is two-way (plan artifact down, consented
+  positions/fills feed up, `BROKER_SYNC` trust tier). Adds HUM-E north-star cut,
+  plan-execution-rate KPIs, three end-user journeys (J1 WealthOS-only / J2 bundle / J3
+  InvestWise-only), resequenced commercial roadmap (plan export = step 3). Written from the
+  sandbox to the mount + verified (294 lines); **needs a docs commit from Windows** (no git
+  write-ops on the mount).
+- **Follow-up (same day): §12 Operating model added to PRODUCT-STRATEGY.md** (B2B2C × B2C: two
+  SKUs of InvestWise, down-bundle / up-referral bridges, channel-conflict fences, one-funded-GTM
+  rule) **+ new docs/GAP-ANALYSIS.md** (W1–W11 WealthOS gaps to G1, IW1–IW9 InvestWise gaps to
+  bundle-ready, shared seam gaps S1–S5, sequencing). Both verified on mount (333 / 100 lines);
+  same pending docs commit. Open owner decisions logged: standalone InvestWise pricing; brand.
+- **Follow-up 2 (same day): evidence pass + mission/vision + market research.** New
+  docs/MARKET-RESEARCH.md (193 lines): sourced industry data (750 CFP-trained / 300+ FPAI-active;
+  457 advisors vs 10,310 agents; ₪6.9T public assets; 161K new trading accounts 2024),
+  claim-audit table C1–C14, TAM/SAM/SOM (both products + bundle), 3 SWOTs, trends, sources.
+  PRODUCT-STRATEGY.md corrected in place per audit (C6: Plan-T exists — differentiation
+  restated; C13: commissions grew, pressure is regulatory; C2 flagged owner-estimate; C7
+  Mislaka licensing nuance) + new §13 Mission & vision, §14 Evidence base (now 370 lines).
+  Same pending docs commit from Windows.
+
 ## Current state (2026-07-15, session 2)
 
 - **M24 (wizard v2 + MC clarity) code-complete — delivered stacked on the M23 patch.** Wizard grows
@@ -16,6 +41,28 @@
   card explained: pre-M23 saved run on a snapshot without goal funding; 2050 goals need horizon ≥ 25.
   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
+
+## Current state (2026-07-19)
+
+- **M26 (deployment plan v2 — variants, per-step decisions, employee-aware tax) code-complete —
+  delivered as m26.patch on 30e30bb.** Owner decisions: employees get a payroll-verification step
+  (never lump-sum deposits; SELF_EMPLOYED keep deposit steps; unknown employment ⇒ verify);
+  three variants with extended risk/meaning/potential narratives; gate requires EVERY step decided;
+  goal impact qualitative + invest-quantified (full projector simulation → backlog, with payslip
+  ingestion).
+  Engine: computeDeploymentPlans returns GROWTH (invest-all; mortgage untouched; narrative warns
+  when expensive tracks exist) / DEBT_FREE (all tracks rate-desc; interest-saved/yr computed;
+  inflation-hedge-reversal + RE-concentration risks named) / BALANCED (threshold waterfall);
+  bilingual pros/cons/risks with computed numbers; per-step ids + goalImpact/He (invest steps
+  quantified vs total PV goal gap; top-priority goal names embedded); validator scans everything;
+  7 rewritten deployment tests (engine-strategy 52). DB: AllocationPlan.chosenVariant +
+  stepDecisions (migration 20260719090000). Router: chooseVariant (resets decisions on switch),
+  decideStep (auto-APPROVES when the chosen variant's last step is decided) — approve mutation
+  replaced. UI: three comparison cards (summary stats + narratives, ring on chosen), per-step
+  אישור/דחייה with decision chips + progress counter, goal-impact line per step, legacy-plan
+  rebuild prompt. Verified: engine 52 tests, api/web tsc, prisma valid, i18n parity.
+  **Owner data task: map both employer pension+hishtalmut contribution flows (kinds
+  PENSION_CONTRIBUTION / HISHTALMUT_CONTRIBUTION) so utilization tracking reflects payroll.**
 
 ## Current state (2026-07-18)
 

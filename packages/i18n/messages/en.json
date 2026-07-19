@@ -992,10 +992,46 @@
       "TAX_CEILING_HISHTALMUT": "Hishtalmut ceiling",
       "TAX_CEILING_PENSION": "Pension ceiling",
       "INVEST_GROWTH": "Invest — growth",
-      "INVEST_DEFENSIVE": "Invest — defensive"
+      "INVEST_DEFENSIVE": "Invest — defensive",
+      "REPAY_DEBT": "Repay debt",
+      "TAX_VERIFY_PAYROLL": "Verify payroll"
     },
     "approveNote": "Note (optional)",
     "approve": "Approve the plan",
-    "approvedNext": "Plan approved — the gate to the strategy phase is open (verification page → advance)."
+    "approvedNext": "Plan approved — the gate to the strategy phase is open (verification page → advance).",
+    "introV2": "The engine computes THREE deployment philosophies for your free cash. Compare their numbers, advantages, and risks; choose one; then approve or decline each step individually. The gate to strategy opens when every step is decided.",
+    "legacyPlan": "This plan predates the variant engine — rebuild to get the three-path comparison.",
+    "variants": {
+      "GROWTH": {
+        "name": "Growth path",
+        "tagline": "Invest everything; the mortgage stays untouched."
+      },
+      "DEBT_FREE": {
+        "name": "Debt-reduction path",
+        "tagline": "Repay mortgage tracks first; certainty over expectation."
+      },
+      "BALANCED": {
+        "name": "Balanced path",
+        "tagline": "Math decides: expensive debt repaid, the rest invested."
+      }
+    },
+    "sumInvested": "Invested",
+    "sumDebtRepaid": "Debt repaid",
+    "sumInterestSaved": "Interest saved",
+    "sumCeilings": "Tax deposits",
+    "perYear": "yr",
+    "pros": "Advantages",
+    "cons": "Trade-offs",
+    "risks": "Risks",
+    "choose": "Choose this path",
+    "chosen": "✓ Chosen — decide the steps below",
+    "chooseFirst": "Choose a path above to start deciding its steps.",
+    "stepsTitle": "Steps",
+    "stepsHint": "Approve or decline each step. Declined steps stay in the audit trail. All steps decided = plan approved.",
+    "approveStep": "Approve",
+    "declineStep": "Decline",
+    "stepApproved": "Approved",
+    "stepDeclined": "Declined",
+    "progress": "{decided} of {total} steps decided"
   }
 }

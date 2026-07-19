@@ -96,3 +96,11 @@ value-to-owner ÷ effort. ✅ = shipped in M14 during this review.
 3. C2 Monte Carlo (credibility) + D2 alert emails (closes the monitoring loop)
 4. C1 Gemel-Net real track data (replaces heuristics)
 5. The rest by taste.
+
+## M26 backlog additions (owner, 2026-07-19)
+- **Full quantitative goal impact per deployment step (option B):** simulate each step through the
+  M8/M17 projector for goal-gap deltas incl. debt steps' payment-relief effect. V1 shipped the
+  qualitative + invested-amount quantification.
+- **Payslip ingestion:** owner suggested uploading one salary slip to auto-verify that payroll
+  captures pension/hishtalmut ceilings (feeds the TAX_VERIFY_PAYROLL step). Fits the M2 adapter
+  framework + trust ladder tier 3.
