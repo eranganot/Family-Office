@@ -28,24 +28,44 @@ export const allocationRouter = router({
     return ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
   }),
 
-  /** Before→after impact of the current working plan (M28). Uses the plan's pinned snapshot. */
-  impact: protectedProcedure.query(async ({ ctx }) => {
+  /** M29 — simulation: aggregate impact of the enabled plan PLUS a per-action contribution
+   *  (each computed at that candidate's working-or-suggested amount) over the pinned snapshot.
+   *  Re-running is just re-reading the working plan, so editing an amount + submitting recomputes. */
+  simulate: protectedProcedure.query(async ({ ctx }) => {
     const householdId = await requireHouseholdId(ctx.db);
     const row = await ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
     if (!row) return null;
     const plan = planOf(row);
     if (!Array.isArray(plan.candidates)) return null;
     const wp = (row.workingPlan ?? {}) as WorkingPlan;
-    const selections: PlanSelection[] = plan.candidates
-      .filter((c) => wp[c.id]?.enabled && c.kind !== "TAX_VERIFY_PAYROLL")
-      .map((c) => ({ kind: c.kind, amount: wp[c.id]!.amount, ratePct: c.ratePct }));
-    if (selections.length === 0) return null;
     const snap = await ctx.db.householdSnapshot.findUnique({ where: { id: row.snapshotId } });
     if (!snap) return null;
     const payload = SnapshotPayloadSchema.parse(snap.payload);
     const assumptions = Object.fromEntries((await assumptionRegistry(ctx.db).all(householdId)).map((a) => [a.key, a.value]));
+    const impactCtx = { assumptions, taxRules: {}, marketRates: { boiRatePct: null } };
     const targetGrowthPct = deriveTargetGrowthPct(assumptions);
-    return computePlanImpact(payload, { assumptions, taxRules: {}, marketRates: { boiRatePct: null } }, selections, plan.bufferTargetBase ?? 0, targetGrowthPct);
+    const buffer = plan.bufferTargetBase ?? 0;
+
+    const enabled: PlanSelection[] = plan.candidates
+      .filter((c) => wp[c.id]?.enabled && c.kind !== "TAX_VERIFY_PAYROLL")
+      .map((c) => ({ kind: c.kind, amount: wp[c.id]!.amount, ratePct: c.ratePct }));
+    const aggregate = enabled.length > 0 ? computePlanImpact(payload, impactCtx, enabled, buffer, targetGrowthPct) : null;
+
+    const perCandidate: Record<string, { amount: number; projectedExtraNetWorth: number; interestSavedYearBase: number; growthPctAfter: number | null; horizonYears: number }> = {};
+    for (const c of plan.candidates) {
+      if (c.kind === "TAX_VERIFY_PAYROLL") continue;
+      const amount = wp[c.id]?.amount ?? c.suggestedAmount;
+      if (!(amount > 0)) continue;
+      const im = computePlanImpact(payload, impactCtx, [{ kind: c.kind, amount, ratePct: c.ratePct }], buffer, targetGrowthPct);
+      perCandidate[c.id] = {
+        amount,
+        projectedExtraNetWorth: im.projectedExtraNetWorth,
+        interestSavedYearBase: im.annualInterestBefore - im.annualInterestAfter,
+        growthPctAfter: c.kind === "INVEST_GROWTH" || c.kind === "INVEST_DEFENSIVE" ? im.growthPctAfter : null,
+        horizonYears: im.horizonYears,
+      };
+    }
+    return { aggregate, perCandidate };
   }),
 
   generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => runAllocation(ctx.db, ctx.householdId)),

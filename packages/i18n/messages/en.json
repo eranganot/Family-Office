@@ -1069,6 +1069,11 @@
     "impFromInvest": "from investing",
     "impFromDebt": "from debt payoff",
     "impFromTax": "from tax deposits",
-    "impNote": "Net worth today is unchanged — you swap cash for investments or lower debt. The gain is future: avoided interest and expected returns, in today's purchasing power. Not a guarantee."
+    "impNote": "Net worth today is unchanged — you swap cash for investments or lower debt. The gain is future: avoided interest and expected returns, in today's purchasing power. Not a guarantee.",
+    "simulateBtn": "Simulate",
+    "perActionAt": "At {amount}",
+    "perActionIn": "in {years}y",
+    "perActionInterest": "interest saved {amt}/yr",
+    "perActionGrowth": "growth share → {pct}%"
   }
 }

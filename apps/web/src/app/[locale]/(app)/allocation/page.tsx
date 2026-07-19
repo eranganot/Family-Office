@@ -29,6 +29,7 @@ interface ImpactShape {
   projectedExtraNetWorth: number; extraFromInvesting: number; extraFromDebt: number; extraFromTax: number;
 }
 type WP = Record<string, { enabled: boolean; amount: number }>;
+type PerCand = Record<string, { amount: number; projectedExtraNetWorth: number; interestSavedYearBase: number; growthPctAfter: number | null; horizonYears: number }>;
 type T = (k: string, v?: Record<string, string | number>) => string;
 
 export default async function AllocationPage({
@@ -60,8 +61,9 @@ export default async function AllocationPage({
   const proposed = latest?.status === "PROPOSED";
   const allocatedTotal = isV3 ? Object.values(wp).reduce((s, e) => s + (e.enabled ? e.amount : 0), 0) : 0;
   const remaining = isV3 ? plan!.freeCashBase - allocatedTotal : 0;
-  const hasSelections = isV3 && Object.values(wp).some((e) => e.enabled && e.amount > 0);
-  const impact = hasSelections ? ((await trpc.allocation.impact()) as ImpactShape | null) : null;
+  const sim = isV3 && Object.keys(wp).length > 0 ? await trpc.allocation.simulate() : null;
+  const impact = (sim?.aggregate ?? null) as ImpactShape | null;
+  const perCand = (sim?.perCandidate ?? {}) as PerCand;
 
   return (
     <div className="flex flex-col gap-6">
@@ -148,16 +150,23 @@ export default async function AllocationPage({
                             </div>
                             <p className="text-sm text-neutral-700" dir="auto">{he ? c.detailHe : c.detail}</p>
                             <p className="mt-0.5 text-xs text-blue-700" dir="auto">◎ {he ? c.goalImpactHe : c.goalImpact}</p>
+                            {perCand[c.id] ? (
+                              <p className="mt-1 rounded bg-blue-50 px-2 py-1 text-xs text-blue-800" dir="auto">
+                                📈 {t("perActionAt", { amount: nis(perCand[c.id]!.amount) })}: <b>+{nis(perCand[c.id]!.projectedExtraNetWorth)}</b> {t("perActionIn", { years: perCand[c.id]!.horizonYears })}
+                                {perCand[c.id]!.interestSavedYearBase > 0 ? ` · ${t("perActionInterest", { amt: nis(perCand[c.id]!.interestSavedYearBase) })}` : ""}
+                                {perCand[c.id]!.growthPctAfter !== null ? ` · ${t("perActionGrowth", { pct: perCand[c.id]!.growthPctAfter as number })}` : ""}
+                              </p>
+                            ) : null}
                             {proposed ? (
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 {c.editable ? (
-                                  <form action={setCandidateAction} className="flex items-center gap-2">
+                                  <form action={setCandidateAction} className="flex flex-wrap items-center gap-2">
                                     <input type="hidden" name="locale" value={locale} />
                                     <input type="hidden" name="id" value={latest.id} />
                                     <input type="hidden" name="candidateId" value={c.id} />
-                                    <input type="hidden" name="enabled" value="1" />
                                     <TextInput name="amount" inputMode="numeric" defaultValue={String(on ? st.amount : c.suggestedAmount || Math.min(c.maxAmount, plan.freeCashBase))} />
-                                    <button type="submit" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
+                                    <button type="submit" name="enabled" value="0" className="rounded border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700">{t("simulateBtn")}</button>
+                                    <button type="submit" name="enabled" value="1" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
                                   </form>
                                 ) : (
                                   <form action={setCandidateAction}>

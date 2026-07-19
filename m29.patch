@@ -1,0 +1,166 @@
+diff --git a/STATUS.md b/STATUS.md
+index b5a7cda..f1b396b 100644
+--- a/STATUS.md
++++ b/STATUS.md
+@@ -17,6 +17,20 @@
+   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
+   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
+ 
++## Current state (2026-07-20, session 3)
++
++- **M29 (per-action impact + responsive simulation) code-complete — m29.patch on M28. No schema/migration.**
++  Owner: wanted impact per action item (not only total) and re-runnable on amount change.
++  Router `allocation.impact` → `allocation.simulate`: returns `{ aggregate, perCandidate }` — aggregate
++  is the enabled-plan impact (as M28); perCandidate maps every non-verify candidate → its OWN
++  contribution (projectedExtraNetWorth over horizon, interest saved/yr, resulting growth share)
++  computed via computePlanImpact([that one selection]) at the candidate's working-or-suggested amount,
++  over the pinned snapshot. UI: each action row now shows a 📈 per-action line ("בסכום X: +Y בעוד N שנים
++  · ריבית שנחסכת …/שנה · רכיב צמיחה → Z%"); editable rows get a "סמלץ" button (stores the typed amount
++  with enabled=0) so you preview any amount WITHOUT adding it to the plan, and "עדכן/הוסף" (enabled=1)
++  adds it — either way the server recomputes, so changing an amount + submitting re-runs the sim
++  (per-action + total). Verified: engine 59 tests, eslint clean, api/web tsc, prisma valid, i18n parity.
++
+ ## Current state (2026-07-20, session 2)
+ 
+ - **M28 (plan impact simulation + add-actions UX) code-complete — m28.patch stacks on M27. No schema
+diff --git a/apps/web/src/app/[locale]/(app)/allocation/page.tsx b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+index de54f46..5cfa6dd 100644
+--- a/apps/web/src/app/[locale]/(app)/allocation/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+@@ -29,6 +29,7 @@ interface ImpactShape {
+   projectedExtraNetWorth: number; extraFromInvesting: number; extraFromDebt: number; extraFromTax: number;
+ }
+ type WP = Record<string, { enabled: boolean; amount: number }>;
++type PerCand = Record<string, { amount: number; projectedExtraNetWorth: number; interestSavedYearBase: number; growthPctAfter: number | null; horizonYears: number }>;
+ type T = (k: string, v?: Record<string, string | number>) => string;
+ 
+ export default async function AllocationPage({
+@@ -60,8 +61,9 @@ export default async function AllocationPage({
+   const proposed = latest?.status === "PROPOSED";
+   const allocatedTotal = isV3 ? Object.values(wp).reduce((s, e) => s + (e.enabled ? e.amount : 0), 0) : 0;
+   const remaining = isV3 ? plan!.freeCashBase - allocatedTotal : 0;
+-  const hasSelections = isV3 && Object.values(wp).some((e) => e.enabled && e.amount > 0);
+-  const impact = hasSelections ? ((await trpc.allocation.impact()) as ImpactShape | null) : null;
++  const sim = isV3 && Object.keys(wp).length > 0 ? await trpc.allocation.simulate() : null;
++  const impact = (sim?.aggregate ?? null) as ImpactShape | null;
++  const perCand = (sim?.perCandidate ?? {}) as PerCand;
+ 
+   return (
+     <div className="flex flex-col gap-6">
+@@ -148,16 +150,23 @@ export default async function AllocationPage({
+                             </div>
+                             <p className="text-sm text-neutral-700" dir="auto">{he ? c.detailHe : c.detail}</p>
+                             <p className="mt-0.5 text-xs text-blue-700" dir="auto">◎ {he ? c.goalImpactHe : c.goalImpact}</p>
++                            {perCand[c.id] ? (
++                              <p className="mt-1 rounded bg-blue-50 px-2 py-1 text-xs text-blue-800" dir="auto">
++                                📈 {t("perActionAt", { amount: nis(perCand[c.id]!.amount) })}: <b>+{nis(perCand[c.id]!.projectedExtraNetWorth)}</b> {t("perActionIn", { years: perCand[c.id]!.horizonYears })}
++                                {perCand[c.id]!.interestSavedYearBase > 0 ? ` · ${t("perActionInterest", { amt: nis(perCand[c.id]!.interestSavedYearBase) })}` : ""}
++                                {perCand[c.id]!.growthPctAfter !== null ? ` · ${t("perActionGrowth", { pct: perCand[c.id]!.growthPctAfter as number })}` : ""}
++                              </p>
++                            ) : null}
+                             {proposed ? (
+                               <div className="mt-2 flex flex-wrap items-center gap-2">
+                                 {c.editable ? (
+-                                  <form action={setCandidateAction} className="flex items-center gap-2">
++                                  <form action={setCandidateAction} className="flex flex-wrap items-center gap-2">
+                                     <input type="hidden" name="locale" value={locale} />
+                                     <input type="hidden" name="id" value={latest.id} />
+                                     <input type="hidden" name="candidateId" value={c.id} />
+-                                    <input type="hidden" name="enabled" value="1" />
+                                     <TextInput name="amount" inputMode="numeric" defaultValue={String(on ? st.amount : c.suggestedAmount || Math.min(c.maxAmount, plan.freeCashBase))} />
+-                                    <button type="submit" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
++                                    <button type="submit" name="enabled" value="0" className="rounded border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700">{t("simulateBtn")}</button>
++                                    <button type="submit" name="enabled" value="1" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
+                                   </form>
+                                 ) : (
+                                   <form action={setCandidateAction}>
+diff --git a/packages/api/src/routers/allocation.ts b/packages/api/src/routers/allocation.ts
+index 660d6b5..d448d7c 100644
+--- a/packages/api/src/routers/allocation.ts
++++ b/packages/api/src/routers/allocation.ts
+@@ -28,24 +28,44 @@ export const allocationRouter = router({
+     return ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
+   }),
+ 
+-  /** Before→after impact of the current working plan (M28). Uses the plan's pinned snapshot. */
+-  impact: protectedProcedure.query(async ({ ctx }) => {
++  /** M29 — simulation: aggregate impact of the enabled plan PLUS a per-action contribution
++   *  (each computed at that candidate's working-or-suggested amount) over the pinned snapshot.
++   *  Re-running is just re-reading the working plan, so editing an amount + submitting recomputes. */
++  simulate: protectedProcedure.query(async ({ ctx }) => {
+     const householdId = await requireHouseholdId(ctx.db);
+     const row = await ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
+     if (!row) return null;
+     const plan = planOf(row);
+     if (!Array.isArray(plan.candidates)) return null;
+     const wp = (row.workingPlan ?? {}) as WorkingPlan;
+-    const selections: PlanSelection[] = plan.candidates
+-      .filter((c) => wp[c.id]?.enabled && c.kind !== "TAX_VERIFY_PAYROLL")
+-      .map((c) => ({ kind: c.kind, amount: wp[c.id]!.amount, ratePct: c.ratePct }));
+-    if (selections.length === 0) return null;
+     const snap = await ctx.db.householdSnapshot.findUnique({ where: { id: row.snapshotId } });
+     if (!snap) return null;
+     const payload = SnapshotPayloadSchema.parse(snap.payload);
+     const assumptions = Object.fromEntries((await assumptionRegistry(ctx.db).all(householdId)).map((a) => [a.key, a.value]));
++    const impactCtx = { assumptions, taxRules: {}, marketRates: { boiRatePct: null } };
+     const targetGrowthPct = deriveTargetGrowthPct(assumptions);
+-    return computePlanImpact(payload, { assumptions, taxRules: {}, marketRates: { boiRatePct: null } }, selections, plan.bufferTargetBase ?? 0, targetGrowthPct);
++    const buffer = plan.bufferTargetBase ?? 0;
++
++    const enabled: PlanSelection[] = plan.candidates
++      .filter((c) => wp[c.id]?.enabled && c.kind !== "TAX_VERIFY_PAYROLL")
++      .map((c) => ({ kind: c.kind, amount: wp[c.id]!.amount, ratePct: c.ratePct }));
++    const aggregate = enabled.length > 0 ? computePlanImpact(payload, impactCtx, enabled, buffer, targetGrowthPct) : null;
++
++    const perCandidate: Record<string, { amount: number; projectedExtraNetWorth: number; interestSavedYearBase: number; growthPctAfter: number | null; horizonYears: number }> = {};
++    for (const c of plan.candidates) {
++      if (c.kind === "TAX_VERIFY_PAYROLL") continue;
++      const amount = wp[c.id]?.amount ?? c.suggestedAmount;
++      if (!(amount > 0)) continue;
++      const im = computePlanImpact(payload, impactCtx, [{ kind: c.kind, amount, ratePct: c.ratePct }], buffer, targetGrowthPct);
++      perCandidate[c.id] = {
++        amount,
++        projectedExtraNetWorth: im.projectedExtraNetWorth,
++        interestSavedYearBase: im.annualInterestBefore - im.annualInterestAfter,
++        growthPctAfter: c.kind === "INVEST_GROWTH" || c.kind === "INVEST_DEFENSIVE" ? im.growthPctAfter : null,
++        horizonYears: im.horizonYears,
++      };
++    }
++    return { aggregate, perCandidate };
+   }),
+ 
+   generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => runAllocation(ctx.db, ctx.householdId)),
+diff --git a/packages/i18n/messages/en.json b/packages/i18n/messages/en.json
+index 5b4b050..95356d4 100644
+--- a/packages/i18n/messages/en.json
++++ b/packages/i18n/messages/en.json
+@@ -1069,6 +1069,11 @@
+     "impFromInvest": "from investing",
+     "impFromDebt": "from debt payoff",
+     "impFromTax": "from tax deposits",
+-    "impNote": "Net worth today is unchanged — you swap cash for investments or lower debt. The gain is future: avoided interest and expected returns, in today's purchasing power. Not a guarantee."
++    "impNote": "Net worth today is unchanged — you swap cash for investments or lower debt. The gain is future: avoided interest and expected returns, in today's purchasing power. Not a guarantee.",
++    "simulateBtn": "Simulate",
++    "perActionAt": "At {amount}",
++    "perActionIn": "in {years}y",
++    "perActionInterest": "interest saved {amt}/yr",
++    "perActionGrowth": "growth share → {pct}%"
+   }
+ }
+diff --git a/packages/i18n/messages/he.json b/packages/i18n/messages/he.json
+index e1ff958..4145aa8 100644
+--- a/packages/i18n/messages/he.json
++++ b/packages/i18n/messages/he.json
+@@ -1069,6 +1069,11 @@
+     "impFromInvest": "מהשקעה",
+     "impFromDebt": "מפירעון חוב",
+     "impFromTax": "מהפקדות מס",
+-    "impNote": "השווי הנקי היום אינו משתנה — אתם ממירים מזומן להשקעה או מקטינים חוב. הרווח הוא עתידי: ריבית שנחסכת ותשואות צפויות, בכוח הקנייה של היום. לא הבטחה."
++    "impNote": "השווי הנקי היום אינו משתנה — אתם ממירים מזומן להשקעה או מקטינים חוב. הרווח הוא עתידי: ריבית שנחסכת ותשואות צפויות, בכוח הקנייה של היום. לא הבטחה.",
++    "simulateBtn": "סמלץ",
++    "perActionAt": "בסכום {amount}",
++    "perActionIn": "בעוד {years} שנים",
++    "perActionInterest": "ריבית שנחסכת {amt}/שנה",
++    "perActionGrowth": "רכיב צמיחה → {pct}%"
+   }
+ }

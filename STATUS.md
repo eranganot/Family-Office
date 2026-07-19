@@ -42,6 +42,20 @@
   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
 
+## Current state (2026-07-20, session 3)
+
+- **M29 (per-action impact + responsive simulation) code-complete — m29.patch on M28. No schema/migration.**
+  Owner: wanted impact per action item (not only total) and re-runnable on amount change.
+  Router `allocation.impact` → `allocation.simulate`: returns `{ aggregate, perCandidate }` — aggregate
+  is the enabled-plan impact (as M28); perCandidate maps every non-verify candidate → its OWN
+  contribution (projectedExtraNetWorth over horizon, interest saved/yr, resulting growth share)
+  computed via computePlanImpact([that one selection]) at the candidate's working-or-suggested amount,
+  over the pinned snapshot. UI: each action row now shows a 📈 per-action line ("בסכום X: +Y בעוד N שנים
+  · ריבית שנחסכת …/שנה · רכיב צמיחה → Z%"); editable rows get a "סמלץ" button (stores the typed amount
+  with enabled=0) so you preview any amount WITHOUT adding it to the plan, and "עדכן/הוסף" (enabled=1)
+  adds it — either way the server recomputes, so changing an amount + submitting re-runs the sim
+  (per-action + total). Verified: engine 59 tests, eslint clean, api/web tsc, prisma valid, i18n parity.
+
 ## Current state (2026-07-20, session 2)
 
 - **M28 (plan impact simulation + add-actions UX) code-complete — m28.patch stacks on M27. No schema
