@@ -34,6 +34,9 @@ export type DeploymentVariantKey = "GROWTH" | "DEBT_FREE" | "BALANCED";
 export interface DeploymentCandidate {
   id: string;
   kind: DeploymentStepKind;
+  /** Short, human, one-line title for the card header (long "detail" is the explanation). */
+  title: string;
+  titleHe: string;
   editable: boolean;
   minAmount: number;
   maxAmount: number;
@@ -104,6 +107,11 @@ const round = (n: number) => Math.round(n);
 const nis = (n: number) => `₪${round(n).toLocaleString("en-US")}`;
 const annualizeDeposit = (amount: number, frequency: string) => (frequency === "MONTHLY" ? amount * 12 : amount);
 
+const TRACK_HE: Record<string, string> = {
+  PRIME: "פריים", FIXED_LINKED: "קבועה צמודה", FIXED_UNLINKED: "קבועה לא צמודה",
+  VARIABLE_LINKED: "משתנה צמודה", VARIABLE_UNLINKED: "משתנה לא צמודה", FOREIGN_CURRENCY: "מט\"ח",
+};
+
 export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerContext): DeploymentPlans {
   const notes: DeploymentNote[] = [];
 
@@ -130,7 +138,8 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
   if (cashBase < bufferTarget) {
     const shortfall = round(bufferTarget - cashBase);
     const c: DeploymentCandidate = {
-      id: "buffer", kind: "BUFFER_TOP_UP", editable: false, minAmount: shortfall, maxAmount: shortfall, suggestedAmount: shortfall, ratePct: null,
+      id: "buffer", kind: "BUFFER_TOP_UP", title: "Top up the emergency buffer", titleHe: "השלמת כרית החירום",
+      editable: false, minAmount: shortfall, maxAmount: shortfall, suggestedAmount: shortfall, ratePct: null,
       detail: `Cash covers less than the ${targetMonths}-month buffer — direct new savings to close the ${nis(shortfall)} shortfall before deploying anything.`,
       detailHe: `המזומן מכסה פחות מכרית של ${targetMonths} חודשים — נתבו חיסכון חדש לסגירת פער של ${nis(shortfall)} לפני כל פריסה אחרת.`,
       goalImpact: "Protects every goal: the buffer keeps a shock from forcing goal-asset sales.",
@@ -157,11 +166,11 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
   const candidates: DeploymentCandidate[] = [];
 
   // debt: one candidate per mortgage track, highest rate first
-  const tracks: Array<{ itemId: string; name: string; ratePct: number; principal: number; idx: number }> = [];
+  const tracks: Array<{ itemId: string; itemName: string; trackType: string; name: string; ratePct: number; principal: number; idx: number }> = [];
   for (const it of snapshot.items) {
     if (it.kind === "MORTGAGE" && it.mortgageTracks) {
       it.mortgageTracks.forEach((t, idx) => {
-        if (t.principalRemaining > 0) tracks.push({ itemId: it.id, name: `${it.name} · ${t.trackType}`, ratePct: t.annualRatePct, principal: t.principalRemaining, idx });
+        if (t.principalRemaining > 0) tracks.push({ itemId: it.id, itemName: it.name, trackType: t.trackType, name: `${it.name} · ${t.trackType}`, ratePct: t.annualRatePct, principal: t.principalRemaining, idx });
       });
     }
   }
@@ -171,6 +180,8 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
     const suggested = round(Math.min(freeCash, t.principal));
     candidates.push({
       id: `debt:${t.itemId}:${t.idx}`, kind: expensive ? "REPAY_EXPENSIVE_DEBT" : "REPAY_DEBT",
+      title: `Repay mortgage · ${t.itemName} · ${t.trackType} · ${t.ratePct}%`,
+      titleHe: `פירעון משכנתא · ${t.itemName} · ${TRACK_HE[t.trackType] ?? t.trackType} · ${t.ratePct}%`,
       editable: true, minAmount: 0, maxAmount: round(t.principal), suggestedAmount: suggested, ratePct: t.ratePct,
       detail: `Repay part or all of "${t.name}" (${t.ratePct}%, ${nis(t.principal)} outstanding) — a guaranteed ${t.ratePct}% return${expensive ? ", above the expected investment return" : ` vs ~${expectedReturn}% (real) expected from investing`}. Get the early-repayment fee quote first.`,
       detailHe: `פרעו חלק או הכול מ"${t.name}" (${t.ratePct}%, יתרה ${nis(t.principal)}) — תשואה מובטחת של ${t.ratePct}%${expensive ? ", מעל התשואה הצפויה מהשקעה" : ` לעומת ~${expectedReturn}% ריאלי צפוי מהשקעה`}. בקשו קודם דוח עמלת פירעון מוקדם.`,
@@ -198,21 +209,27 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
       if (adult.employmentStatus === "SELF_EMPLOYED") {
         const hu = hishCeiling - depositsFor(adult.id, "HISHTALMUT_CONTRIBUTION");
         if (hishCeiling > 0 && hu > 0) candidates.push({
-          id: `hish:${adult.id}`, kind: "TAX_CEILING_HISHTALMUT", editable: true, minAmount: 0, maxAmount: round(hu), suggestedAmount: round(hu), ratePct: null,
+          id: `hish:${adult.id}`, kind: "TAX_CEILING_HISHTALMUT",
+          title: `Deposit · keren hishtalmut · ${adult.name}`, titleHe: `הפקדה · קרן השתלמות · ${adult.name}`,
+          editable: true, minAmount: 0, maxAmount: round(hu), suggestedAmount: round(hu), ratePct: null,
           detail: `Deposit up to ${nis(hu)} to ${adult.name}'s keren hishtalmut — inside this year's exempt ceiling, growth is capital-gains free.`,
           detailHe: `הפקידו עד ${nis(hu)} לקרן ההשתלמות של ${adult.name} — בתוך התקרה הפטורה השנה, הצבירה פטורה ממס רווחי הון.`,
           goalImpact: "Tax-free compounding accelerates every long-term goal.", goalImpactHe: "צבירה פטורה ממס מאיצה כל יעד ארוך-טווח.", evidenceItemIds: [],
         });
         const pu = pensCeiling - depositsFor(adult.id, "PENSION_CONTRIBUTION");
         if (pensCeiling > 0 && pu > 0) candidates.push({
-          id: `pens:${adult.id}`, kind: "TAX_CEILING_PENSION", editable: true, minAmount: 0, maxAmount: round(pu), suggestedAmount: round(pu), ratePct: null,
+          id: `pens:${adult.id}`, kind: "TAX_CEILING_PENSION",
+          title: `Deposit · pension · ${adult.name}`, titleHe: `הפקדה · פנסיה · ${adult.name}`,
+          editable: true, minAmount: 0, maxAmount: round(pu), suggestedAmount: round(pu), ratePct: null,
           detail: `Deposit up to ${nis(pu)} to ${adult.name}'s pension within the benefit ceiling — immediate deduction/credit value.`,
           detailHe: `הפקידו עד ${nis(pu)} לפנסיה של ${adult.name} בתוך תקרת ההטבה — שווי ניכוי/זיכוי מיידי.`,
           goalImpact: "Strengthens the retirement goal, with an immediate tax benefit.", goalImpactHe: "מחזק את יעד הפרישה, עם הטבת מס מיידית.", evidenceItemIds: [],
         });
       } else {
         candidates.push({
-          id: `verify:${adult.id}`, kind: "TAX_VERIFY_PAYROLL", editable: false, minAmount: 0, maxAmount: 0, suggestedAmount: 0, ratePct: null,
+          id: `verify:${adult.id}`, kind: "TAX_VERIFY_PAYROLL",
+          title: `Verify payroll · ${adult.name}`, titleHe: `בדיקת תלוש · ${adult.name}`,
+          editable: false, minAmount: 0, maxAmount: 0, suggestedAmount: 0, ratePct: null,
           detail: `${adult.name}: contributions run through the employer — confirm from form 106 (or one payslip) that pension + hishtalmut deductions capture the ceilings (a section-46 supplemental deposit may apply if not).`,
           detailHe: `${adult.name}: ההפקדות רצות דרך המעסיק — אשרו מטופס 106 (או מתלוש אחד) שניכויי הפנסיה וההשתלמות ממצים את התקרות (אם לא — ייתכן שרלוונטית הפקדה משלימה לפי סעיף 46).`,
           goalImpact: "Confirms the tax benefits behind the retirement goal are fully captured.", goalImpactHe: "מוודא שהטבות המס שמאחורי יעד הפרישה ממוצות במלואן.", evidenceItemIds: [],
@@ -239,13 +256,17 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
     goalImpactHe: goalsLabel ? `מקדם את ${goalsLabel}: סוגר כ-${nis(amt)} מפער המימון הכולל של היעדים כיום.` : `סוגר כ-${nis(amt)} מפער המימון הכולל של היעדים כיום.`,
   });
   candidates.push({
-    id: "invest:growth", kind: "INVEST_GROWTH", editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
+    id: "invest:growth", kind: "INVEST_GROWTH",
+    title: `Invest · growth channels (target ${targetGrowthPct}%)`, titleHe: `השקעה · אפיקי צמיחה (יעד ${targetGrowthPct}%)`,
+    editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
     detail: `Invest in growth channels (equity-type tracks in existing wrappers or a taxable investment account) — moves the mix toward your ${targetGrowthPct}% target.${mixUnknown ? " Record your accounts' growth share first for a responsible split." : ""}`,
     detailHe: `השקיעו באפיקי צמיחה (מסלולים מוטי-צמיחה בעטיפות הקיימות או חשבון השקעות חייב) — מקרב את התמהיל ליעד ${targetGrowthPct}%.${mixUnknown ? " הזינו קודם רכיב צמיחה לחשבונות לפיצול אחראי." : ""}`,
     ...investGI(freeCash), evidenceItemIds: [],
   });
   candidates.push({
-    id: "invest:defensive", kind: "INVEST_DEFENSIVE", editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
+    id: "invest:defensive", kind: "INVEST_DEFENSIVE",
+    title: "Invest · defensive channels", titleHe: "השקעה · אפיקים סולידיים",
+    editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
     detail: `Place in defensive channels (bond-oriented tracks / deposits) to keep the mix at target.`,
     detailHe: `הניחו באפיקים סולידיים (מסלולים מוטי-אג"ח / פיקדונות) לשמירת התמהיל ביעד.`,
     ...investGI(freeCash), evidenceItemIds: [],

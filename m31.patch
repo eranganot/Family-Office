@@ -1,0 +1,255 @@
+diff --git a/STATUS.md b/STATUS.md
+index 8e28e85..7a73b76 100644
+--- a/STATUS.md
++++ b/STATUS.md
+@@ -17,6 +17,17 @@
+   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
+   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
+ 
++## Current state (2026-07-20, session 5)
++
++- **M31 (readable cart labels) code-complete — m31.patch on M30. No migration.** Fix: cart rows showed
++  the long detail sentence truncated ("…FIXED_UNLIN…") — unreadable. DeploymentCandidate now carries a
++  short bilingual `title`/`titleHe` (Hebrew track-type names via TRACK_HE: FIXED_UNLINKED→"קבועה לא
++  צמודה" etc.) per kind — "פירעון משכנתא · <נכס> · <מסלול> · <ריבית>%", "השקעה · אפיקי צמיחה (יעד N%)",
++  "הפקדה · קרן השתלמות · <בן/בת בית>", "בדיקת תלוש · <שם>", "השלמת כרית החירום". Cart + catalog render
++  the full title (no slice, wraps), catalog shows the long detail as secondary text, cart shows a
++  labeled ₪ amount field. engine 61 tests (candidates gain title; no test breakage), eslint clean,
++  api/web tsc, i18n parity (+amountLabel).
++
+ ## Current state (2026-07-20, session 4)
+ 
+ - **M30 (allocation page redesign C + strategy alignment) code-complete — m30.patch. No migration.**
+diff --git a/apps/web/src/app/[locale]/(app)/allocation/page.tsx b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+index a6cf5b3..aae2cc3 100644
+--- a/apps/web/src/app/[locale]/(app)/allocation/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+@@ -8,7 +8,7 @@ import { Link } from "../../../../i18n/navigation";
+ 
+ interface Candidate {
+   id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
+-  suggestedAmount: number; ratePct: number | null; detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
++  suggestedAmount: number; ratePct: number | null; title: string; titleHe: string; detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
+ }
+ interface Variant {
+   key: "GROWTH" | "DEBT_FREE" | "BALANCED";
+@@ -54,6 +54,7 @@ export default async function AllocationPage({
+     ? plan!.candidates.map((c) => ({
+         id: c.id, kind: c.kind, editable: c.editable, minAmount: c.minAmount, maxAmount: c.maxAmount,
+         suggestedAmount: c.suggestedAmount, ratePct: c.ratePct,
++        title: he ? c.titleHe : c.title,
+         detail: he ? c.detailHe : c.detail, goalImpact: he ? c.goalImpactHe : c.goalImpact,
+       }))
+     : [];
+@@ -67,7 +68,7 @@ export default async function AllocationPage({
+     catalog: t("catalog"), myPlan: t("myPlan"), add: t("addToPlan"), remove: t("remove"), empty: t("cartEmpty"),
+     allocated: t("allocated"), remaining: t("remaining"), over: t("overAllocated"), projected: t("projectedTotal"), inYears: t("inHorizon"),
+     interestSaved: t("interestSavedShort"), liquidity: t("impLiquidity"), growthShare: t("growthVsTarget"), debtLeft: t("debtLeft"),
+-    approve: t("approveAndContinue"), approveHint: t("approveHint2"), note: t("approveNote"), verifyDone: t("verifyReminder"), perYear: t("perYearShort"),
++    approve: t("approveAndContinue"), approveHint: t("approveHint2"), note: t("approveNote"), verifyDone: t("verifyReminder"), perYear: t("perYearShort"), amountLabel: t("amountLabel"),
+   };
+ 
+   return (
+diff --git a/apps/web/src/components/allocation-cart.tsx b/apps/web/src/components/allocation-cart.tsx
+index be8904d..1be0800 100644
+--- a/apps/web/src/components/allocation-cart.tsx
++++ b/apps/web/src/components/allocation-cart.tsx
+@@ -5,7 +5,7 @@ import { commitCartAction } from "../lib/actions/allocation-actions";
+ 
+ export interface CartCandidate {
+   id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
+-  suggestedAmount: number; ratePct: number | null; detail: string; goalImpact: string;
++  suggestedAmount: number; ratePct: number | null; title: string; detail: string; goalImpact: string;
+ }
+ export interface ImpactBase {
+   horizonYears: number; expectedReturnPct: number; inflationPct: number; targetGrowthPct: number;
+@@ -16,7 +16,7 @@ export interface CartLabels {
+   catalog: string; myPlan: string; add: string; remove: string; empty: string;
+   allocated: string; remaining: string; over: string; projected: string; inYears: string;
+   interestSaved: string; liquidity: string; growthShare: string; debtLeft: string;
+-  approve: string; approveHint: string; note: string; verifyDone: string; perYear: string;
++  approve: string; approveHint: string; note: string; verifyDone: string; perYear: string; amountLabel: string;
+ }
+ const KIND_REPAY = new Set(["REPAY_EXPENSIVE_DEBT", "REPAY_DEBT"]);
+ const KIND_INVEST = new Set(["INVEST_GROWTH", "INVEST_DEFENSIVE"]);
+@@ -73,12 +73,10 @@ export function AllocationCart({
+           const pi = perItem(c.id, c.suggestedAmount || Math.min(c.maxAmount, Math.max(0, remaining)));
+           return (
+             <div key={c.id} style={box}>
+-              <div className="mb-1 flex items-center gap-2 text-xs">
+-                <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{c.kind.startsWith("REPAY") ? c.ratePct + "%" : ""}</span>
+-              </div>
+-              <p className="text-sm text-neutral-700" dir="auto">{c.detail}</p>
+-              <p className="mt-1 text-xs text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}</p>
+-              <button type="button" onClick={() => add(c.id)} className="mt-2 w-full rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700">+ {labels.add}</button>
++              <p className="text-sm font-semibold text-neutral-800" dir="auto">{c.title}</p>
++              <p className="mt-1 text-xs leading-relaxed text-neutral-500" dir="auto">{c.detail}</p>
++              <p className="mt-1.5 text-xs font-medium text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}</p>
++              <button type="button" onClick={() => add(c.id)} className="mt-2 w-full rounded-lg border border-blue-300 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50">+ {labels.add}</button>
+             </div>
+           );
+         })}
+@@ -91,15 +89,21 @@ export function AllocationCart({
+           const amt = sel[c.id] ?? 0; const pi = perItem(c.id, amt);
+           return (
+             <div key={c.id} style={box}>
+-              <div className="flex items-center justify-between">
+-                <span className="text-sm font-medium">{c.detail.slice(0, 42)}{c.detail.length > 42 ? "…" : ""}</span>
+-                <button type="button" onClick={() => remove(c.id)} aria-label={labels.remove} className="text-neutral-400">✕</button>
++              <div className="flex items-start justify-between gap-2">
++                <span className="text-sm font-semibold text-neutral-800" dir="auto">{c.title}</span>
++                <button type="button" onClick={() => remove(c.id)} aria-label={labels.remove} className="shrink-0 text-neutral-400 hover:text-red-500">✕</button>
+               </div>
+               {c.editable ? (
+-                <input value={String(amt)} onChange={(e) => setAmt(c.id, e.target.value)} inputMode="numeric"
+-                  className="mt-1 h-8 w-full rounded border border-neutral-300 px-2 text-sm" />
++                <label className="mt-2 block">
++                  <span className="text-xs text-neutral-500">{labels.amountLabel}</span>
++                  <span className="mt-0.5 flex items-center rounded border border-neutral-300 focus-within:border-blue-500">
++                    <span className="px-2 text-sm text-neutral-400">₪</span>
++                    <input value={String(amt)} onChange={(e) => setAmt(c.id, e.target.value)} inputMode="numeric"
++                      className="h-9 w-full rounded-l bg-transparent px-1 text-sm outline-none" />
++                  </span>
++                </label>
+               ) : null}
+-              <p className="mt-1 text-xs text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}{pi.interest > 0 ? ` · ${labels.interestSaved} ${nis(pi.interest)}/${labels.perYear}` : ""}</p>
++              <p className="mt-1.5 text-xs font-medium text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}{pi.interest > 0 ? ` · ${labels.interestSaved} ${nis(pi.interest)}/${labels.perYear}` : ""}</p>
+             </div>
+           );
+         })}
+diff --git a/packages/engine-strategy/src/deployment.ts b/packages/engine-strategy/src/deployment.ts
+index 993232a..e7c1959 100644
+--- a/packages/engine-strategy/src/deployment.ts
++++ b/packages/engine-strategy/src/deployment.ts
+@@ -34,6 +34,9 @@ export type DeploymentVariantKey = "GROWTH" | "DEBT_FREE" | "BALANCED";
+ export interface DeploymentCandidate {
+   id: string;
+   kind: DeploymentStepKind;
++  /** Short, human, one-line title for the card header (long "detail" is the explanation). */
++  title: string;
++  titleHe: string;
+   editable: boolean;
+   minAmount: number;
+   maxAmount: number;
+@@ -104,6 +107,11 @@ const round = (n: number) => Math.round(n);
+ const nis = (n: number) => `₪${round(n).toLocaleString("en-US")}`;
+ const annualizeDeposit = (amount: number, frequency: string) => (frequency === "MONTHLY" ? amount * 12 : amount);
+ 
++const TRACK_HE: Record<string, string> = {
++  PRIME: "פריים", FIXED_LINKED: "קבועה צמודה", FIXED_UNLINKED: "קבועה לא צמודה",
++  VARIABLE_LINKED: "משתנה צמודה", VARIABLE_UNLINKED: "משתנה לא צמודה", FOREIGN_CURRENCY: "מט\"ח",
++};
++
+ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerContext): DeploymentPlans {
+   const notes: DeploymentNote[] = [];
+ 
+@@ -130,7 +138,8 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
+   if (cashBase < bufferTarget) {
+     const shortfall = round(bufferTarget - cashBase);
+     const c: DeploymentCandidate = {
+-      id: "buffer", kind: "BUFFER_TOP_UP", editable: false, minAmount: shortfall, maxAmount: shortfall, suggestedAmount: shortfall, ratePct: null,
++      id: "buffer", kind: "BUFFER_TOP_UP", title: "Top up the emergency buffer", titleHe: "השלמת כרית החירום",
++      editable: false, minAmount: shortfall, maxAmount: shortfall, suggestedAmount: shortfall, ratePct: null,
+       detail: `Cash covers less than the ${targetMonths}-month buffer — direct new savings to close the ${nis(shortfall)} shortfall before deploying anything.`,
+       detailHe: `המזומן מכסה פחות מכרית של ${targetMonths} חודשים — נתבו חיסכון חדש לסגירת פער של ${nis(shortfall)} לפני כל פריסה אחרת.`,
+       goalImpact: "Protects every goal: the buffer keeps a shock from forcing goal-asset sales.",
+@@ -157,11 +166,11 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
+   const candidates: DeploymentCandidate[] = [];
+ 
+   // debt: one candidate per mortgage track, highest rate first
+-  const tracks: Array<{ itemId: string; name: string; ratePct: number; principal: number; idx: number }> = [];
++  const tracks: Array<{ itemId: string; itemName: string; trackType: string; name: string; ratePct: number; principal: number; idx: number }> = [];
+   for (const it of snapshot.items) {
+     if (it.kind === "MORTGAGE" && it.mortgageTracks) {
+       it.mortgageTracks.forEach((t, idx) => {
+-        if (t.principalRemaining > 0) tracks.push({ itemId: it.id, name: `${it.name} · ${t.trackType}`, ratePct: t.annualRatePct, principal: t.principalRemaining, idx });
++        if (t.principalRemaining > 0) tracks.push({ itemId: it.id, itemName: it.name, trackType: t.trackType, name: `${it.name} · ${t.trackType}`, ratePct: t.annualRatePct, principal: t.principalRemaining, idx });
+       });
+     }
+   }
+@@ -171,6 +180,8 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
+     const suggested = round(Math.min(freeCash, t.principal));
+     candidates.push({
+       id: `debt:${t.itemId}:${t.idx}`, kind: expensive ? "REPAY_EXPENSIVE_DEBT" : "REPAY_DEBT",
++      title: `Repay mortgage · ${t.itemName} · ${t.trackType} · ${t.ratePct}%`,
++      titleHe: `פירעון משכנתא · ${t.itemName} · ${TRACK_HE[t.trackType] ?? t.trackType} · ${t.ratePct}%`,
+       editable: true, minAmount: 0, maxAmount: round(t.principal), suggestedAmount: suggested, ratePct: t.ratePct,
+       detail: `Repay part or all of "${t.name}" (${t.ratePct}%, ${nis(t.principal)} outstanding) — a guaranteed ${t.ratePct}% return${expensive ? ", above the expected investment return" : ` vs ~${expectedReturn}% (real) expected from investing`}. Get the early-repayment fee quote first.`,
+       detailHe: `פרעו חלק או הכול מ"${t.name}" (${t.ratePct}%, יתרה ${nis(t.principal)}) — תשואה מובטחת של ${t.ratePct}%${expensive ? ", מעל התשואה הצפויה מהשקעה" : ` לעומת ~${expectedReturn}% ריאלי צפוי מהשקעה`}. בקשו קודם דוח עמלת פירעון מוקדם.`,
+@@ -198,21 +209,27 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
+       if (adult.employmentStatus === "SELF_EMPLOYED") {
+         const hu = hishCeiling - depositsFor(adult.id, "HISHTALMUT_CONTRIBUTION");
+         if (hishCeiling > 0 && hu > 0) candidates.push({
+-          id: `hish:${adult.id}`, kind: "TAX_CEILING_HISHTALMUT", editable: true, minAmount: 0, maxAmount: round(hu), suggestedAmount: round(hu), ratePct: null,
++          id: `hish:${adult.id}`, kind: "TAX_CEILING_HISHTALMUT",
++          title: `Deposit · keren hishtalmut · ${adult.name}`, titleHe: `הפקדה · קרן השתלמות · ${adult.name}`,
++          editable: true, minAmount: 0, maxAmount: round(hu), suggestedAmount: round(hu), ratePct: null,
+           detail: `Deposit up to ${nis(hu)} to ${adult.name}'s keren hishtalmut — inside this year's exempt ceiling, growth is capital-gains free.`,
+           detailHe: `הפקידו עד ${nis(hu)} לקרן ההשתלמות של ${adult.name} — בתוך התקרה הפטורה השנה, הצבירה פטורה ממס רווחי הון.`,
+           goalImpact: "Tax-free compounding accelerates every long-term goal.", goalImpactHe: "צבירה פטורה ממס מאיצה כל יעד ארוך-טווח.", evidenceItemIds: [],
+         });
+         const pu = pensCeiling - depositsFor(adult.id, "PENSION_CONTRIBUTION");
+         if (pensCeiling > 0 && pu > 0) candidates.push({
+-          id: `pens:${adult.id}`, kind: "TAX_CEILING_PENSION", editable: true, minAmount: 0, maxAmount: round(pu), suggestedAmount: round(pu), ratePct: null,
++          id: `pens:${adult.id}`, kind: "TAX_CEILING_PENSION",
++          title: `Deposit · pension · ${adult.name}`, titleHe: `הפקדה · פנסיה · ${adult.name}`,
++          editable: true, minAmount: 0, maxAmount: round(pu), suggestedAmount: round(pu), ratePct: null,
+           detail: `Deposit up to ${nis(pu)} to ${adult.name}'s pension within the benefit ceiling — immediate deduction/credit value.`,
+           detailHe: `הפקידו עד ${nis(pu)} לפנסיה של ${adult.name} בתוך תקרת ההטבה — שווי ניכוי/זיכוי מיידי.`,
+           goalImpact: "Strengthens the retirement goal, with an immediate tax benefit.", goalImpactHe: "מחזק את יעד הפרישה, עם הטבת מס מיידית.", evidenceItemIds: [],
+         });
+       } else {
+         candidates.push({
+-          id: `verify:${adult.id}`, kind: "TAX_VERIFY_PAYROLL", editable: false, minAmount: 0, maxAmount: 0, suggestedAmount: 0, ratePct: null,
++          id: `verify:${adult.id}`, kind: "TAX_VERIFY_PAYROLL",
++          title: `Verify payroll · ${adult.name}`, titleHe: `בדיקת תלוש · ${adult.name}`,
++          editable: false, minAmount: 0, maxAmount: 0, suggestedAmount: 0, ratePct: null,
+           detail: `${adult.name}: contributions run through the employer — confirm from form 106 (or one payslip) that pension + hishtalmut deductions capture the ceilings (a section-46 supplemental deposit may apply if not).`,
+           detailHe: `${adult.name}: ההפקדות רצות דרך המעסיק — אשרו מטופס 106 (או מתלוש אחד) שניכויי הפנסיה וההשתלמות ממצים את התקרות (אם לא — ייתכן שרלוונטית הפקדה משלימה לפי סעיף 46).`,
+           goalImpact: "Confirms the tax benefits behind the retirement goal are fully captured.", goalImpactHe: "מוודא שהטבות המס שמאחורי יעד הפרישה ממוצות במלואן.", evidenceItemIds: [],
+@@ -239,13 +256,17 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
+     goalImpactHe: goalsLabel ? `מקדם את ${goalsLabel}: סוגר כ-${nis(amt)} מפער המימון הכולל של היעדים כיום.` : `סוגר כ-${nis(amt)} מפער המימון הכולל של היעדים כיום.`,
+   });
+   candidates.push({
+-    id: "invest:growth", kind: "INVEST_GROWTH", editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
++    id: "invest:growth", kind: "INVEST_GROWTH",
++    title: `Invest · growth channels (target ${targetGrowthPct}%)`, titleHe: `השקעה · אפיקי צמיחה (יעד ${targetGrowthPct}%)`,
++    editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
+     detail: `Invest in growth channels (equity-type tracks in existing wrappers or a taxable investment account) — moves the mix toward your ${targetGrowthPct}% target.${mixUnknown ? " Record your accounts' growth share first for a responsible split." : ""}`,
+     detailHe: `השקיעו באפיקי צמיחה (מסלולים מוטי-צמיחה בעטיפות הקיימות או חשבון השקעות חייב) — מקרב את התמהיל ליעד ${targetGrowthPct}%.${mixUnknown ? " הזינו קודם רכיב צמיחה לחשבונות לפיצול אחראי." : ""}`,
+     ...investGI(freeCash), evidenceItemIds: [],
+   });
+   candidates.push({
+-    id: "invest:defensive", kind: "INVEST_DEFENSIVE", editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
++    id: "invest:defensive", kind: "INVEST_DEFENSIVE",
++    title: "Invest · defensive channels", titleHe: "השקעה · אפיקים סולידיים",
++    editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
+     detail: `Place in defensive channels (bond-oriented tracks / deposits) to keep the mix at target.`,
+     detailHe: `הניחו באפיקים סולידיים (מסלולים מוטי-אג"ח / פיקדונות) לשמירת התמהיל ביעד.`,
+     ...investGI(freeCash), evidenceItemIds: [],
+diff --git a/packages/i18n/messages/en.json b/packages/i18n/messages/en.json
+index 48a1993..9b27bcc 100644
+--- a/packages/i18n/messages/en.json
++++ b/packages/i18n/messages/en.json
+@@ -1092,6 +1092,7 @@
+     "cartHint": "Add actions, set amounts, watch the impact. Approve when it fits your free cash.",
+     "approvedAligned": "Plan approved — it now feeds the strategy phase.",
+     "toStrategy": "Go to strategy",
+-    "basedOnPlan": "Based on your approved allocation plan of {date} — deployment decisions are excluded from these recommendations."
++    "basedOnPlan": "Based on your approved allocation plan of {date} — deployment decisions are excluded from these recommendations.",
++    "amountLabel": "Amount"
+   }
+ }
+diff --git a/packages/i18n/messages/he.json b/packages/i18n/messages/he.json
+index 826b04b..7ee96f9 100644
+--- a/packages/i18n/messages/he.json
++++ b/packages/i18n/messages/he.json
+@@ -1092,6 +1092,7 @@
+     "cartHint": "הוסיפו פעולות, קבעו סכומים, צפו בהשפעה. אשרו כשזה נכנס בכסף הפנוי.",
+     "approvedAligned": "התוכנית אושרה — היא מזינה כעת את שלב האסטרטגיה.",
+     "toStrategy": "מעבר לאסטרטגיה",
+-    "basedOnPlan": "מבוסס על תוכנית ההקצאה המאושרת מ-{date} — החלטות הפריסה אינן נכללות בהמלצות אלה."
++    "basedOnPlan": "מבוסס על תוכנית ההקצאה המאושרת מ-{date} — החלטות הפריסה אינן נכללות בהמלצות אלה.",
++    "amountLabel": "סכום"
+   }
+ }

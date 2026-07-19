@@ -8,7 +8,7 @@ import { Link } from "../../../../i18n/navigation";
 
 interface Candidate {
   id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
-  suggestedAmount: number; ratePct: number | null; detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
+  suggestedAmount: number; ratePct: number | null; title: string; titleHe: string; detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
 }
 interface Variant {
   key: "GROWTH" | "DEBT_FREE" | "BALANCED";
@@ -54,6 +54,7 @@ export default async function AllocationPage({
     ? plan!.candidates.map((c) => ({
         id: c.id, kind: c.kind, editable: c.editable, minAmount: c.minAmount, maxAmount: c.maxAmount,
         suggestedAmount: c.suggestedAmount, ratePct: c.ratePct,
+        title: he ? c.titleHe : c.title,
         detail: he ? c.detailHe : c.detail, goalImpact: he ? c.goalImpactHe : c.goalImpact,
       }))
     : [];
@@ -67,7 +68,7 @@ export default async function AllocationPage({
     catalog: t("catalog"), myPlan: t("myPlan"), add: t("addToPlan"), remove: t("remove"), empty: t("cartEmpty"),
     allocated: t("allocated"), remaining: t("remaining"), over: t("overAllocated"), projected: t("projectedTotal"), inYears: t("inHorizon"),
     interestSaved: t("interestSavedShort"), liquidity: t("impLiquidity"), growthShare: t("growthVsTarget"), debtLeft: t("debtLeft"),
-    approve: t("approveAndContinue"), approveHint: t("approveHint2"), note: t("approveNote"), verifyDone: t("verifyReminder"), perYear: t("perYearShort"),
+    approve: t("approveAndContinue"), approveHint: t("approveHint2"), note: t("approveNote"), verifyDone: t("verifyReminder"), perYear: t("perYearShort"), amountLabel: t("amountLabel"),
   };
 
   return (

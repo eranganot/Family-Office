@@ -5,7 +5,7 @@ import { commitCartAction } from "../lib/actions/allocation-actions";
 
 export interface CartCandidate {
   id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
-  suggestedAmount: number; ratePct: number | null; detail: string; goalImpact: string;
+  suggestedAmount: number; ratePct: number | null; title: string; detail: string; goalImpact: string;
 }
 export interface ImpactBase {
   horizonYears: number; expectedReturnPct: number; inflationPct: number; targetGrowthPct: number;
@@ -16,7 +16,7 @@ export interface CartLabels {
   catalog: string; myPlan: string; add: string; remove: string; empty: string;
   allocated: string; remaining: string; over: string; projected: string; inYears: string;
   interestSaved: string; liquidity: string; growthShare: string; debtLeft: string;
-  approve: string; approveHint: string; note: string; verifyDone: string; perYear: string;
+  approve: string; approveHint: string; note: string; verifyDone: string; perYear: string; amountLabel: string;
 }
 const KIND_REPAY = new Set(["REPAY_EXPENSIVE_DEBT", "REPAY_DEBT"]);
 const KIND_INVEST = new Set(["INVEST_GROWTH", "INVEST_DEFENSIVE"]);
@@ -73,12 +73,10 @@ export function AllocationCart({
           const pi = perItem(c.id, c.suggestedAmount || Math.min(c.maxAmount, Math.max(0, remaining)));
           return (
             <div key={c.id} style={box}>
-              <div className="mb-1 flex items-center gap-2 text-xs">
-                <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{c.kind.startsWith("REPAY") ? c.ratePct + "%" : ""}</span>
-              </div>
-              <p className="text-sm text-neutral-700" dir="auto">{c.detail}</p>
-              <p className="mt-1 text-xs text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}</p>
-              <button type="button" onClick={() => add(c.id)} className="mt-2 w-full rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700">+ {labels.add}</button>
+              <p className="text-sm font-semibold text-neutral-800" dir="auto">{c.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-neutral-500" dir="auto">{c.detail}</p>
+              <p className="mt-1.5 text-xs font-medium text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}</p>
+              <button type="button" onClick={() => add(c.id)} className="mt-2 w-full rounded-lg border border-blue-300 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50">+ {labels.add}</button>
             </div>
           );
         })}
@@ -91,15 +89,21 @@ export function AllocationCart({
           const amt = sel[c.id] ?? 0; const pi = perItem(c.id, amt);
           return (
             <div key={c.id} style={box}>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{c.detail.slice(0, 42)}{c.detail.length > 42 ? "…" : ""}</span>
-                <button type="button" onClick={() => remove(c.id)} aria-label={labels.remove} className="text-neutral-400">✕</button>
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-sm font-semibold text-neutral-800" dir="auto">{c.title}</span>
+                <button type="button" onClick={() => remove(c.id)} aria-label={labels.remove} className="shrink-0 text-neutral-400 hover:text-red-500">✕</button>
               </div>
               {c.editable ? (
-                <input value={String(amt)} onChange={(e) => setAmt(c.id, e.target.value)} inputMode="numeric"
-                  className="mt-1 h-8 w-full rounded border border-neutral-300 px-2 text-sm" />
+                <label className="mt-2 block">
+                  <span className="text-xs text-neutral-500">{labels.amountLabel}</span>
+                  <span className="mt-0.5 flex items-center rounded border border-neutral-300 focus-within:border-blue-500">
+                    <span className="px-2 text-sm text-neutral-400">₪</span>
+                    <input value={String(amt)} onChange={(e) => setAmt(c.id, e.target.value)} inputMode="numeric"
+                      className="h-9 w-full rounded-l bg-transparent px-1 text-sm outline-none" />
+                  </span>
+                </label>
               ) : null}
-              <p className="mt-1 text-xs text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}{pi.interest > 0 ? ` · ${labels.interestSaved} ${nis(pi.interest)}/${labels.perYear}` : ""}</p>
+              <p className="mt-1.5 text-xs font-medium text-blue-700">📈 +{nis(pi.extra)} {labels.inYears}{pi.interest > 0 ? ` · ${labels.interestSaved} ${nis(pi.interest)}/${labels.perYear}` : ""}</p>
             </div>
           );
         })}

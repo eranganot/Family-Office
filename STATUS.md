@@ -42,6 +42,17 @@
   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
 
+## Current state (2026-07-20, session 5)
+
+- **M31 (readable cart labels) code-complete — m31.patch on M30. No migration.** Fix: cart rows showed
+  the long detail sentence truncated ("…FIXED_UNLIN…") — unreadable. DeploymentCandidate now carries a
+  short bilingual `title`/`titleHe` (Hebrew track-type names via TRACK_HE: FIXED_UNLINKED→"קבועה לא
+  צמודה" etc.) per kind — "פירעון משכנתא · <נכס> · <מסלול> · <ריבית>%", "השקעה · אפיקי צמיחה (יעד N%)",
+  "הפקדה · קרן השתלמות · <בן/בת בית>", "בדיקת תלוש · <שם>", "השלמת כרית החירום". Cart + catalog render
+  the full title (no slice, wraps), catalog shows the long detail as secondary text, cart shows a
+  labeled ₪ amount field. engine 61 tests (candidates gain title; no test breakage), eslint clean,
+  api/web tsc, i18n parity (+amountLabel).
+
 ## Current state (2026-07-20, session 4)
 
 - **M30 (allocation page redesign C + strategy alignment) code-complete — m30.patch. No migration.**
