@@ -5,7 +5,7 @@ import { Card, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { Link } from "../../../../i18n/navigation";
 
-/** M27 — candidate-based ALLOCATION page: presets seed an editable working plan. */
+/** M28 — allocation page: editable working plan + before→after impact panel. */
 
 interface Candidate {
   id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
@@ -19,17 +19,24 @@ interface Variant {
 }
 interface Plans {
   monthlyExpensesBase: number | null; bufferTargetBase: number | null;
-  cashBase: number; freeCashBase: number; candidates: Candidate[];
-  variants: Variant[]; notes: string[];
+  cashBase: number; freeCashBase: number; candidates: Candidate[]; variants: Variant[]; notes: string[];
+}
+interface ImpactShape {
+  horizonYears: number; liquidCashBefore: number; liquidCashAfter: number;
+  growthPctBefore: number | null; growthPctAfter: number | null; targetGrowthPct: number;
+  totalDebtBefore: number; totalDebtAfter: number; annualInterestBefore: number; annualInterestAfter: number;
+  taxCeilingsCaptured: number; goalGapBefore: number | null; goalGapAfter: number | null;
+  projectedExtraNetWorth: number; extraFromInvesting: number; extraFromDebt: number; extraFromTax: number;
 }
 type WP = Record<string, { enabled: boolean; amount: number }>;
+type T = (k: string, v?: Record<string, string | number>) => string;
 
 export default async function AllocationPage({
   params, searchParams,
 }: { params: Promise<{ locale: string }>; searchParams: Promise<{ error?: string }> }) {
   const { locale } = await params;
   const { error } = await searchParams;
-  const t = await getTranslations("allocation");
+  const t = (await getTranslations("allocation")) as unknown as T & { has: (k: string) => boolean };
   const trpc = await serverCaller();
   const household = await trpc.household.get();
   if (!household) return null;
@@ -53,6 +60,8 @@ export default async function AllocationPage({
   const proposed = latest?.status === "PROPOSED";
   const allocatedTotal = isV3 ? Object.values(wp).reduce((s, e) => s + (e.enabled ? e.amount : 0), 0) : 0;
   const remaining = isV3 ? plan!.freeCashBase - allocatedTotal : 0;
+  const hasSelections = isV3 && Object.values(wp).some((e) => e.enabled && e.amount > 0);
+  const impact = hasSelections ? ((await trpc.allocation.impact()) as ImpactShape | null) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -116,55 +125,68 @@ export default async function AllocationPage({
                 <span>{t("remaining")}: <b>{nis(Math.max(0, remaining))}</b></span>
                 {remaining < -1 ? <span className="font-medium">{t("overAllocated")}</span> : null}
               </div>
-              <ul className="flex flex-col gap-2">
-                {plan.candidates.map((c) => {
-                  const st = wp[c.id] ?? { enabled: c.kind === "TAX_VERIFY_PAYROLL", amount: c.suggestedAmount };
-                  const on = st.enabled;
-                  return (
-                    <li key={c.id} className={`rounded-lg border p-3 ${on ? "border-green-200 bg-green-50/30" : "border-neutral-100"}`}>
-                      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs">
-                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{t(`kinds.${c.kind}`)}</span>
-                        {c.ratePct !== null ? <span className="text-neutral-500">{c.ratePct}%</span> : null}
-                        {c.kind !== "TAX_VERIFY_PAYROLL" ? <span className="text-neutral-400">{t("upTo")} {nis(c.maxAmount)}</span> : null}
-                      </div>
-                      <p className="text-sm text-neutral-700" dir="auto">{he ? c.detailHe : c.detail}</p>
-                      <p className="mt-0.5 text-xs text-blue-700" dir="auto">◎ {he ? c.goalImpactHe : c.goalImpact}</p>
-                      {proposed ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {c.editable ? (
-                            <form action={setCandidateAction} className="flex items-center gap-2">
-                              <input type="hidden" name="locale" value={locale} />
-                              <input type="hidden" name="id" value={latest.id} />
-                              <input type="hidden" name="candidateId" value={c.id} />
-                              <input type="hidden" name="enabled" value="1" />
-                              <TextInput name="amount" inputMode="numeric" defaultValue={String(on ? st.amount : c.suggestedAmount || Math.min(c.maxAmount, plan.freeCashBase))} />
-                              <button type="submit" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
-                            </form>
-                          ) : (
-                            <form action={setCandidateAction}>
-                              <input type="hidden" name="locale" value={locale} />
-                              <input type="hidden" name="id" value={latest.id} />
-                              <input type="hidden" name="candidateId" value={c.id} />
-                              <input type="hidden" name="enabled" value={on ? "0" : "1"} />
-                              <button type="submit" className={`rounded px-3 py-1.5 text-xs font-medium ${on ? "bg-green-600 text-white" : "border border-green-300 text-green-700"}`}>{on ? t("markDone") : t("confirm106")}</button>
-                            </form>
-                          )}
-                          {on && c.editable ? (
-                            <form action={setCandidateAction}>
-                              <input type="hidden" name="locale" value={locale} />
-                              <input type="hidden" name="id" value={latest.id} />
-                              <input type="hidden" name="candidateId" value={c.id} />
-                              <input type="hidden" name="enabled" value="0" />
-                              <input type="hidden" name="amount" value={String(st.amount)} />
-                              <button type="submit" className="rounded border border-neutral-300 px-3 py-1.5 text-xs text-neutral-500">{t("remove")}</button>
-                            </form>
-                          ) : null}
-                        </div>
-                      ) : on ? <p className="mt-1 text-sm font-medium text-green-700">{c.kind === "TAX_VERIFY_PAYROLL" ? t("done") : nis(st.amount)}</p> : null}
-                    </li>
-                  );
-                })}
-              </ul>
+              {impact ? <ImpactPanel im={impact} nis={nis} t={t} /> : null}
+              {(["enabled", "available"] as const).map((group) => {
+                const rows = plan.candidates.filter((c) => {
+                  const on = (wp[c.id] ?? { enabled: c.kind === "TAX_VERIFY_PAYROLL" }).enabled;
+                  return group === "enabled" ? on : !on;
+                });
+                if (rows.length === 0) return null;
+                return (
+                  <div key={group} className="mb-4">
+                    <h4 className={`mb-2 text-sm font-semibold ${group === "enabled" ? "text-green-700" : "text-neutral-500"}`}>{group === "enabled" ? t("groupInPlan") : t("groupAvailable")}</h4>
+                    <ul className="flex flex-col gap-2">
+                      {rows.map((c) => {
+                        const st = wp[c.id] ?? { enabled: c.kind === "TAX_VERIFY_PAYROLL", amount: c.suggestedAmount };
+                        const on = st.enabled;
+                        return (
+                          <li key={c.id} className={`rounded-lg border p-3 ${on ? "border-green-200 bg-green-50/30" : "border-neutral-100"}`}>
+                            <div className="mb-1 flex flex-wrap items-center gap-2 text-xs">
+                              <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{t(`kinds.${c.kind}`)}</span>
+                              {c.ratePct !== null ? <span className="text-neutral-500">{c.ratePct}%</span> : null}
+                              {c.kind !== "TAX_VERIFY_PAYROLL" ? <span className="text-neutral-400">{t("upTo")} {nis(c.maxAmount)}</span> : null}
+                            </div>
+                            <p className="text-sm text-neutral-700" dir="auto">{he ? c.detailHe : c.detail}</p>
+                            <p className="mt-0.5 text-xs text-blue-700" dir="auto">◎ {he ? c.goalImpactHe : c.goalImpact}</p>
+                            {proposed ? (
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                {c.editable ? (
+                                  <form action={setCandidateAction} className="flex items-center gap-2">
+                                    <input type="hidden" name="locale" value={locale} />
+                                    <input type="hidden" name="id" value={latest.id} />
+                                    <input type="hidden" name="candidateId" value={c.id} />
+                                    <input type="hidden" name="enabled" value="1" />
+                                    <TextInput name="amount" inputMode="numeric" defaultValue={String(on ? st.amount : c.suggestedAmount || Math.min(c.maxAmount, plan.freeCashBase))} />
+                                    <button type="submit" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
+                                  </form>
+                                ) : (
+                                  <form action={setCandidateAction}>
+                                    <input type="hidden" name="locale" value={locale} />
+                                    <input type="hidden" name="id" value={latest.id} />
+                                    <input type="hidden" name="candidateId" value={c.id} />
+                                    <input type="hidden" name="enabled" value={on ? "0" : "1"} />
+                                    <button type="submit" className={`rounded px-3 py-1.5 text-xs font-medium ${on ? "bg-green-600 text-white" : "border border-green-300 text-green-700"}`}>{on ? t("markDone") : t("confirm106")}</button>
+                                  </form>
+                                )}
+                                {on && c.editable ? (
+                                  <form action={setCandidateAction}>
+                                    <input type="hidden" name="locale" value={locale} />
+                                    <input type="hidden" name="id" value={latest.id} />
+                                    <input type="hidden" name="candidateId" value={c.id} />
+                                    <input type="hidden" name="enabled" value="0" />
+                                    <input type="hidden" name="amount" value={String(st.amount)} />
+                                    <button type="submit" className="rounded border border-neutral-300 px-3 py-1.5 text-xs text-neutral-500">{t("remove")}</button>
+                                  </form>
+                                ) : null}
+                              </div>
+                            ) : on ? <p className="mt-1 text-sm font-medium text-green-700">{c.kind === "TAX_VERIFY_PAYROLL" ? t("done") : nis(st.amount)}</p> : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })}
               {proposed ? (
                 <form action={approveWorkingPlanAction} className="mt-4 flex flex-wrap items-end gap-3">
                   <input type="hidden" name="locale" value={locale} />
@@ -177,6 +199,36 @@ export default async function AllocationPage({
           ) : proposed && plan.variants.length > 1 ? <p className="text-center text-sm text-neutral-500">{t("presetFirst")}</p> : null}
         </>
       ) : null}
+    </div>
+  );
+}
+
+function ImpactPanel({ im, nis, t }: { im: ImpactShape; nis: (n: number) => string; t: T }) {
+  const Row = ({ label, before, after, good }: { label: string; before: string; after: string; good?: boolean }) => (
+    <div className="flex items-center justify-between border-b border-neutral-100 py-1.5 text-sm last:border-0">
+      <span className="text-neutral-600">{label}</span>
+      <span className="flex items-center gap-2"><span className="text-neutral-400">{before}</span><span className="text-neutral-300">→</span><span className={`font-medium ${good ? "text-green-700" : ""}`}>{after}</span></span>
+    </div>
+  );
+  return (
+    <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+      <div className="mb-2 text-sm font-semibold text-blue-800">{t("impactTitle")}</div>
+      <Row label={t("impLiquidity")} before={nis(im.liquidCashBefore)} after={nis(im.liquidCashAfter)} />
+      {im.growthPctBefore !== null && im.growthPctAfter !== null ? <Row label={t("impGrowth", { target: im.targetGrowthPct })} before={`${im.growthPctBefore}%`} after={`${im.growthPctAfter}%`} good /> : null}
+      {im.totalDebtBefore > 0 ? <Row label={t("impDebt")} before={nis(im.totalDebtBefore)} after={nis(im.totalDebtAfter)} good={im.totalDebtAfter < im.totalDebtBefore} /> : null}
+      {im.annualInterestBefore > 0 ? <Row label={t("impInterest")} before={`${nis(im.annualInterestBefore)}/${t("perYearShort")}`} after={`${nis(im.annualInterestAfter)}/${t("perYearShort")}`} good={im.annualInterestAfter < im.annualInterestBefore} /> : null}
+      {im.taxCeilingsCaptured > 0 ? <Row label={t("impTax")} before={nis(0)} after={nis(im.taxCeilingsCaptured)} good /> : null}
+      {im.goalGapBefore !== null ? <Row label={t("impGoalGap")} before={nis(im.goalGapBefore)} after={nis(im.goalGapAfter ?? im.goalGapBefore)} /> : null}
+      <div className="mt-3 rounded-lg bg-white/70 px-3 py-2">
+        <div className="text-xs text-neutral-500">{t("impProjectionLabel", { years: im.horizonYears })}</div>
+        <div className="text-lg font-bold text-green-700">+{nis(im.projectedExtraNetWorth)}</div>
+        <div className="mt-1 text-xs text-neutral-500">
+          {im.extraFromInvesting > 0 ? `${t("impFromInvest")}: +${nis(im.extraFromInvesting)}  ` : ""}
+          {im.extraFromDebt > 0 ? `${t("impFromDebt")}: +${nis(im.extraFromDebt)}  ` : ""}
+          {im.extraFromTax > 0 ? `${t("impFromTax")}: +${nis(im.extraFromTax)}` : ""}
+        </div>
+        <div className="mt-1 text-xs text-neutral-400">{t("impNote")}</div>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { TRPCError } from "@trpc/server";
-import type { DeploymentPlans } from "@wealthos/engine-strategy";
+import { computePlanImpact, deriveTargetGrowthPct, type DeploymentPlans, type PlanSelection } from "@wealthos/engine-strategy";
+import { SnapshotPayloadSchema } from "@wealthos/domain";
+import { assumptionRegistry } from "@wealthos/registry";
 import { z } from "zod";
 import { runAllocation } from "../services/allocation-service";
 import { protectedProcedure, router, workflowGuard } from "../trpc";
@@ -24,6 +26,26 @@ export const allocationRouter = router({
   latest: protectedProcedure.query(async ({ ctx }) => {
     const householdId = await requireHouseholdId(ctx.db);
     return ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
+  }),
+
+  /** Before→after impact of the current working plan (M28). Uses the plan's pinned snapshot. */
+  impact: protectedProcedure.query(async ({ ctx }) => {
+    const householdId = await requireHouseholdId(ctx.db);
+    const row = await ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
+    if (!row) return null;
+    const plan = planOf(row);
+    if (!Array.isArray(plan.candidates)) return null;
+    const wp = (row.workingPlan ?? {}) as WorkingPlan;
+    const selections: PlanSelection[] = plan.candidates
+      .filter((c) => wp[c.id]?.enabled && c.kind !== "TAX_VERIFY_PAYROLL")
+      .map((c) => ({ kind: c.kind, amount: wp[c.id]!.amount, ratePct: c.ratePct }));
+    if (selections.length === 0) return null;
+    const snap = await ctx.db.householdSnapshot.findUnique({ where: { id: row.snapshotId } });
+    if (!snap) return null;
+    const payload = SnapshotPayloadSchema.parse(snap.payload);
+    const assumptions = Object.fromEntries((await assumptionRegistry(ctx.db).all(householdId)).map((a) => [a.key, a.value]));
+    const targetGrowthPct = deriveTargetGrowthPct(assumptions);
+    return computePlanImpact(payload, { assumptions, taxRules: {}, marketRates: { boiRatePct: null } }, selections, plan.bufferTargetBase ?? 0, targetGrowthPct);
   }),
 
   generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => runAllocation(ctx.db, ctx.householdId)),

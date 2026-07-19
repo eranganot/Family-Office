@@ -42,6 +42,25 @@
   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
 
+## Current state (2026-07-20, session 2)
+
+- **M28 (plan impact simulation + add-actions UX) code-complete — m28.patch stacks on M27. No schema
+  change / no migration.** Answers owner's two questions on the working plan.
+  (1) IMPACT: new pure `engine-strategy/src/impact.ts` computePlanImpact(snapshot, ctx, selections,
+  bufferTarget, targetGrowthPct) → before→after for liquid cash, growth-share % (→target), total
+  mortgage debt, annual interest, tax ceilings captured, goal PV gap, PLUS a deterministic real-terms
+  projection of EXTRA net worth over the risk-horizon vs leaving cash idle (invest at expected real
+  return; debt at REAL rate = nominal−inflation floored 0; tax deposits tax-free≈growth), broken down
+  by source. Documented honesty note: net worth today is unchanged (cash↔asset/debt swap); the gain is
+  future trajectory. 5 impact tests (engine-strategy 59). `allocation.impact` query resolves the
+  current workingPlan selections against the plan's PINNED snapshot; impact panel renders above the
+  action list and recomputes as you toggle/edit.
+  (2) ADD ACTIONS: the working plan now splits into "בתוכנית שלכם" (enabled) and "זמינות להוספה (מכל
+  מסלול)" (disabled) — the union of all candidates across paths was always rendered, but the split +
+  heading makes cross-path adding obvious (owner couldn't find where to add). Each available row has
+  its amount field + הוספה.
+  Verified: engine 59 tests, eslint clean, api/web tsc, prisma valid, i18n parity.
+
 ## Current state (2026-07-20)
 
 - **M27 (deployment v3: editable working plan, partial debt, CI fix, doc-type edit) code-complete —

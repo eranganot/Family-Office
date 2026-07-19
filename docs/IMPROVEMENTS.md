@@ -112,3 +112,10 @@ value-to-owner ÷ effort. ✅ = shipped in M14 during this review.
 - **Pre-import parsed-value editing:** editing the parsed numeric values before ייבוא (beyond docType,
   shipped in M27, and ownership, already editable). Today values are correctable post-import via the
   M3 verification "correct value" flow / suspense resolution.
+
+## M28 backlog additions (owner, 2026-07-20)
+- **Monte Carlo band on the plan impact:** the M28 impact projection is deterministic (single real-rate
+  path). A P10/P50/P90 band via the existing MC projector would show the plan's outcome distribution,
+  not just the expected extra net worth.
+- **Per-goal impact of the plan:** M28 shows the aggregate PV goal gap; break the projected extra net
+  worth down per goal (retirement vs children vs FI) using the funding-gap engine.

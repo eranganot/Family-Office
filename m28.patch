@@ -1,0 +1,562 @@
+diff --git a/STATUS.md b/STATUS.md
+index 52423ae..b5a7cda 100644
+--- a/STATUS.md
++++ b/STATUS.md
+@@ -17,6 +17,25 @@
+   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
+   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
+ 
++## Current state (2026-07-20, session 2)
++
++- **M28 (plan impact simulation + add-actions UX) code-complete — m28.patch stacks on M27. No schema
++  change / no migration.** Answers owner's two questions on the working plan.
++  (1) IMPACT: new pure `engine-strategy/src/impact.ts` computePlanImpact(snapshot, ctx, selections,
++  bufferTarget, targetGrowthPct) → before→after for liquid cash, growth-share % (→target), total
++  mortgage debt, annual interest, tax ceilings captured, goal PV gap, PLUS a deterministic real-terms
++  projection of EXTRA net worth over the risk-horizon vs leaving cash idle (invest at expected real
++  return; debt at REAL rate = nominal−inflation floored 0; tax deposits tax-free≈growth), broken down
++  by source. Documented honesty note: net worth today is unchanged (cash↔asset/debt swap); the gain is
++  future trajectory. 5 impact tests (engine-strategy 59). `allocation.impact` query resolves the
++  current workingPlan selections against the plan's PINNED snapshot; impact panel renders above the
++  action list and recomputes as you toggle/edit.
++  (2) ADD ACTIONS: the working plan now splits into "בתוכנית שלכם" (enabled) and "זמינות להוספה (מכל
++  מסלול)" (disabled) — the union of all candidates across paths was always rendered, but the split +
++  heading makes cross-path adding obvious (owner couldn't find where to add). Each available row has
++  its amount field + הוספה.
++  Verified: engine 59 tests, eslint clean, api/web tsc, prisma valid, i18n parity.
++
+ ## Current state (2026-07-20)
+ 
+ - **M27 (deployment v3: editable working plan, partial debt, CI fix, doc-type edit) code-complete —
+diff --git a/apps/web/src/app/[locale]/(app)/allocation/page.tsx b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+index c05e747..de54f46 100644
+--- a/apps/web/src/app/[locale]/(app)/allocation/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+@@ -5,7 +5,7 @@ import { Card, TextInput } from "../../../../components/fields";
+ import { serverCaller } from "../../../../lib/trpc-server";
+ import { Link } from "../../../../i18n/navigation";
+ 
+-/** M27 — candidate-based ALLOCATION page: presets seed an editable working plan. */
++/** M28 — allocation page: editable working plan + before→after impact panel. */
+ 
+ interface Candidate {
+   id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
+@@ -19,17 +19,24 @@ interface Variant {
+ }
+ interface Plans {
+   monthlyExpensesBase: number | null; bufferTargetBase: number | null;
+-  cashBase: number; freeCashBase: number; candidates: Candidate[];
+-  variants: Variant[]; notes: string[];
++  cashBase: number; freeCashBase: number; candidates: Candidate[]; variants: Variant[]; notes: string[];
++}
++interface ImpactShape {
++  horizonYears: number; liquidCashBefore: number; liquidCashAfter: number;
++  growthPctBefore: number | null; growthPctAfter: number | null; targetGrowthPct: number;
++  totalDebtBefore: number; totalDebtAfter: number; annualInterestBefore: number; annualInterestAfter: number;
++  taxCeilingsCaptured: number; goalGapBefore: number | null; goalGapAfter: number | null;
++  projectedExtraNetWorth: number; extraFromInvesting: number; extraFromDebt: number; extraFromTax: number;
+ }
+ type WP = Record<string, { enabled: boolean; amount: number }>;
++type T = (k: string, v?: Record<string, string | number>) => string;
+ 
+ export default async function AllocationPage({
+   params, searchParams,
+ }: { params: Promise<{ locale: string }>; searchParams: Promise<{ error?: string }> }) {
+   const { locale } = await params;
+   const { error } = await searchParams;
+-  const t = await getTranslations("allocation");
++  const t = (await getTranslations("allocation")) as unknown as T & { has: (k: string) => boolean };
+   const trpc = await serverCaller();
+   const household = await trpc.household.get();
+   if (!household) return null;
+@@ -53,6 +60,8 @@ export default async function AllocationPage({
+   const proposed = latest?.status === "PROPOSED";
+   const allocatedTotal = isV3 ? Object.values(wp).reduce((s, e) => s + (e.enabled ? e.amount : 0), 0) : 0;
+   const remaining = isV3 ? plan!.freeCashBase - allocatedTotal : 0;
++  const hasSelections = isV3 && Object.values(wp).some((e) => e.enabled && e.amount > 0);
++  const impact = hasSelections ? ((await trpc.allocation.impact()) as ImpactShape | null) : null;
+ 
+   return (
+     <div className="flex flex-col gap-6">
+@@ -116,55 +125,68 @@ export default async function AllocationPage({
+                 <span>{t("remaining")}: <b>{nis(Math.max(0, remaining))}</b></span>
+                 {remaining < -1 ? <span className="font-medium">{t("overAllocated")}</span> : null}
+               </div>
+-              <ul className="flex flex-col gap-2">
+-                {plan.candidates.map((c) => {
+-                  const st = wp[c.id] ?? { enabled: c.kind === "TAX_VERIFY_PAYROLL", amount: c.suggestedAmount };
+-                  const on = st.enabled;
+-                  return (
+-                    <li key={c.id} className={`rounded-lg border p-3 ${on ? "border-green-200 bg-green-50/30" : "border-neutral-100"}`}>
+-                      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs">
+-                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{t(`kinds.${c.kind}`)}</span>
+-                        {c.ratePct !== null ? <span className="text-neutral-500">{c.ratePct}%</span> : null}
+-                        {c.kind !== "TAX_VERIFY_PAYROLL" ? <span className="text-neutral-400">{t("upTo")} {nis(c.maxAmount)}</span> : null}
+-                      </div>
+-                      <p className="text-sm text-neutral-700" dir="auto">{he ? c.detailHe : c.detail}</p>
+-                      <p className="mt-0.5 text-xs text-blue-700" dir="auto">◎ {he ? c.goalImpactHe : c.goalImpact}</p>
+-                      {proposed ? (
+-                        <div className="mt-2 flex flex-wrap items-center gap-2">
+-                          {c.editable ? (
+-                            <form action={setCandidateAction} className="flex items-center gap-2">
+-                              <input type="hidden" name="locale" value={locale} />
+-                              <input type="hidden" name="id" value={latest.id} />
+-                              <input type="hidden" name="candidateId" value={c.id} />
+-                              <input type="hidden" name="enabled" value="1" />
+-                              <TextInput name="amount" inputMode="numeric" defaultValue={String(on ? st.amount : c.suggestedAmount || Math.min(c.maxAmount, plan.freeCashBase))} />
+-                              <button type="submit" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
+-                            </form>
+-                          ) : (
+-                            <form action={setCandidateAction}>
+-                              <input type="hidden" name="locale" value={locale} />
+-                              <input type="hidden" name="id" value={latest.id} />
+-                              <input type="hidden" name="candidateId" value={c.id} />
+-                              <input type="hidden" name="enabled" value={on ? "0" : "1"} />
+-                              <button type="submit" className={`rounded px-3 py-1.5 text-xs font-medium ${on ? "bg-green-600 text-white" : "border border-green-300 text-green-700"}`}>{on ? t("markDone") : t("confirm106")}</button>
+-                            </form>
+-                          )}
+-                          {on && c.editable ? (
+-                            <form action={setCandidateAction}>
+-                              <input type="hidden" name="locale" value={locale} />
+-                              <input type="hidden" name="id" value={latest.id} />
+-                              <input type="hidden" name="candidateId" value={c.id} />
+-                              <input type="hidden" name="enabled" value="0" />
+-                              <input type="hidden" name="amount" value={String(st.amount)} />
+-                              <button type="submit" className="rounded border border-neutral-300 px-3 py-1.5 text-xs text-neutral-500">{t("remove")}</button>
+-                            </form>
+-                          ) : null}
+-                        </div>
+-                      ) : on ? <p className="mt-1 text-sm font-medium text-green-700">{c.kind === "TAX_VERIFY_PAYROLL" ? t("done") : nis(st.amount)}</p> : null}
+-                    </li>
+-                  );
+-                })}
+-              </ul>
++              {impact ? <ImpactPanel im={impact} nis={nis} t={t} /> : null}
++              {(["enabled", "available"] as const).map((group) => {
++                const rows = plan.candidates.filter((c) => {
++                  const on = (wp[c.id] ?? { enabled: c.kind === "TAX_VERIFY_PAYROLL" }).enabled;
++                  return group === "enabled" ? on : !on;
++                });
++                if (rows.length === 0) return null;
++                return (
++                  <div key={group} className="mb-4">
++                    <h4 className={`mb-2 text-sm font-semibold ${group === "enabled" ? "text-green-700" : "text-neutral-500"}`}>{group === "enabled" ? t("groupInPlan") : t("groupAvailable")}</h4>
++                    <ul className="flex flex-col gap-2">
++                      {rows.map((c) => {
++                        const st = wp[c.id] ?? { enabled: c.kind === "TAX_VERIFY_PAYROLL", amount: c.suggestedAmount };
++                        const on = st.enabled;
++                        return (
++                          <li key={c.id} className={`rounded-lg border p-3 ${on ? "border-green-200 bg-green-50/30" : "border-neutral-100"}`}>
++                            <div className="mb-1 flex flex-wrap items-center gap-2 text-xs">
++                              <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{t(`kinds.${c.kind}`)}</span>
++                              {c.ratePct !== null ? <span className="text-neutral-500">{c.ratePct}%</span> : null}
++                              {c.kind !== "TAX_VERIFY_PAYROLL" ? <span className="text-neutral-400">{t("upTo")} {nis(c.maxAmount)}</span> : null}
++                            </div>
++                            <p className="text-sm text-neutral-700" dir="auto">{he ? c.detailHe : c.detail}</p>
++                            <p className="mt-0.5 text-xs text-blue-700" dir="auto">◎ {he ? c.goalImpactHe : c.goalImpact}</p>
++                            {proposed ? (
++                              <div className="mt-2 flex flex-wrap items-center gap-2">
++                                {c.editable ? (
++                                  <form action={setCandidateAction} className="flex items-center gap-2">
++                                    <input type="hidden" name="locale" value={locale} />
++                                    <input type="hidden" name="id" value={latest.id} />
++                                    <input type="hidden" name="candidateId" value={c.id} />
++                                    <input type="hidden" name="enabled" value="1" />
++                                    <TextInput name="amount" inputMode="numeric" defaultValue={String(on ? st.amount : c.suggestedAmount || Math.min(c.maxAmount, plan.freeCashBase))} />
++                                    <button type="submit" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
++                                  </form>
++                                ) : (
++                                  <form action={setCandidateAction}>
++                                    <input type="hidden" name="locale" value={locale} />
++                                    <input type="hidden" name="id" value={latest.id} />
++                                    <input type="hidden" name="candidateId" value={c.id} />
++                                    <input type="hidden" name="enabled" value={on ? "0" : "1"} />
++                                    <button type="submit" className={`rounded px-3 py-1.5 text-xs font-medium ${on ? "bg-green-600 text-white" : "border border-green-300 text-green-700"}`}>{on ? t("markDone") : t("confirm106")}</button>
++                                  </form>
++                                )}
++                                {on && c.editable ? (
++                                  <form action={setCandidateAction}>
++                                    <input type="hidden" name="locale" value={locale} />
++                                    <input type="hidden" name="id" value={latest.id} />
++                                    <input type="hidden" name="candidateId" value={c.id} />
++                                    <input type="hidden" name="enabled" value="0" />
++                                    <input type="hidden" name="amount" value={String(st.amount)} />
++                                    <button type="submit" className="rounded border border-neutral-300 px-3 py-1.5 text-xs text-neutral-500">{t("remove")}</button>
++                                  </form>
++                                ) : null}
++                              </div>
++                            ) : on ? <p className="mt-1 text-sm font-medium text-green-700">{c.kind === "TAX_VERIFY_PAYROLL" ? t("done") : nis(st.amount)}</p> : null}
++                          </li>
++                        );
++                      })}
++                    </ul>
++                  </div>
++                );
++              })}
+               {proposed ? (
+                 <form action={approveWorkingPlanAction} className="mt-4 flex flex-wrap items-end gap-3">
+                   <input type="hidden" name="locale" value={locale} />
+@@ -181,6 +203,36 @@ export default async function AllocationPage({
+   );
+ }
+ 
++function ImpactPanel({ im, nis, t }: { im: ImpactShape; nis: (n: number) => string; t: T }) {
++  const Row = ({ label, before, after, good }: { label: string; before: string; after: string; good?: boolean }) => (
++    <div className="flex items-center justify-between border-b border-neutral-100 py-1.5 text-sm last:border-0">
++      <span className="text-neutral-600">{label}</span>
++      <span className="flex items-center gap-2"><span className="text-neutral-400">{before}</span><span className="text-neutral-300">→</span><span className={`font-medium ${good ? "text-green-700" : ""}`}>{after}</span></span>
++    </div>
++  );
++  return (
++    <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
++      <div className="mb-2 text-sm font-semibold text-blue-800">{t("impactTitle")}</div>
++      <Row label={t("impLiquidity")} before={nis(im.liquidCashBefore)} after={nis(im.liquidCashAfter)} />
++      {im.growthPctBefore !== null && im.growthPctAfter !== null ? <Row label={t("impGrowth", { target: im.targetGrowthPct })} before={`${im.growthPctBefore}%`} after={`${im.growthPctAfter}%`} good /> : null}
++      {im.totalDebtBefore > 0 ? <Row label={t("impDebt")} before={nis(im.totalDebtBefore)} after={nis(im.totalDebtAfter)} good={im.totalDebtAfter < im.totalDebtBefore} /> : null}
++      {im.annualInterestBefore > 0 ? <Row label={t("impInterest")} before={`${nis(im.annualInterestBefore)}/${t("perYearShort")}`} after={`${nis(im.annualInterestAfter)}/${t("perYearShort")}`} good={im.annualInterestAfter < im.annualInterestBefore} /> : null}
++      {im.taxCeilingsCaptured > 0 ? <Row label={t("impTax")} before={nis(0)} after={nis(im.taxCeilingsCaptured)} good /> : null}
++      {im.goalGapBefore !== null ? <Row label={t("impGoalGap")} before={nis(im.goalGapBefore)} after={nis(im.goalGapAfter ?? im.goalGapBefore)} /> : null}
++      <div className="mt-3 rounded-lg bg-white/70 px-3 py-2">
++        <div className="text-xs text-neutral-500">{t("impProjectionLabel", { years: im.horizonYears })}</div>
++        <div className="text-lg font-bold text-green-700">+{nis(im.projectedExtraNetWorth)}</div>
++        <div className="mt-1 text-xs text-neutral-500">
++          {im.extraFromInvesting > 0 ? `${t("impFromInvest")}: +${nis(im.extraFromInvesting)}  ` : ""}
++          {im.extraFromDebt > 0 ? `${t("impFromDebt")}: +${nis(im.extraFromDebt)}  ` : ""}
++          {im.extraFromTax > 0 ? `${t("impFromTax")}: +${nis(im.extraFromTax)}` : ""}
++        </div>
++        <div className="mt-1 text-xs text-neutral-400">{t("impNote")}</div>
++      </div>
++    </div>
++  );
++}
++
+ function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+   return <div><div className="text-xs text-neutral-400">{label}</div><div className={`font-medium ${highlight ? "text-blue-700" : ""}`}>{value}</div></div>;
+ }
+diff --git a/docs/IMPROVEMENTS.md b/docs/IMPROVEMENTS.md
+index 68f04e9..26844b1 100644
+--- a/docs/IMPROVEMENTS.md
++++ b/docs/IMPROVEMENTS.md
+@@ -112,3 +112,10 @@ value-to-owner ÷ effort. ✅ = shipped in M14 during this review.
+ - **Pre-import parsed-value editing:** editing the parsed numeric values before ייבוא (beyond docType,
+   shipped in M27, and ownership, already editable). Today values are correctable post-import via the
+   M3 verification "correct value" flow / suspense resolution.
++
++## M28 backlog additions (owner, 2026-07-20)
++- **Monte Carlo band on the plan impact:** the M28 impact projection is deterministic (single real-rate
++  path). A P10/P50/P90 band via the existing MC projector would show the plan's outcome distribution,
++  not just the expected extra net worth.
++- **Per-goal impact of the plan:** M28 shows the aggregate PV goal gap; break the projected extra net
++  worth down per goal (retirement vs children vs FI) using the funding-gap engine.
+diff --git a/packages/api/src/routers/allocation.ts b/packages/api/src/routers/allocation.ts
+index a59146a..660d6b5 100644
+--- a/packages/api/src/routers/allocation.ts
++++ b/packages/api/src/routers/allocation.ts
+@@ -1,5 +1,7 @@
+ import { TRPCError } from "@trpc/server";
+-import type { DeploymentPlans } from "@wealthos/engine-strategy";
++import { computePlanImpact, deriveTargetGrowthPct, type DeploymentPlans, type PlanSelection } from "@wealthos/engine-strategy";
++import { SnapshotPayloadSchema } from "@wealthos/domain";
++import { assumptionRegistry } from "@wealthos/registry";
+ import { z } from "zod";
+ import { runAllocation } from "../services/allocation-service";
+ import { protectedProcedure, router, workflowGuard } from "../trpc";
+@@ -26,6 +28,26 @@ export const allocationRouter = router({
+     return ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
+   }),
+ 
++  /** Before→after impact of the current working plan (M28). Uses the plan's pinned snapshot. */
++  impact: protectedProcedure.query(async ({ ctx }) => {
++    const householdId = await requireHouseholdId(ctx.db);
++    const row = await ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
++    if (!row) return null;
++    const plan = planOf(row);
++    if (!Array.isArray(plan.candidates)) return null;
++    const wp = (row.workingPlan ?? {}) as WorkingPlan;
++    const selections: PlanSelection[] = plan.candidates
++      .filter((c) => wp[c.id]?.enabled && c.kind !== "TAX_VERIFY_PAYROLL")
++      .map((c) => ({ kind: c.kind, amount: wp[c.id]!.amount, ratePct: c.ratePct }));
++    if (selections.length === 0) return null;
++    const snap = await ctx.db.householdSnapshot.findUnique({ where: { id: row.snapshotId } });
++    if (!snap) return null;
++    const payload = SnapshotPayloadSchema.parse(snap.payload);
++    const assumptions = Object.fromEntries((await assumptionRegistry(ctx.db).all(householdId)).map((a) => [a.key, a.value]));
++    const targetGrowthPct = deriveTargetGrowthPct(assumptions);
++    return computePlanImpact(payload, { assumptions, taxRules: {}, marketRates: { boiRatePct: null } }, selections, plan.bufferTargetBase ?? 0, targetGrowthPct);
++  }),
++
+   generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => runAllocation(ctx.db, ctx.householdId)),
+ 
+   /** Seed the working plan from a named preset (does not approve). */
+diff --git a/packages/engine-strategy/src/impact.ts b/packages/engine-strategy/src/impact.ts
+new file mode 100644
+index 0000000..0d47044
+--- /dev/null
++++ b/packages/engine-strategy/src/impact.ts
+@@ -0,0 +1,131 @@
++import type { SnapshotPayload } from "@wealthos/domain";
++import type { AnalyzerContext } from "./findings";
++import { isCash, sum, valued } from "./analyzers/pools";
++import type { DeploymentStepKind } from "./deployment";
++
++/**
++ * M28 — plan impact simulation. Given the household's snapshot and the SELECTED
++ * working-plan actions (kind + amount + rate), computes a before→after picture of
++ * the components the plan touches, plus a deterministic real-terms projection of
++ * the extra net worth the plan produces over the household's horizon.
++ *
++ * Honesty notes (documented): deploying free cash does NOT change net worth TODAY
++ * (cash → debt-payoff or investment is a like-for-like swap). The impact is on the
++ * FUTURE trajectory (interest avoided, expected returns), on liquidity (cash falls),
++ * on the allocation mix, and on tax captured. The projection compares "leave the
++ * cash idle" (≈0% real) against the plan, so the delta is purely the plan's effect.
++ * Guaranteed-return logic (debt) uses the REAL rate (nominal − inflation, floored 0).
++ */
++
++export interface PlanSelection {
++  kind: DeploymentStepKind;
++  amount: number;
++  ratePct: number | null; // for debt
++}
++
++export interface PlanImpact {
++  horizonYears: number;
++  liquidCashBefore: number;
++  liquidCashAfter: number;
++  bufferTargetBase: number;
++  growthPctBefore: number | null;
++  growthPctAfter: number | null;
++  targetGrowthPct: number;
++  totalDebtBefore: number;
++  totalDebtAfter: number;
++  annualInterestBefore: number;
++  annualInterestAfter: number;
++  taxCeilingsCaptured: number;
++  goalGapBefore: number | null;
++  goalGapAfter: number | null;
++  /** Extra real net worth at the horizon vs leaving the free cash idle. */
++  projectedExtraNetWorth: number;
++  /** Component breakdown of that delta. */
++  extraFromInvesting: number;
++  extraFromDebt: number;
++  extraFromTax: number;
++}
++
++const round = (n: number) => Math.round(n);
++
++export function computePlanImpact(snapshot: SnapshotPayload, ctx: AnalyzerContext, selections: PlanSelection[], bufferTargetBase: number, targetGrowthPct: number): PlanImpact {
++  const horizonYears = Math.max(1, Number(ctx.assumptions["risk_horizon_years"] ?? 20));
++  const expectedReturn = Number(ctx.assumptions["expected_real_return_equity_pct"] ?? 4.5) / 100;
++  const inflation = Number(ctx.assumptions["inflation_il_pct"] ?? 2.5) / 100;
++
++  // --- liquidity -------------------------------------------------------------
++  const cashBase = sum(valued(snapshot.items).filter(isCash));
++  const deployed = selections.filter((s) => s.kind !== "TAX_VERIFY_PAYROLL" && s.kind !== "BUFFER_TOP_UP").reduce((t, s) => t + s.amount, 0);
++  const liquidCashAfter = cashBase - deployed;
++
++  // --- debt ------------------------------------------------------------------
++  let totalDebt = 0;
++  let annualInterest = 0;
++  for (const it of snapshot.items) {
++    if (it.kind === "MORTGAGE" && it.mortgageTracks) {
++      for (const tk of it.mortgageTracks) {
++        totalDebt += tk.principalRemaining;
++        annualInterest += (tk.principalRemaining * tk.annualRatePct) / 100;
++      }
++    }
++  }
++  const debtSel = selections.filter((s) => s.kind === "REPAY_EXPENSIVE_DEBT" || s.kind === "REPAY_DEBT");
++  const debtRepaid = debtSel.reduce((t, s) => t + s.amount, 0);
++  const interestAvoidedYear = debtSel.reduce((t, s) => t + (s.amount * (s.ratePct ?? 0)) / 100, 0);
++
++  // --- allocation ------------------------------------------------------------
++  const investable = valued(snapshot.items).filter((i) => i.kind === "ACCOUNT");
++  let growth = 0, knownMix = 0, unknown = 0;
++  for (const i of investable) {
++    const v = i.valueBase ?? 0;
++    if (i.growthSharePct !== null && i.growthSharePct !== undefined) { growth += (v * i.growthSharePct) / 100; knownMix += v; }
++    else if (isCash(i)) knownMix += v; else unknown += v;
++  }
++  const mixKnown = knownMix + unknown === 0 || unknown / (knownMix + unknown) <= 0.5;
++  const growthAdded = selections.filter((s) => s.kind === "INVEST_GROWTH").reduce((t, s) => t + s.amount, 0);
++  const defensiveAdded = selections.filter((s) => s.kind === "INVEST_DEFENSIVE").reduce((t, s) => t + s.amount, 0);
++  const investedTotal = growthAdded + defensiveAdded;
++  const growthPctBefore = mixKnown && knownMix > 0 ? (growth / knownMix) * 100 : null;
++  const knownAfter = knownMix + investedTotal;
++  const growthPctAfter = mixKnown && knownAfter > 0 ? ((growth + growthAdded) / knownAfter) * 100 : null;
++
++  // --- tax -------------------------------------------------------------------
++  const taxCaptured = selections.filter((s) => s.kind === "TAX_CEILING_HISHTALMUT" || s.kind === "TAX_CEILING_PENSION").reduce((t, s) => t + s.amount, 0);
++
++  // --- goals (PV gap: required − assets, funded goals only) ------------------
++  const assetsTotal = sum(valued(snapshot.items).filter((i) => ["ACCOUNT", "REAL_ESTATE", "OTHER_ASSET"].includes(i.kind)));
++  const requiredTotal = snapshot.goals.filter((g) => g.requiredFundingBase !== null).reduce((t, g) => t + (g.requiredFundingBase ?? 0), 0);
++  const goalGapBefore = requiredTotal > 0 ? Math.max(0, requiredTotal - assetsTotal) : null;
++  // Investing and tax deposits keep assets whole (cash→investment) so the gap is unchanged today;
++  // but debt repayment converts an asset (cash) into equity (lower liability) — net assets side flat too.
++  // The gap moves with FUTURE growth, captured in the projection below; today's gap is essentially unchanged.
++  const goalGapAfter = goalGapBefore;
++
++  // --- projection (real terms, vs idle cash) ---------------------------------
++  const grow = (amt: number, realRate: number) => amt * (Math.pow(1 + realRate, horizonYears) - 1);
++  const extraFromInvesting = grow(investedTotal, expectedReturn);
++  const extraFromDebt = debtSel.reduce((t, s) => t + grow(s.amount, Math.max(0, (s.ratePct ?? 0) / 100 - inflation)), 0);
++  const extraFromTax = grow(taxCaptured, expectedReturn); // tax-advantaged ≈ growth, tax-free
++  const projectedExtraNetWorth = extraFromInvesting + extraFromDebt + extraFromTax;
++
++  return {
++    horizonYears,
++    liquidCashBefore: round(cashBase),
++    liquidCashAfter: round(liquidCashAfter),
++    bufferTargetBase: round(bufferTargetBase),
++    growthPctBefore: growthPctBefore === null ? null : Math.round(growthPctBefore * 10) / 10,
++    growthPctAfter: growthPctAfter === null ? null : Math.round(growthPctAfter * 10) / 10,
++    targetGrowthPct,
++    totalDebtBefore: round(totalDebt),
++    totalDebtAfter: round(totalDebt - debtRepaid),
++    annualInterestBefore: round(annualInterest),
++    annualInterestAfter: round(annualInterest - interestAvoidedYear),
++    taxCeilingsCaptured: round(taxCaptured),
++    goalGapBefore: goalGapBefore === null ? null : round(goalGapBefore),
++    goalGapAfter: goalGapAfter === null ? null : round(goalGapAfter),
++    projectedExtraNetWorth: round(projectedExtraNetWorth),
++    extraFromInvesting: round(extraFromInvesting),
++    extraFromDebt: round(extraFromDebt),
++    extraFromTax: round(extraFromTax),
++  };
++}
+diff --git a/packages/engine-strategy/src/index.ts b/packages/engine-strategy/src/index.ts
+index 015e57a..d88d370 100644
+--- a/packages/engine-strategy/src/index.ts
++++ b/packages/engine-strategy/src/index.ts
+@@ -8,6 +8,8 @@ export type { Rationale, RecommendationDraft } from "./rationale";
+ export { validateStrategyText } from "./validator";
+ export { actionItemsFor } from "./action-items";
+ export { computeDeploymentPlans } from "./deployment";
++export { computePlanImpact } from "./impact";
++export type { PlanImpact, PlanSelection } from "./impact";
+ export type { DeploymentPlans, DeploymentVariant, DeploymentVariantKey, DeploymentStep, DeploymentStepKind, DeploymentNote, DeploymentCandidate, PresetEntry } from "./deployment";
+ export type { ActionItems } from "./action-items";
+ export { scorePriority } from "./scoring";
+diff --git a/packages/engine-strategy/test/impact.test.ts b/packages/engine-strategy/test/impact.test.ts
+new file mode 100644
+index 0000000..f793bc6
+--- /dev/null
++++ b/packages/engine-strategy/test/impact.test.ts
+@@ -0,0 +1,62 @@
++import { describe, expect, it } from "vitest";
++import { computePlanImpact, type PlanSelection } from "../src/impact";
++import { CTX, item, snapshot } from "./fixtures";
++
++const ctx = (over: Record<string, unknown> = {}) => ({ assumptions: { ...CTX.assumptions, risk_horizon_years: 20, expected_real_return_equity_pct: 5, inflation_il_pct: 2.5, ...over }, taxRules: { ...CTX.taxRules } });
++
++describe("computePlanImpact", () => {
++  const base = snapshot([
++    item({ accountType: "BANK_CHECKING", valueBase: 500_000 }),
++    item({ accountType: "BROKERAGE_IL", valueBase: 300_000, growthSharePct: 40 }),
++    item({ kind: "MORTGAGE", accountType: null, valueBase: 600_000, mortgageTracks: [
++      { trackType: "PRIME", principalRemaining: 200_000, annualRatePct: 6, cpiLinked: false, endDate: "2040-01-01" },
++    ] }),
++  ]);
++
++  it("liquidity falls by the deployed amount; debt/interest fall by repayment", () => {
++    const sel: PlanSelection[] = [{ kind: "REPAY_EXPENSIVE_DEBT", amount: 100_000, ratePct: 6 }];
++    const im = computePlanImpact(base, ctx(), sel, 60_000, 60);
++    expect(im.liquidCashBefore).toBe(500_000);
++    expect(im.liquidCashAfter).toBe(400_000);
++    expect(im.totalDebtBefore).toBe(200_000);
++    expect(im.totalDebtAfter).toBe(100_000);
++    expect(im.annualInterestBefore).toBe(12_000);
++    expect(im.annualInterestAfter).toBe(6_000);
++  });
++
++  it("investing moves the growth share toward target and projects extra net worth", () => {
++    const sel: PlanSelection[] = [{ kind: "INVEST_GROWTH", amount: 200_000, ratePct: null }];
++    const im = computePlanImpact(base, ctx(), sel, 60_000, 70);
++    // before: 120k growth / 800k known = 15%; after: 320k / 1,000k = 32%
++    expect(im.growthPctBefore).toBe(15);
++    expect(im.growthPctAfter).toBe(32);
++    // 200k at 5% real over 20y: 200k*((1.05^20)-1) ≈ 200k*1.653 ≈ 330,660
++    expect(im.extraFromInvesting).toBeGreaterThan(300_000);
++    expect(im.projectedExtraNetWorth).toBe(im.extraFromInvesting);
++  });
++
++  it("debt uses the REAL rate for its guaranteed return", () => {
++    const sel: PlanSelection[] = [{ kind: "REPAY_EXPENSIVE_DEBT", amount: 100_000, ratePct: 6 }];
++    const im = computePlanImpact(base, ctx({ inflation_il_pct: 2.5 }), sel, 60_000, 60);
++    // real rate 3.5% over 20y: 100k*((1.035^20)-1) ≈ 100k*0.989 ≈ 98,900
++    expect(im.extraFromDebt).toBeGreaterThan(90_000);
++    expect(im.extraFromDebt).toBeLessThan(110_000);
++  });
++
++  it("tax deposits count as tax-free growth in the projection", () => {
++    const sel: PlanSelection[] = [{ kind: "TAX_CEILING_HISHTALMUT", amount: 20_000, ratePct: null }];
++    const im = computePlanImpact(base, ctx(), sel, 60_000, 60);
++    expect(im.taxCeilingsCaptured).toBe(20_000);
++    expect(im.extraFromTax).toBeGreaterThan(0);
++  });
++
++  it("goal gap reported from funded goals (PV, unchanged by the swap today)", () => {
++    const s2 = snapshot([
++      item({ accountType: "BANK_CHECKING", valueBase: 500_000 }),
++    ]);
++    s2.goals = [{ id: "g1", type: "RETIREMENT", name: "פרישה", priority: 1, targetDate: "2050-01-01", requiredFundingBase: 2_000_000 }];
++    const im = computePlanImpact(s2, ctx(), [{ kind: "INVEST_GROWTH", amount: 100_000, ratePct: null }], 60_000, 60);
++    expect(im.goalGapBefore).toBe(1_500_000); // 2M − 500k assets
++    expect(im.goalGapAfter).toBe(1_500_000);
++  });
++});
+diff --git a/packages/i18n/messages/en.json b/packages/i18n/messages/en.json
+index 8a9cee3..5b4b050 100644
+--- a/packages/i18n/messages/en.json
++++ b/packages/i18n/messages/en.json
+@@ -1054,6 +1054,21 @@
+       "OVER_ALLOCATED": "That would exceed your free cash — lower an amount first.",
+       "CANDIDATE_NOT_IN_PLAN": "Unknown action.",
+       "VARIANT_NOT_IN_PLAN": "Unknown preset."
+-    }
++    },
++    "groupInPlan": "In your plan",
++    "groupAvailable": "Available to add (from any path)",
++    "impactTitle": "If you approve this plan — before → after",
++    "impLiquidity": "Liquid cash",
++    "impGrowth": "Growth share (target {target}%)",
++    "impDebt": "Total mortgage debt",
++    "impInterest": "Annual mortgage interest",
++    "impTax": "Tax ceilings captured this year",
++    "impGoalGap": "Goal funding gap (today)",
++    "perYearShort": "yr",
++    "impProjectionLabel": "Extra real net worth in {years} years vs leaving the cash idle",
++    "impFromInvest": "from investing",
++    "impFromDebt": "from debt payoff",
++    "impFromTax": "from tax deposits",
++    "impNote": "Net worth today is unchanged — you swap cash for investments or lower debt. The gain is future: avoided interest and expected returns, in today's purchasing power. Not a guarantee."
+   }
+ }
+diff --git a/packages/i18n/messages/he.json b/packages/i18n/messages/he.json
+index bacb54b..e1ff958 100644
+--- a/packages/i18n/messages/he.json
++++ b/packages/i18n/messages/he.json
+@@ -1054,6 +1054,21 @@
+       "OVER_ALLOCATED": "זה יחרוג מהכסף הפנוי — הפחיתו סכום קודם.",
+       "CANDIDATE_NOT_IN_PLAN": "פעולה לא מוכרת.",
+       "VARIANT_NOT_IN_PLAN": "נקודת פתיחה לא מוכרת."
+-    }
++    },
++    "groupInPlan": "בתוכנית שלכם",
++    "groupAvailable": "זמינות להוספה (מכל מסלול)",
++    "impactTitle": "אם תאשרו את התוכנית — לפני → אחרי",
++    "impLiquidity": "מזומן נזיל",
++    "impGrowth": "רכיב צמיחה (יעד {target}%)",
++    "impDebt": "סך חוב משכנתא",
++    "impInterest": "ריבית משכנתא שנתית",
++    "impTax": "תקרות מס שנוצלו השנה",
++    "impGoalGap": "פער מימון היעדים (היום)",
++    "perYearShort": "שנה",
++    "impProjectionLabel": "תוספת שווי נקי ריאלי בעוד {years} שנים לעומת השארת המזומן ללא שימוש",
++    "impFromInvest": "מהשקעה",
++    "impFromDebt": "מפירעון חוב",
++    "impFromTax": "מהפקדות מס",
++    "impNote": "השווי הנקי היום אינו משתנה — אתם ממירים מזומן להשקעה או מקטינים חוב. הרווח הוא עתידי: ריבית שנחסכת ותשואות צפויות, בכוח הקנייה של היום. לא הבטחה."
+   }
+ }

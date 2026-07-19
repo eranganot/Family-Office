@@ -1054,6 +1054,21 @@
       "OVER_ALLOCATED": "That would exceed your free cash — lower an amount first.",
       "CANDIDATE_NOT_IN_PLAN": "Unknown action.",
       "VARIANT_NOT_IN_PLAN": "Unknown preset."
-    }
+    },
+    "groupInPlan": "In your plan",
+    "groupAvailable": "Available to add (from any path)",
+    "impactTitle": "If you approve this plan — before → after",
+    "impLiquidity": "Liquid cash",
+    "impGrowth": "Growth share (target {target}%)",
+    "impDebt": "Total mortgage debt",
+    "impInterest": "Annual mortgage interest",
+    "impTax": "Tax ceilings captured this year",
+    "impGoalGap": "Goal funding gap (today)",
+    "perYearShort": "yr",
+    "impProjectionLabel": "Extra real net worth in {years} years vs leaving the cash idle",
+    "impFromInvest": "from investing",
+    "impFromDebt": "from debt payoff",
+    "impFromTax": "from tax deposits",
+    "impNote": "Net worth today is unchanged — you swap cash for investments or lower debt. The gain is future: avoided interest and expected returns, in today's purchasing power. Not a guarantee."
   }
 }
