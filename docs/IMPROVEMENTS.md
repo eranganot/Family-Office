@@ -104,3 +104,11 @@ value-to-owner ÷ effort. ✅ = shipped in M14 during this review.
 - **Payslip ingestion:** owner suggested uploading one salary slip to auto-verify that payroll
   captures pension/hishtalmut ceilings (feeds the TAX_VERIFY_PAYROLL step). Fits the M2 adapter
   framework + trust ladder tier 3.
+
+## M27 backlog additions (owner, 2026-07-19)
+- **Form 106 adapter (auto-extract deposits):** parse the 106 PDF's pension/hishtalmut deposit rows
+  to auto-create contribution flows — removes manual flow mapping and satisfies TAX_VERIFY_PAYROLL
+  from real numbers. M2 adapter framework + trust ladder tier 3. (V1: one-click "confirm from 106".)
+- **Pre-import parsed-value editing:** editing the parsed numeric values before ייבוא (beyond docType,
+  shipped in M27, and ownership, already editable). Today values are correctable post-import via the
+  M3 verification "correct value" flow / suspense resolution.

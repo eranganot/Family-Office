@@ -42,6 +42,27 @@
   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
 
+## Current state (2026-07-20)
+
+- **M27 (deployment v3: editable working plan, partial debt, CI fix, doc-type edit) code-complete —
+  m27.patch on 9207ab9 (the pushed M26).** FIRST fixes the red CI on M26 (two unused-var lint errors:
+  `flow` in deployment.test, `opt` import in allocation-actions) — full-repo `eslint --max-warnings 0`
+  now clean.
+  Owner decisions 2026-07-19: (mix of editable working plan + cross-path cherry-pick) engine is now
+  CANDIDATE-based — computeDeploymentPlans returns `candidates` (one editable action per mortgage
+  TRACK for partial repayment, tax deposit/verify per member, growth+defensive invest) + `presets`
+  (GROWTH/DEBT_FREE/BALANCED seed entries) + `variants` (comparison cards, derived from presets).
+  Partial mortgage repayment = a smaller amount on a track candidate; highest-rate track first.
+  EMPLOYED members → non-editable TAX_VERIFY_PAYROLL candidate satisfiable by form 106 (owner: 106
+  already lists deposits — auto-extract backlogged; one-click "אשר על סמך טופס 106" now). AllocationPlan
+  gains `workingPlan Json` (migration 20260720090000); router applyPreset/setCandidate(bounds+over-alloc
+  guard)/approve replace M26 choose/decide. UI: comparison cards → "השתמש כבסיס" seeds an editable
+  working plan with per-candidate enable/amount, a live מוקצה/פנוי meter, over-allocation block, goal
+  impact per row; approve opens the STRATEGY gate. Doc-type edit: `documents.setDocType` + inline
+  selector on each uploaded doc (your #2; ownership already editable at import; parsed-value edit
+  backlogged). 9 engine deployment tests (engine-strategy 54), domain 34. Verified: eslint clean
+  (whole repo), engine+domain tests, api/web/registry tsc, prisma valid, i18n parity.
+
 ## Current state (2026-07-19)
 
 - **M26 (deployment plan v2 — variants, per-step decisions, employee-aware tax) code-complete —

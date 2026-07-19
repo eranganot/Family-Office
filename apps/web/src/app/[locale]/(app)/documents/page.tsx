@@ -1,6 +1,6 @@
 import { formatDate, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
-import { runImportAction, uploadDocumentAction } from "../../../../lib/actions/import-actions";
+import { runImportAction, setDocTypeAction, uploadDocumentAction } from "../../../../lib/actions/import-actions";
 import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 
@@ -77,6 +77,16 @@ export default async function DocumentsPage({
                     </span>
                   </div>
                 </div>
+                <form action={setDocTypeAction} className="mt-2 flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="locale" value={locale} />
+                  <input type="hidden" name="documentId" value={doc.id} />
+                  <Field label={t("docType")}>
+                    <Select name="docType" defaultValue={doc.docType ?? "OTHER"}>
+                      {DOC_TYPES.map((d) => <option key={d} value={d}>{t(`types.${d}`)}</option>)}
+                    </Select>
+                  </Field>
+                  <button type="submit" className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm">{t("updateDocType")}</button>
+                </form>
                 <form action={runImportAction} className="mt-2 flex flex-wrap items-end gap-3">
                   <input type="hidden" name="locale" value={locale} />
                   <input type="hidden" name="documentId" value={doc.id} />

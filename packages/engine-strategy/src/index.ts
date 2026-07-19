@@ -8,7 +8,7 @@ export type { Rationale, RecommendationDraft } from "./rationale";
 export { validateStrategyText } from "./validator";
 export { actionItemsFor } from "./action-items";
 export { computeDeploymentPlans } from "./deployment";
-export type { DeploymentPlans, DeploymentVariant, DeploymentVariantKey, DeploymentStep, DeploymentStepKind, DeploymentNote } from "./deployment";
+export type { DeploymentPlans, DeploymentVariant, DeploymentVariantKey, DeploymentStep, DeploymentStepKind, DeploymentNote, DeploymentCandidate, PresetEntry } from "./deployment";
 export type { ActionItems } from "./action-items";
 export { scorePriority } from "./scoring";
 export type { PriorityWeights } from "./scoring";

@@ -36,7 +36,8 @@ export async function runAllocation(db: PrismaClient, householdId: string): Prom
   };
 
   const plan = computeDeploymentPlans(payload, ctx);
-  const nothingToDecide = plan.variants.every((v) => v.steps.length === 0);
+  const actionable = plan.candidates.some((c) => c.kind !== "TAX_VERIFY_PAYROLL");
+  const nothingToDecide = !actionable;
   const status = nothingToDecide ? "APPROVED" : "PROPOSED";
 
   const row = await db.$transaction(async (tx) => {

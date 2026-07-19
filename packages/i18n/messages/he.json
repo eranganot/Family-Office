@@ -336,7 +336,8 @@
       "MORTGAGE_SCHEDULE": "לוח סילוקין משכנתא",
       "TAX_106": "טופס 106",
       "OTHER": "אחר"
-    }
+    },
+    "updateDocType": "עדכון סוג"
   },
   "verification": {
     "explainerTitle": "מה זה הטאב הזה?",
@@ -988,12 +989,12 @@
     "noSteps": "אין צעדי פריסה — הכרית צורכת את כל המזומן הזמין.",
     "kinds": {
       "BUFFER_TOP_UP": "השלמת כרית",
-      "REPAY_EXPENSIVE_DEBT": "פירעון חוב יקר",
+      "REPAY_EXPENSIVE_DEBT": "פירעון מסלול יקר",
       "TAX_CEILING_HISHTALMUT": "תקרת השתלמות",
       "TAX_CEILING_PENSION": "תקרת פנסיה",
       "INVEST_GROWTH": "השקעה — צמיחה",
       "INVEST_DEFENSIVE": "השקעה — סולידי",
-      "REPAY_DEBT": "פירעון חוב",
+      "REPAY_DEBT": "פירעון מסלול",
       "TAX_VERIFY_PAYROLL": "בדיקת תלוש"
     },
     "approveNote": "הערה (רשות)",
@@ -1032,6 +1033,27 @@
     "declineStep": "דחייה",
     "stepApproved": "אושר",
     "stepDeclined": "נדחה",
-    "progress": "הוכרעו {decided} מתוך {total} צעדים"
+    "progress": "הוכרעו {decided} מתוך {total} צעדים",
+    "introV3": "שלוש פילוסופיות לכסף הפנוי — בחרו אחת כנקודת פתיחה, ואז ערכו בחופשיות: הדליקו או כבו כל פעולה, קבעו סכום חלקי (פירעון חלק ממסלול משכנתא) וערבבו בין המסלולים. אשרו כשהתוכנית נכנסת בתוך הכסף הפנוי.",
+    "usePreset": "שימוש כנקודת פתיחה",
+    "presetFirst": "בחרו נקודת פתיחה למעלה, ואז כווננו את התוכנית.",
+    "workingTitle": "התוכנית שלכם",
+    "workingHint": "הדליקו/כבו כל פעולה וקבעו סכומים. לפירעון חלקי של מסלול הזינו סכום קטן יותר. המד שומר אתכם בתוך הכסף הפנוי.",
+    "allocated": "מוקצה",
+    "remaining": "נותר פנוי",
+    "overAllocated": "חורג מהכסף הפנוי — הפחיתו משהו.",
+    "upTo": "עד",
+    "update": "עדכון",
+    "enable": "הוספה",
+    "remove": "הסרה",
+    "markDone": "בוצע ✓",
+    "confirm106": "אישור על סמך טופס 106",
+    "done": "אושר",
+    "approvePlan": "אישור התוכנית",
+    "errors": {
+      "OVER_ALLOCATED": "זה יחרוג מהכסף הפנוי — הפחיתו סכום קודם.",
+      "CANDIDATE_NOT_IN_PLAN": "פעולה לא מוכרת.",
+      "VARIANT_NOT_IN_PLAN": "נקודת פתיחה לא מוכרת."
+    }
   }
 }

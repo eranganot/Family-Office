@@ -1,0 +1,1486 @@
+diff --git a/STATUS.md b/STATUS.md
+index 45e1a4a..52423ae 100644
+--- a/STATUS.md
++++ b/STATUS.md
+@@ -17,6 +17,27 @@
+   Verified: registry 7 tests, engine-scenario 14 tests, tsc (registry/scenario/api/web), i18n parity.
+   Patches on the mount: `m24.patch` (on top of m23) and `m23-m24-combined.patch` (directly on a069108).
+ 
++## Current state (2026-07-20)
++
++- **M27 (deployment v3: editable working plan, partial debt, CI fix, doc-type edit) code-complete —
++  m27.patch on 9207ab9 (the pushed M26).** FIRST fixes the red CI on M26 (two unused-var lint errors:
++  `flow` in deployment.test, `opt` import in allocation-actions) — full-repo `eslint --max-warnings 0`
++  now clean.
++  Owner decisions 2026-07-19: (mix of editable working plan + cross-path cherry-pick) engine is now
++  CANDIDATE-based — computeDeploymentPlans returns `candidates` (one editable action per mortgage
++  TRACK for partial repayment, tax deposit/verify per member, growth+defensive invest) + `presets`
++  (GROWTH/DEBT_FREE/BALANCED seed entries) + `variants` (comparison cards, derived from presets).
++  Partial mortgage repayment = a smaller amount on a track candidate; highest-rate track first.
++  EMPLOYED members → non-editable TAX_VERIFY_PAYROLL candidate satisfiable by form 106 (owner: 106
++  already lists deposits — auto-extract backlogged; one-click "אשר על סמך טופס 106" now). AllocationPlan
++  gains `workingPlan Json` (migration 20260720090000); router applyPreset/setCandidate(bounds+over-alloc
++  guard)/approve replace M26 choose/decide. UI: comparison cards → "השתמש כבסיס" seeds an editable
++  working plan with per-candidate enable/amount, a live מוקצה/פנוי meter, over-allocation block, goal
++  impact per row; approve opens the STRATEGY gate. Doc-type edit: `documents.setDocType` + inline
++  selector on each uploaded doc (your #2; ownership already editable at import; parsed-value edit
++  backlogged). 9 engine deployment tests (engine-strategy 54), domain 34. Verified: eslint clean
++  (whole repo), engine+domain tests, api/web/registry tsc, prisma valid, i18n parity.
++
+ ## Current state (2026-07-19)
+ 
+ - **M26 (deployment plan v2 — variants, per-step decisions, employee-aware tax) code-complete —
+diff --git a/apps/web/src/app/[locale]/(app)/allocation/page.tsx b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+index 7d8ee83..c05e747 100644
+--- a/apps/web/src/app/[locale]/(app)/allocation/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/allocation/page.tsx
+@@ -1,33 +1,32 @@
+ import { formatMoney, type Locale } from "@wealthos/i18n";
+ import { getTranslations } from "next-intl/server";
+-import { chooseVariantAction, decideStepAction, generatePlanAction } from "../../../../lib/actions/allocation-actions";
+-import { Card } from "../../../../components/fields";
++import { applyPresetAction, approveWorkingPlanAction, generatePlanAction, setCandidateAction } from "../../../../lib/actions/allocation-actions";
++import { Card, TextInput } from "../../../../components/fields";
+ import { serverCaller } from "../../../../lib/trpc-server";
+ import { Link } from "../../../../i18n/navigation";
+ 
+-/** M26 — variantized ALLOCATION page: pick a philosophy, then decide every step. */
++/** M27 — candidate-based ALLOCATION page: presets seed an editable working plan. */
+ 
+-interface StepShape {
+-  id: string; kind: string; amountBase: number;
++interface Candidate {
++  id: string; kind: string; editable: boolean; minAmount: number; maxAmount: number;
++  suggestedAmount: number; ratePct: number | null;
+   detail: string; detailHe: string; goalImpact: string; goalImpactHe: string;
+ }
+-interface VariantShape {
++interface Variant {
+   key: "GROWTH" | "DEBT_FREE" | "BALANCED";
+-  steps: StepShape[]; leftoverBase: number;
+   summary: { investedBase: number; debtRepaidBase: number; interestSavedYearBase: number; ceilingDepositsBase: number };
+   pros: string[]; prosHe: string[]; cons: string[]; consHe: string[]; risks: string[]; risksHe: string[];
+ }
+-interface PlansShape {
++interface Plans {
+   monthlyExpensesBase: number | null; bufferTargetBase: number | null;
+-  cashBase: number; freeCashBase: number; variants: VariantShape[]; notes: string[];
++  cashBase: number; freeCashBase: number; candidates: Candidate[];
++  variants: Variant[]; notes: string[];
+ }
++type WP = Record<string, { enabled: boolean; amount: number }>;
+ 
+ export default async function AllocationPage({
+   params, searchParams,
+-}: {
+-  params: Promise<{ locale: string }>;
+-  searchParams: Promise<{ error?: string }>;
+-}) {
++}: { params: Promise<{ locale: string }>; searchParams: Promise<{ error?: string }> }) {
+   const { locale } = await params;
+   const { error } = await searchParams;
+   const t = await getTranslations("allocation");
+@@ -48,33 +47,30 @@ export default async function AllocationPage({
+   }
+ 
+   const latest = await trpc.allocation.latest();
+-  const plan = (latest?.plan ?? null) as PlansShape | null;
+-  const isV2 = !!plan && Array.isArray(plan.variants);
+-  const chosenKey = (latest?.chosenVariant ?? null) as VariantShape["key"] | null;
+-  const chosen = isV2 && chosenKey ? plan!.variants.find((v) => v.key === chosenKey) ?? null : null;
+-  const decisions = (latest?.stepDecisions ?? {}) as Record<string, "APPROVED" | "DECLINED">;
++  const plan = (latest?.plan ?? null) as Plans | null;
++  const isV3 = !!plan && Array.isArray(plan.candidates);
++  const wp = (latest?.workingPlan ?? {}) as WP;
++  const proposed = latest?.status === "PROPOSED";
++  const allocatedTotal = isV3 ? Object.values(wp).reduce((s, e) => s + (e.enabled ? e.amount : 0), 0) : 0;
++  const remaining = isV3 ? plan!.freeCashBase - allocatedTotal : 0;
+ 
+   return (
+     <div className="flex flex-col gap-6">
+       <Card title={t("title")}>
+-        <p className="mb-3 text-sm text-neutral-600">{t("introV2")}</p>
+-        {error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{decodeURIComponent(error)}</p> : null}
++        <p className="mb-3 text-sm text-neutral-600">{t("introV3")}</p>
++        {error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{t.has(`errors.${decodeURIComponent(error)}`) ? t(`errors.${decodeURIComponent(error)}`) : decodeURIComponent(error)}</p> : null}
+         <form action={generatePlanAction}>
+           <input type="hidden" name="locale" value={locale} />
+-          <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+-            {latest ? t("regenerate") : t("generate")}
+-          </button>
++          <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{latest ? t("regenerate") : t("generate")}</button>
+         </form>
+-        {latest && !isV2 ? <p className="mt-3 text-sm text-amber-700">{t("legacyPlan")}</p> : null}
++        {latest && !isV3 ? <p className="mt-3 text-sm text-amber-700">{t("legacyPlan")}</p> : null}
+       </Card>
+ 
+-      {latest && isV2 && plan ? (
++      {latest && isV3 && plan ? (
+         <>
+           <Card title={`${t("planTitle")} · ${new Date(latest.createdAt).toLocaleDateString(he ? "he-IL" : "en-GB")}`}>
+             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+-              <span className={`rounded-full px-2 py-0.5 font-medium ${latest.status === "APPROVED" ? "bg-green-50 text-green-700" : latest.status === "PROPOSED" ? "bg-amber-50 text-amber-700" : "bg-neutral-100 text-neutral-500"}`}>
+-                {t(`status.${latest.status}`)}
+-              </span>
++              <span className={`rounded-full px-2 py-0.5 font-medium ${latest.status === "APPROVED" ? "bg-green-50 text-green-700" : proposed ? "bg-amber-50 text-amber-700" : "bg-neutral-100 text-neutral-500"}`}>{t(`status.${latest.status}`)}</span>
+               {latest.note === "AUTO_APPROVED_NOTHING_TO_DEPLOY" ? <span className="text-neutral-400">{t("autoApproved")}</span> : null}
+             </div>
+             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+@@ -83,101 +79,102 @@ export default async function AllocationPage({
+               <Stat label={t("freeCash")} value={nis(plan.freeCashBase)} highlight={plan.freeCashBase > 0} />
+               <Stat label={t("monthlyExpenses")} value={plan.monthlyExpensesBase !== null ? nis(plan.monthlyExpensesBase) : "—"} />
+             </div>
+-            {plan.notes.includes("EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED") ? (
+-              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{t("expensesUnknown")}</p>
+-            ) : null}
++            {plan.notes.includes("EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED") ? <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{t("expensesUnknown")}</p> : null}
+           </Card>
+ 
+-          {latest.status === "PROPOSED" && plan.variants.length > 1 ? (
++          {proposed && plan.variants.length > 1 ? (
+             <div className="grid gap-4 lg:grid-cols-3">
+-              {plan.variants.map((v) => {
+-                const active = chosenKey === v.key;
+-                return (
+-                  <div key={v.key} className={`flex flex-col rounded-xl border p-4 ${active ? "border-blue-500 ring-2 ring-blue-200" : "border-neutral-200"}`}>
+-                    <h3 className="mb-1 text-base font-semibold">{t(`variants.${v.key}.name`)}</h3>
+-                    <p className="mb-3 text-xs text-neutral-500">{t(`variants.${v.key}.tagline`)}</p>
+-                    <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+-                      <Stat label={t("sumInvested")} value={nis(v.summary.investedBase)} />
+-                      <Stat label={t("sumDebtRepaid")} value={nis(v.summary.debtRepaidBase)} />
+-                      <Stat label={t("sumInterestSaved")} value={`${nis(v.summary.interestSavedYearBase)}/${t("perYear")}`} />
+-                      <Stat label={t("sumCeilings")} value={nis(v.summary.ceilingDepositsBase)} />
+-                    </div>
+-                    <NarrativeList title={t("pros")} items={he ? v.prosHe : v.pros} tone="green" />
+-                    <NarrativeList title={t("cons")} items={he ? v.consHe : v.cons} tone="amber" />
+-                    <NarrativeList title={t("risks")} items={he ? v.risksHe : v.risks} tone="red" />
+-                    <form action={chooseVariantAction} className="mt-auto pt-3">
+-                      <input type="hidden" name="locale" value={locale} />
+-                      <input type="hidden" name="id" value={latest.id} />
+-                      <input type="hidden" name="variant" value={v.key} />
+-                      <button type="submit" className={`w-full rounded-lg px-3 py-2 text-sm font-medium ${active ? "bg-blue-600 text-white" : "border border-blue-300 text-blue-700 hover:bg-blue-50"}`}>
+-                        {active ? t("chosen") : t("choose")}
+-                      </button>
+-                    </form>
++              {plan.variants.map((v) => (
++                <div key={v.key} className={`flex flex-col rounded-xl border p-4 ${latest.chosenVariant === v.key ? "border-blue-500 ring-2 ring-blue-200" : "border-neutral-200"}`}>
++                  <h3 className="mb-1 text-base font-semibold">{t(`variants.${v.key}.name`)}</h3>
++                  <p className="mb-3 text-xs text-neutral-500">{t(`variants.${v.key}.tagline`)}</p>
++                  <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
++                    <Stat label={t("sumInvested")} value={nis(v.summary.investedBase)} />
++                    <Stat label={t("sumDebtRepaid")} value={nis(v.summary.debtRepaidBase)} />
++                    <Stat label={t("sumInterestSaved")} value={`${nis(v.summary.interestSavedYearBase)}/${t("perYear")}`} />
++                    <Stat label={t("sumCeilings")} value={nis(v.summary.ceilingDepositsBase)} />
+                   </div>
+-                );
+-              })}
++                  <NList title={t("pros")} items={he ? v.prosHe : v.pros} tone="green" />
++                  <NList title={t("cons")} items={he ? v.consHe : v.cons} tone="amber" />
++                  <NList title={t("risks")} items={he ? v.risksHe : v.risks} tone="red" />
++                  <form action={applyPresetAction} className="mt-auto pt-3">
++                    <input type="hidden" name="locale" value={locale} />
++                    <input type="hidden" name="id" value={latest.id} />
++                    <input type="hidden" name="variant" value={v.key} />
++                    <button type="submit" className={`w-full rounded-lg px-3 py-2 text-sm font-medium ${latest.chosenVariant === v.key ? "bg-blue-600 text-white" : "border border-blue-300 text-blue-700 hover:bg-blue-50"}`}>{t("usePreset")}</button>
++                  </form>
++                </div>
++              ))}
+             </div>
+           ) : null}
+ 
+-          {chosen ? (
+-            <Card title={`${t("stepsTitle")} — ${t(`variants.${chosen.key}.name`)}`}>
+-              <p className="mb-3 text-xs text-neutral-500">{t("stepsHint")}</p>
+-              <ol className="flex flex-col gap-2">
+-                {chosen.steps.map((s, i) => {
+-                  const d = decisions[s.id];
++          {Object.keys(wp).length > 0 ? (
++            <Card title={t("workingTitle")}>
++              <p className="mb-2 text-xs text-neutral-500">{t("workingHint")}</p>
++              <div className={`mb-4 flex flex-wrap gap-4 rounded-lg px-3 py-2 text-sm ${remaining < -1 ? "bg-red-50 text-red-700" : "bg-neutral-50"}`}>
++                <span>{t("allocated")}: <b>{nis(allocatedTotal)}</b></span>
++                <span>{t("remaining")}: <b>{nis(Math.max(0, remaining))}</b></span>
++                {remaining < -1 ? <span className="font-medium">{t("overAllocated")}</span> : null}
++              </div>
++              <ul className="flex flex-col gap-2">
++                {plan.candidates.map((c) => {
++                  const st = wp[c.id] ?? { enabled: c.kind === "TAX_VERIFY_PAYROLL", amount: c.suggestedAmount };
++                  const on = st.enabled;
+                   return (
+-                    <li key={s.id} className={`flex items-start gap-3 rounded-lg border p-3 ${d === "APPROVED" ? "border-green-200 bg-green-50/40" : d === "DECLINED" ? "border-neutral-200 bg-neutral-50 opacity-70" : "border-neutral-100"}`}>
+-                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">{i + 1}</span>
+-                      <div className="grow">
+-                        <div className="mb-0.5 flex flex-wrap items-center gap-2 text-xs">
+-                          <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{t(`kinds.${s.kind}`)}</span>
+-                          {s.amountBase > 0 ? <span className="font-semibold">{nis(s.amountBase)}</span> : null}
+-                          {d ? (
+-                            <span className={`rounded-full px-2 py-0.5 font-medium ${d === "APPROVED" ? "bg-green-100 text-green-700" : "bg-neutral-200 text-neutral-600"}`}>
+-                              {d === "APPROVED" ? t("stepApproved") : t("stepDeclined")}
+-                            </span>
+-                          ) : null}
+-                        </div>
+-                        <p className="text-sm text-neutral-700" dir="auto">{he ? s.detailHe : s.detail}</p>
+-                        <p className="mt-0.5 text-xs text-blue-700" dir="auto">◎ {he ? s.goalImpactHe : s.goalImpact}</p>
++                    <li key={c.id} className={`rounded-lg border p-3 ${on ? "border-green-200 bg-green-50/30" : "border-neutral-100"}`}>
++                      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs">
++                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium">{t(`kinds.${c.kind}`)}</span>
++                        {c.ratePct !== null ? <span className="text-neutral-500">{c.ratePct}%</span> : null}
++                        {c.kind !== "TAX_VERIFY_PAYROLL" ? <span className="text-neutral-400">{t("upTo")} {nis(c.maxAmount)}</span> : null}
+                       </div>
+-                      {latest.status === "PROPOSED" ? (
+-                        <div className="flex shrink-0 flex-col gap-1">
+-                          {(["APPROVED", "DECLINED"] as const).map((decision) => (
+-                            <form key={decision} action={decideStepAction}>
++                      <p className="text-sm text-neutral-700" dir="auto">{he ? c.detailHe : c.detail}</p>
++                      <p className="mt-0.5 text-xs text-blue-700" dir="auto">◎ {he ? c.goalImpactHe : c.goalImpact}</p>
++                      {proposed ? (
++                        <div className="mt-2 flex flex-wrap items-center gap-2">
++                          {c.editable ? (
++                            <form action={setCandidateAction} className="flex items-center gap-2">
++                              <input type="hidden" name="locale" value={locale} />
++                              <input type="hidden" name="id" value={latest.id} />
++                              <input type="hidden" name="candidateId" value={c.id} />
++                              <input type="hidden" name="enabled" value="1" />
++                              <TextInput name="amount" inputMode="numeric" defaultValue={String(on ? st.amount : c.suggestedAmount || Math.min(c.maxAmount, plan.freeCashBase))} />
++                              <button type="submit" className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white">{on ? t("update") : t("enable")}</button>
++                            </form>
++                          ) : (
++                            <form action={setCandidateAction}>
+                               <input type="hidden" name="locale" value={locale} />
+                               <input type="hidden" name="id" value={latest.id} />
+-                              <input type="hidden" name="stepId" value={s.id} />
+-                              <input type="hidden" name="decision" value={decision} />
+-                              <button
+-                                type="submit"
+-                                className={
+-                                  decision === "APPROVED"
+-                                    ? `rounded px-2.5 py-1 text-xs font-medium ${d === "APPROVED" ? "bg-green-600 text-white" : "border border-green-300 text-green-700"}`
+-                                    : `rounded px-2.5 py-1 text-xs font-medium ${d === "DECLINED" ? "bg-neutral-500 text-white" : "border border-neutral-300 text-neutral-500"}`
+-                                }
+-                              >
+-                                {decision === "APPROVED" ? t("approveStep") : t("declineStep")}
+-                              </button>
++                              <input type="hidden" name="candidateId" value={c.id} />
++                              <input type="hidden" name="enabled" value={on ? "0" : "1"} />
++                              <button type="submit" className={`rounded px-3 py-1.5 text-xs font-medium ${on ? "bg-green-600 text-white" : "border border-green-300 text-green-700"}`}>{on ? t("markDone") : t("confirm106")}</button>
+                             </form>
+-                          ))}
++                          )}
++                          {on && c.editable ? (
++                            <form action={setCandidateAction}>
++                              <input type="hidden" name="locale" value={locale} />
++                              <input type="hidden" name="id" value={latest.id} />
++                              <input type="hidden" name="candidateId" value={c.id} />
++                              <input type="hidden" name="enabled" value="0" />
++                              <input type="hidden" name="amount" value={String(st.amount)} />
++                              <button type="submit" className="rounded border border-neutral-300 px-3 py-1.5 text-xs text-neutral-500">{t("remove")}</button>
++                            </form>
++                          ) : null}
+                         </div>
+-                      ) : null}
++                      ) : on ? <p className="mt-1 text-sm font-medium text-green-700">{c.kind === "TAX_VERIFY_PAYROLL" ? t("done") : nis(st.amount)}</p> : null}
+                     </li>
+                   );
+                 })}
+-              </ol>
+-              {latest.status === "PROPOSED" ? (
+-                <p className="mt-3 text-xs text-neutral-500">
+-                  {t("progress", { decided: chosen.steps.filter((s) => decisions[s.id]).length, total: chosen.steps.length })}
+-                </p>
+-              ) : (
+-                <p className="mt-3 text-sm text-green-700">{t("approvedNext")}</p>
+-              )}
++              </ul>
++              {proposed ? (
++                <form action={approveWorkingPlanAction} className="mt-4 flex flex-wrap items-end gap-3">
++                  <input type="hidden" name="locale" value={locale} />
++                  <input type="hidden" name="id" value={latest.id} />
++                  <TextInput name="note" placeholder={t("approveNote")} />
++                  <button type="submit" disabled={remaining < -1} className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${remaining < -1 ? "bg-neutral-300" : "bg-green-600"}`}>{t("approvePlan")}</button>
++                </form>
++              ) : <p className="mt-4 text-sm text-green-700">{t("approvedNext")}</p>}
+             </Card>
+-          ) : latest.status === "PROPOSED" && plan.variants.length > 1 ? (
+-            <p className="text-center text-sm text-neutral-500">{t("chooseFirst")}</p>
+-          ) : null}
++          ) : proposed && plan.variants.length > 1 ? <p className="text-center text-sm text-neutral-500">{t("presetFirst")}</p> : null}
+         </>
+       ) : null}
+     </div>
+@@ -185,23 +182,10 @@ export default async function AllocationPage({
+ }
+ 
+ function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+-  return (
+-    <div>
+-      <div className="text-xs text-neutral-400">{label}</div>
+-      <div className={`font-medium ${highlight ? "text-blue-700" : ""}`}>{value}</div>
+-    </div>
+-  );
++  return <div><div className="text-xs text-neutral-400">{label}</div><div className={`font-medium ${highlight ? "text-blue-700" : ""}`}>{value}</div></div>;
+ }
+-
+-function NarrativeList({ title, items, tone }: { title: string; items: string[]; tone: "green" | "amber" | "red" }) {
++function NList({ title, items, tone }: { title: string; items: string[]; tone: "green" | "amber" | "red" }) {
+   if (items.length === 0) return null;
+-  const color = tone === "green" ? "text-green-700" : tone === "amber" ? "text-amber-700" : "text-red-700";
+-  return (
+-    <div className="mb-2">
+-      <div className={`mb-0.5 text-xs font-semibold ${color}`}>{title}</div>
+-      <ul className="list-inside list-disc text-xs text-neutral-600">
+-        {items.map((x, i) => <li key={i} dir="auto">{x}</li>)}
+-      </ul>
+-    </div>
+-  );
++  const c = tone === "green" ? "text-green-700" : tone === "amber" ? "text-amber-700" : "text-red-700";
++  return <div className="mb-2"><div className={`mb-0.5 text-xs font-semibold ${c}`}>{title}</div><ul className="list-inside list-disc text-xs text-neutral-600">{items.map((x, i) => <li key={i} dir="auto">{x}</li>)}</ul></div>;
+ }
+diff --git a/apps/web/src/app/[locale]/(app)/documents/page.tsx b/apps/web/src/app/[locale]/(app)/documents/page.tsx
+index b41ee3d..72e0feb 100644
+--- a/apps/web/src/app/[locale]/(app)/documents/page.tsx
++++ b/apps/web/src/app/[locale]/(app)/documents/page.tsx
+@@ -1,6 +1,6 @@
+ import { formatDate, type Locale } from "@wealthos/i18n";
+ import { getTranslations } from "next-intl/server";
+-import { runImportAction, uploadDocumentAction } from "../../../../lib/actions/import-actions";
++import { runImportAction, setDocTypeAction, uploadDocumentAction } from "../../../../lib/actions/import-actions";
+ import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
+ import { serverCaller } from "../../../../lib/trpc-server";
+ 
+@@ -77,6 +77,16 @@ export default async function DocumentsPage({
+                     </span>
+                   </div>
+                 </div>
++                <form action={setDocTypeAction} className="mt-2 flex flex-wrap items-end gap-2">
++                  <input type="hidden" name="locale" value={locale} />
++                  <input type="hidden" name="documentId" value={doc.id} />
++                  <Field label={t("docType")}>
++                    <Select name="docType" defaultValue={doc.docType ?? "OTHER"}>
++                      {DOC_TYPES.map((d) => <option key={d} value={d}>{t(`types.${d}`)}</option>)}
++                    </Select>
++                  </Field>
++                  <button type="submit" className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm">{t("updateDocType")}</button>
++                </form>
+                 <form action={runImportAction} className="mt-2 flex flex-wrap items-end gap-3">
+                   <input type="hidden" name="locale" value={locale} />
+                   <input type="hidden" name="documentId" value={doc.id} />
+diff --git a/apps/web/src/lib/actions/allocation-actions.ts b/apps/web/src/lib/actions/allocation-actions.ts
+index 5250b8f..14c84fb 100644
+--- a/apps/web/src/lib/actions/allocation-actions.ts
++++ b/apps/web/src/lib/actions/allocation-actions.ts
+@@ -4,11 +4,10 @@ import { redirect } from "next/navigation";
+ import { serverCaller } from "../trpc-server";
+ import { opt, str } from "./form-helpers";
+ 
+-export async function generatePlanAction(fd: FormData): Promise<void> {
+-  const locale = str(fd, "locale");
++async function run(locale: string, fn: (trpc: Awaited<ReturnType<typeof serverCaller>>) => Promise<unknown>): Promise<never> {
+   const trpc = await serverCaller();
+   try {
+-    await trpc.allocation.generate();
++    await fn(trpc);
+   } catch (e) {
+     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 120)) : "UNKNOWN";
+     redirect(`/${locale}/allocation?error=${code}`);
+@@ -16,31 +15,30 @@ export async function generatePlanAction(fd: FormData): Promise<void> {
+   redirect(`/${locale}/allocation`);
+ }
+ 
++export async function generatePlanAction(fd: FormData): Promise<void> {
++  await run(str(fd, "locale"), (trpc) => trpc.allocation.generate());
++}
+ 
+-export async function chooseVariantAction(fd: FormData): Promise<void> {
+-  const locale = str(fd, "locale");
+-  const trpc = await serverCaller();
+-  try {
+-    await trpc.allocation.chooseVariant({ id: str(fd, "id"), variant: str(fd, "variant") as never });
+-  } catch (e) {
+-    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 120)) : "UNKNOWN";
+-    redirect(`/${locale}/allocation?error=${code}`);
+-  }
+-  redirect(`/${locale}/allocation`);
++export async function applyPresetAction(fd: FormData): Promise<void> {
++  await run(str(fd, "locale"), (trpc) =>
++    trpc.allocation.applyPreset({ id: str(fd, "id"), variant: str(fd, "variant") as never }),
++  );
+ }
+ 
+-export async function decideStepAction(fd: FormData): Promise<void> {
+-  const locale = str(fd, "locale");
+-  const trpc = await serverCaller();
+-  try {
+-    await trpc.allocation.decideStep({
++export async function setCandidateAction(fd: FormData): Promise<void> {
++  const amountRaw = opt(fd, "amount");
++  await run(str(fd, "locale"), (trpc) =>
++    trpc.allocation.setCandidate({
+       id: str(fd, "id"),
+-      stepId: str(fd, "stepId"),
+-      decision: str(fd, "decision") as never,
+-    });
+-  } catch (e) {
+-    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 120)) : "UNKNOWN";
+-    redirect(`/${locale}/allocation?error=${code}`);
+-  }
+-  redirect(`/${locale}/allocation`);
++      candidateId: str(fd, "candidateId"),
++      enabled: str(fd, "enabled") === "1",
++      ...(amountRaw !== undefined ? { amount: Number(amountRaw) } : {}),
++    }),
++  );
++}
++
++export async function approveWorkingPlanAction(fd: FormData): Promise<void> {
++  await run(str(fd, "locale"), (trpc) =>
++    trpc.allocation.approve({ id: str(fd, "id"), note: opt(fd, "note") }),
++  );
+ }
+diff --git a/apps/web/src/lib/actions/import-actions.ts b/apps/web/src/lib/actions/import-actions.ts
+index 22a748f..06aec1a 100644
+--- a/apps/web/src/lib/actions/import-actions.ts
++++ b/apps/web/src/lib/actions/import-actions.ts
+@@ -39,3 +39,18 @@ export async function runImportAction(fd: FormData): Promise<void> {
+   }
+   redirect(`/${locale}/documents?report=${batchId}`);
+ }
++
++export async function setDocTypeAction(fd: FormData): Promise<void> {
++  const locale = str(fd, "locale");
++  const trpc = await serverCaller();
++  try {
++    await trpc.documents.setDocType({
++      id: str(fd, "documentId"),
++      docType: str(fd, "docType") as never,
++    });
++  } catch (e) {
++    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "UNKNOWN";
++    redirect(`/${locale}/documents?error=${code}`);
++  }
++  redirect(`/${locale}/documents`);
++}
+diff --git a/docs/IMPROVEMENTS.md b/docs/IMPROVEMENTS.md
+index e152789..68f04e9 100644
+--- a/docs/IMPROVEMENTS.md
++++ b/docs/IMPROVEMENTS.md
+@@ -104,3 +104,11 @@ value-to-owner ÷ effort. ✅ = shipped in M14 during this review.
+ - **Payslip ingestion:** owner suggested uploading one salary slip to auto-verify that payroll
+   captures pension/hishtalmut ceilings (feeds the TAX_VERIFY_PAYROLL step). Fits the M2 adapter
+   framework + trust ladder tier 3.
++
++## M27 backlog additions (owner, 2026-07-19)
++- **Form 106 adapter (auto-extract deposits):** parse the 106 PDF's pension/hishtalmut deposit rows
++  to auto-create contribution flows — removes manual flow mapping and satisfies TAX_VERIFY_PAYROLL
++  from real numbers. M2 adapter framework + trust ladder tier 3. (V1: one-click "confirm from 106".)
++- **Pre-import parsed-value editing:** editing the parsed numeric values before ייבוא (beyond docType,
++  shipped in M27, and ownership, already editable). Today values are correctable post-import via the
++  M3 verification "correct value" flow / suspense resolution.
+diff --git a/packages/api/src/routers/allocation.ts b/packages/api/src/routers/allocation.ts
+index a5a8ca4..a59146a 100644
+--- a/packages/api/src/routers/allocation.ts
++++ b/packages/api/src/routers/allocation.ts
+@@ -6,64 +6,72 @@ import { protectedProcedure, router, workflowGuard } from "../trpc";
+ import { requireHouseholdId } from "./ledger";
+ 
+ /**
+- * M26 — ALLOCATION phase router v2: three variants per plan; the household picks
+- * one, then decides EVERY step individually (owner decision: full audit trail).
+- * The plan flips to APPROVED automatically when the chosen variant's last step
+- * is decided — that approval is the state-machine gate into STRATEGY.
++ * M27 — ALLOCATION router v3: an editable working plan over the engine's candidate
++ * menu. Presets seed it; the household then toggles candidates and edits amounts
++ * (partial mortgage repayment, cross-path mixing); approving it (sum within free
++ * cash) opens the state-machine gate into STRATEGY.
+  */
++type WorkingPlan = Record<string, { enabled: boolean; amount: number }>;
++
++function planOf(row: { plan: unknown }): DeploymentPlans {
++  return row.plan as unknown as DeploymentPlans;
++}
++function allocated(wp: WorkingPlan): number {
++  return Object.values(wp).reduce((t, e) => t + (e.enabled ? e.amount : 0), 0);
++}
++
+ export const allocationRouter = router({
+   latest: protectedProcedure.query(async ({ ctx }) => {
+     const householdId = await requireHouseholdId(ctx.db);
+-    return ctx.db.allocationPlan.findFirst({
+-      where: { householdId },
+-      orderBy: { createdAt: "desc" },
+-    });
++    return ctx.db.allocationPlan.findFirst({ where: { householdId }, orderBy: { createdAt: "desc" } });
+   }),
+ 
+-  generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => {
+-    return runAllocation(ctx.db, ctx.householdId);
+-  }),
++  generate: workflowGuard("ALLOCATION").mutation(async ({ ctx }) => runAllocation(ctx.db, ctx.householdId)),
+ 
+-  chooseVariant: workflowGuard("ALLOCATION")
++  /** Seed the working plan from a named preset (does not approve). */
++  applyPreset: workflowGuard("ALLOCATION")
+     .input(z.object({ id: z.uuid(), variant: z.enum(["GROWTH", "DEBT_FREE", "BALANCED"]) }))
+     .mutation(async ({ ctx, input }) => {
+       const row = await ctx.db.allocationPlan.findUnique({ where: { id: input.id } });
+       if (!row || row.householdId !== ctx.householdId) throw new TRPCError({ code: "NOT_FOUND" });
+       if (row.status !== "PROPOSED") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PLAN_NOT_PROPOSED" });
+-      const plan = row.plan as unknown as DeploymentPlans;
+-      if (!plan.variants?.some((v) => v.key === input.variant)) {
+-        throw new TRPCError({ code: "BAD_REQUEST", message: "VARIANT_NOT_IN_PLAN" });
+-      }
+-      // Switching variants resets prior step decisions — decisions belong to a path.
+-      return ctx.db.allocationPlan.update({
+-        where: { id: input.id },
+-        data: { chosenVariant: input.variant, stepDecisions: {} },
+-      });
++      const plan = planOf(row);
++      const preset = plan.presets?.[input.variant];
++      if (!preset) throw new TRPCError({ code: "BAD_REQUEST", message: "VARIANT_NOT_IN_PLAN" });
++      const wp: WorkingPlan = {};
++      // start disabled; verify candidates default enabled (0-amount reminders)
++      for (const c of plan.candidates) wp[c.id] = { enabled: c.kind === "TAX_VERIFY_PAYROLL", amount: c.suggestedAmount };
++      for (const e of preset) wp[e.candidateId] = { enabled: true, amount: e.amount };
++      return ctx.db.allocationPlan.update({ where: { id: input.id }, data: { chosenVariant: input.variant, workingPlan: wp } });
+     }),
+ 
+-  decideStep: workflowGuard("ALLOCATION")
+-    .input(z.object({ id: z.uuid(), stepId: z.string().min(1), decision: z.enum(["APPROVED", "DECLINED"]) }))
++  /** Toggle/edit a single candidate in the working plan. */
++  setCandidate: workflowGuard("ALLOCATION")
++    .input(z.object({ id: z.uuid(), candidateId: z.string().min(1), enabled: z.boolean(), amount: z.number().min(0).optional() }))
+     .mutation(async ({ ctx, input }) => {
+       const row = await ctx.db.allocationPlan.findUnique({ where: { id: input.id } });
+       if (!row || row.householdId !== ctx.householdId) throw new TRPCError({ code: "NOT_FOUND" });
+       if (row.status !== "PROPOSED") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PLAN_NOT_PROPOSED" });
+-      if (!row.chosenVariant) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "CHOOSE_VARIANT_FIRST" });
+-
+-      const plan = row.plan as unknown as DeploymentPlans;
+-      const variant = plan.variants.find((v) => v.key === row.chosenVariant);
+-      if (!variant || !variant.steps.some((s) => s.id === input.stepId)) {
+-        throw new TRPCError({ code: "BAD_REQUEST", message: "STEP_NOT_IN_CHOSEN_VARIANT" });
+-      }
+-
+-      const decisions = { ...(row.stepDecisions as Record<string, string>), [input.stepId]: input.decision };
+-      const allDecided = variant.steps.every((s) => decisions[s.id] === "APPROVED" || decisions[s.id] === "DECLINED");
++      const plan = planOf(row);
++      const cand = plan.candidates.find((c) => c.id === input.candidateId);
++      if (!cand) throw new TRPCError({ code: "BAD_REQUEST", message: "CANDIDATE_NOT_IN_PLAN" });
++      const amount = cand.editable ? Math.min(Math.max(input.amount ?? cand.suggestedAmount, cand.minAmount), cand.maxAmount) : cand.suggestedAmount;
++      const wp: WorkingPlan = { ...(row.workingPlan as WorkingPlan) };
++      wp[input.candidateId] = { enabled: input.enabled, amount };
++      if (allocated(wp) > plan.freeCashBase + 1) throw new TRPCError({ code: "BAD_REQUEST", message: "OVER_ALLOCATED" });
++      return ctx.db.allocationPlan.update({ where: { id: input.id }, data: { workingPlan: wp } });
++    }),
+ 
+-      return ctx.db.allocationPlan.update({
+-        where: { id: input.id },
+-        data: {
+-          stepDecisions: decisions,
+-          ...(allDecided ? { status: "APPROVED", approvedAt: new Date() } : {}),
+-        },
+-      });
++  /** Approve the current working plan → opens the gate into STRATEGY. */
++  approve: workflowGuard("ALLOCATION")
++    .input(z.object({ id: z.uuid(), note: z.string().max(500).optional() }))
++    .mutation(async ({ ctx, input }) => {
++      const row = await ctx.db.allocationPlan.findUnique({ where: { id: input.id } });
++      if (!row || row.householdId !== ctx.householdId) throw new TRPCError({ code: "NOT_FOUND" });
++      if (row.status !== "PROPOSED") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "PLAN_NOT_PROPOSED" });
++      const plan = planOf(row);
++      const wp = row.workingPlan as WorkingPlan;
++      if (allocated(wp) > plan.freeCashBase + 1) throw new TRPCError({ code: "BAD_REQUEST", message: "OVER_ALLOCATED" });
++      return ctx.db.allocationPlan.update({ where: { id: input.id }, data: { status: "APPROVED", approvedAt: new Date(), note: input.note ?? null } });
+     }),
+ });
+diff --git a/packages/api/src/routers/documents.ts b/packages/api/src/routers/documents.ts
+index c8306a0..6b90afa 100644
+--- a/packages/api/src/routers/documents.ts
++++ b/packages/api/src/routers/documents.ts
+@@ -57,4 +57,14 @@ export const documentsRouter = router({
+         storageKey,
+       });
+     }),
++
++  /** M27: correct the document type after upload (chooses which adapter runs on import). */
++  setDocType: protectedProcedure
++    .input(z.object({ id: z.uuid(), docType: DocTypeSchema }))
++    .mutation(async ({ ctx, input }) => {
++      const householdId = await requireHouseholdId(ctx.db);
++      const doc = await ctx.db.document.findUnique({ where: { id: input.id }, select: { householdId: true } });
++      if (!doc || doc.householdId !== householdId) throw new TRPCError({ code: "NOT_FOUND" });
++      return ctx.db.document.update({ where: { id: input.id }, data: { docType: input.docType } });
++    }),
+ });
+diff --git a/packages/api/src/services/allocation-service.ts b/packages/api/src/services/allocation-service.ts
+index 5d54cf3..697999d 100644
+--- a/packages/api/src/services/allocation-service.ts
++++ b/packages/api/src/services/allocation-service.ts
+@@ -36,7 +36,8 @@ export async function runAllocation(db: PrismaClient, householdId: string): Prom
+   };
+ 
+   const plan = computeDeploymentPlans(payload, ctx);
+-  const nothingToDecide = plan.variants.every((v) => v.steps.length === 0);
++  const actionable = plan.candidates.some((c) => c.kind !== "TAX_VERIFY_PAYROLL");
++  const nothingToDecide = !actionable;
+   const status = nothingToDecide ? "APPROVED" : "PROPOSED";
+ 
+   const row = await db.$transaction(async (tx) => {
+diff --git a/packages/db/prisma/migrations/20260720090000_m27_working_plan/migration.sql b/packages/db/prisma/migrations/20260720090000_m27_working_plan/migration.sql
+new file mode 100644
+index 0000000..5d7cd60
+--- /dev/null
++++ b/packages/db/prisma/migrations/20260720090000_m27_working_plan/migration.sql
+@@ -0,0 +1,2 @@
++-- M27: editable working plan (candidate-based deployment)
++ALTER TABLE "AllocationPlan" ADD COLUMN "workingPlan" JSONB NOT NULL DEFAULT '{}';
+diff --git a/packages/db/prisma/schema.prisma b/packages/db/prisma/schema.prisma
+index 43816e3..663fb78 100755
+--- a/packages/db/prisma/schema.prisma
++++ b/packages/db/prisma/schema.prisma
+@@ -662,8 +662,9 @@ model AllocationPlan {
+   snapshot      HouseholdSnapshot    @relation(fields: [snapshotId], references: [id])
+   engineVersion String
+   plan          Json // M26: DeploymentPlans — three variants, bilingual steps + narratives
+-  chosenVariant String? // GROWTH | DEBT_FREE | BALANCED — picked by the household
+-  stepDecisions Json    @default("{}") // { [stepId]: "APPROVED" | "DECLINED" } — gate needs EVERY step decided
++  chosenVariant String? // last preset applied (informational)
++  stepDecisions Json    @default("{}") // legacy (M26 per-step decisions)
++  workingPlan   Json    @default("{}") // M27: { [candidateId]: { enabled: boolean, amount: number } } — the household's edited plan
+   status        AllocationPlanStatus @default(PROPOSED)
+   createdAt     DateTime             @default(now())
+   approvedAt    DateTime?
+diff --git a/packages/engine-strategy/src/deployment.ts b/packages/engine-strategy/src/deployment.ts
+index ec8a6db..993232a 100644
+--- a/packages/engine-strategy/src/deployment.ts
++++ b/packages/engine-strategy/src/deployment.ts
+@@ -5,22 +5,19 @@ import { isCash, sum, valued } from "./analyzers/pools";
+ import { validateStrategyText } from "./validator";
+ 
+ /**
+- * M26 — free-cash deployment engine v2 (ALLOCATION phase).
+- * Owner decisions 2026-07-19:
+- *  - THREE computed variants per plan (GROWTH / DEBT_FREE / BALANCED), each with
+- *    bilingual pros/cons/risks so the household chooses a philosophy, not a number.
+- *  - Employment-aware tax steps: EMPLOYED members get a payroll-verification step
+- *    (their ceilings flow through salary); lump-sum deposit steps are for
+- *    SELF_EMPLOYED members only. Unknown employment ⇒ verify, never deposit.
+- *  - Per-step ids for individual approve/decline (gate = every step decided).
+- *  - Goal impact per step: qualitative + quantified for invest steps (invested
+- *    money reduces today's PV goal gap ~1:1; deeper simulation is backlogged).
+- * Unchanged principles: buffer first; expenses unmapped ⇒ REFUSE (never guess);
+- * strategy-level language only (validator-enforced); pure and deterministic.
++ * M27 — deployment engine v3 (ALLOCATION phase). Candidate-based: the engine emits
++ * a menu of individual CANDIDATE actions the household can freely mix, each with an
++ * editable amount (partial mortgage repayment = a smaller number), plus three named
++ * PRESETS that seed the editable working plan, plus the three VARIANTS (with computed
++ * pros/cons/risks) that back the comparison cards.
++ *
++ * Owner decisions 2026-07-19: full flexibility (cherry-pick across paths + edit
++ * amounts); partial debt targets the highest-rate track first; each mortgage track
++ * is its own candidate. EMPLOYED members get a payroll-verify candidate (satisfiable
++ * by form 106 / payslip), SELF_EMPLOYED get deposit candidates. Buffer never guessed
++ * (expenses unmapped ⇒ refuse). Strategy-level language only (validator-enforced).
+  */
+ 
+-export type DeploymentVariantKey = "GROWTH" | "DEBT_FREE" | "BALANCED";
+-
+ export type DeploymentStepKind =
+   | "BUFFER_TOP_UP"
+   | "REPAY_EXPENSIVE_DEBT"
+@@ -31,6 +28,26 @@ export type DeploymentStepKind =
+   | "INVEST_GROWTH"
+   | "INVEST_DEFENSIVE";
+ 
++export type DeploymentVariantKey = "GROWTH" | "DEBT_FREE" | "BALANCED";
++
++/** An individually selectable, optionally-editable action. */
++export interface DeploymentCandidate {
++  id: string;
++  kind: DeploymentStepKind;
++  editable: boolean;
++  minAmount: number;
++  maxAmount: number;
++  suggestedAmount: number;
++  ratePct: number | null;
++  detail: string;
++  detailHe: string;
++  goalImpact: string;
++  goalImpactHe: string;
++  evidenceItemIds: string[];
++}
++
++export interface PresetEntry { candidateId: string; amount: number }
++
+ export interface DeploymentStep {
+   id: string;
+   kind: DeploymentStepKind;
+@@ -45,7 +62,6 @@ export interface DeploymentStep {
+ export interface VariantSummary {
+   investedBase: number;
+   debtRepaidBase: number;
+-  /** Annual interest avoided by the repayment steps (principal × rate). */
+   interestSavedYearBase: number;
+   ceilingDepositsBase: number;
+ }
+@@ -55,12 +71,9 @@ export interface DeploymentVariant {
+   steps: DeploymentStep[];
+   leftoverBase: number;
+   summary: VariantSummary;
+-  pros: string[];
+-  prosHe: string[];
+-  cons: string[];
+-  consHe: string[];
+-  risks: string[];
+-  risksHe: string[];
++  pros: string[]; prosHe: string[];
++  cons: string[]; consHe: string[];
++  risks: string[]; risksHe: string[];
+ }
+ 
+ export type DeploymentNote =
+@@ -75,20 +88,21 @@ export interface DeploymentPlans {
+   bufferTargetBase: number | null;
+   cashBase: number;
+   freeCashBase: number;
++  /** The editable action menu the household mixes freely. */
++  candidates: DeploymentCandidate[];
++  /** Named seeds for the working plan: presets[key] = which candidates + amounts. */
++  presets: Record<DeploymentVariantKey, PresetEntry[]>;
++  /** Comparison cards with narratives (derived from the presets). */
+   variants: DeploymentVariant[];
+   notes: DeploymentNote[];
+ }
+ 
+ interface HishtalmutCeilings { selfEmployedExemptDepositAnnualILS: number }
+ interface PensionCeilings { qualifiedIncomeAnnualILS: number; maxBenefitDepositPctOfQualified: number }
+-interface Debt { itemId: string; name: string; ratePct: number; principal: number }
+ 
+ const round = (n: number) => Math.round(n);
+ const nis = (n: number) => `₪${round(n).toLocaleString("en-US")}`;
+-
+-function annualizeDeposit(amount: number, frequency: string): number {
+-  return frequency === "MONTHLY" ? amount * 12 : amount;
+-}
++const annualizeDeposit = (amount: number, frequency: string) => (frequency === "MONTHLY" ? amount * 12 : amount);
+ 
+ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerContext): DeploymentPlans {
+   const notes: DeploymentNote[] = [];
+@@ -96,348 +110,238 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
+   const monthlyExpenses = snapshot.items
+     .filter((i) => i.cashFlow?.direction === "OUT" && i.cashFlow.amountBase !== null)
+     .reduce((s, i) => {
+-      const amount = i.cashFlow!.amountBase!;
+-      return s + (i.cashFlow!.frequency === "ANNUAL" ? amount / 12 : i.cashFlow!.frequency === "MONTHLY" ? amount : 0);
++      const a = i.cashFlow!.amountBase!;
++      return s + (i.cashFlow!.frequency === "ANNUAL" ? a / 12 : i.cashFlow!.frequency === "MONTHLY" ? a : 0);
+     }, 0);
+ 
+   const cashItems = valued(snapshot.items).filter(isCash);
+   const cashBase = sum(cashItems);
+   const cashIds = cashItems.map((i) => i.id);
+-
+-  const base = {
+-    engineNote: "STRATEGY_LEVEL_ONLY_NEVER_PRODUCTS" as const,
+-    cashBase: round(cashBase),
+-  };
++  const emptyPresets = { GROWTH: [], DEBT_FREE: [], BALANCED: [] } as Record<DeploymentVariantKey, PresetEntry[]>;
++  const base = { engineNote: "STRATEGY_LEVEL_ONLY_NEVER_PRODUCTS" as const, cashBase: round(cashBase) };
+ 
+   if (monthlyExpenses <= 0) {
+-    return { ...base, monthlyExpensesBase: null, bufferTargetBase: null, freeCashBase: 0, variants: [], notes: ["EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED"] };
++    return { ...base, monthlyExpensesBase: null, bufferTargetBase: null, freeCashBase: 0, candidates: [], presets: emptyPresets, variants: [], notes: ["EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED"] };
+   }
+ 
+   const targetMonths = Number(ctx.assumptions["emergency_fund_months"] ?? 6);
+   const bufferTarget = monthlyExpenses * targetMonths;
+ 
+   if (cashBase < bufferTarget) {
+-    const shortfall = bufferTarget - cashBase;
+-    const step: DeploymentStep = {
+-      id: "s1",
+-      kind: "BUFFER_TOP_UP",
+-      amountBase: round(shortfall),
++    const shortfall = round(bufferTarget - cashBase);
++    const c: DeploymentCandidate = {
++      id: "buffer", kind: "BUFFER_TOP_UP", editable: false, minAmount: shortfall, maxAmount: shortfall, suggestedAmount: shortfall, ratePct: null,
+       detail: `Cash covers less than the ${targetMonths}-month buffer — direct new savings to close the ${nis(shortfall)} shortfall before deploying anything.`,
+       detailHe: `המזומן מכסה פחות מכרית של ${targetMonths} חודשים — נתבו חיסכון חדש לסגירת פער של ${nis(shortfall)} לפני כל פריסה אחרת.`,
+-      goalImpact: "Protects every goal: the buffer is what keeps a shock from forcing goal-asset sales.",
+-      goalImpactHe: "מגן על כל היעדים: הכרית היא שמונעת ממשבר לאלץ מכירת נכסי יעדים.",
++      goalImpact: "Protects every goal: the buffer keeps a shock from forcing goal-asset sales.",
++      goalImpactHe: "מגן על כל היעדים: הכרית מונעת ממשבר לאלץ מכירת נכסי יעדים.",
+       evidenceItemIds: cashIds,
+     };
+     notes.push("BUFFER_BELOW_TARGET");
+-    return {
+-      ...base,
+-      monthlyExpensesBase: round(monthlyExpenses),
+-      bufferTargetBase: round(bufferTarget),
+-      freeCashBase: 0,
+-      variants: [{ key: "BALANCED", steps: [step], leftoverBase: 0, summary: { investedBase: 0, debtRepaidBase: 0, interestSavedYearBase: 0, ceilingDepositsBase: 0 }, pros: [], prosHe: [], cons: [], consHe: [], risks: [], risksHe: [] }],
+-      notes,
+-    };
++    const preset = [{ candidateId: "buffer", amount: shortfall }];
++    const presets = { GROWTH: preset, DEBT_FREE: preset, BALANCED: preset };
++    const variant: DeploymentVariant = { key: "BALANCED", steps: [{ id: "buffer", kind: "BUFFER_TOP_UP", amountBase: shortfall, detail: c.detail, detailHe: c.detailHe, goalImpact: c.goalImpact, goalImpactHe: c.goalImpactHe, evidenceItemIds: cashIds }], leftoverBase: 0, summary: { investedBase: 0, debtRepaidBase: 0, interestSavedYearBase: 0, ceilingDepositsBase: 0 }, pros: [], prosHe: [], cons: [], consHe: [], risks: [], risksHe: [] };
++    return { ...base, monthlyExpensesBase: round(monthlyExpenses), bufferTargetBase: round(bufferTarget), freeCashBase: 0, candidates: [c], presets, variants: [variant], notes };
+   }
+ 
+   const freeCash = cashBase - bufferTarget;
+   if (freeCash <= 0) notes.push("NO_FREE_CASH");
+ 
+-  // ---- shared inputs ---------------------------------------------------------
+   const expensiveRate = Number(ctx.assumptions["expensive_debt_rate_pct"] ?? 8);
+   const expectedReturn = Number(ctx.assumptions["expected_real_return_equity_pct"] ?? 4.5);
+   const volatility = Number(ctx.assumptions["mc_return_volatility_pct"] ?? 15);
++  const targetGrowthPct = deriveTargetGrowthPct(ctx.assumptions);
++  const unknownMaxPct = Number(ctx.assumptions["allocation_mix_unknown_max_pct"] ?? 50);
++
++  // ---- candidate menu --------------------------------------------------------
++  const candidates: DeploymentCandidate[] = [];
+ 
+-  const allDebts: Debt[] = [];
++  // debt: one candidate per mortgage track, highest rate first
++  const tracks: Array<{ itemId: string; name: string; ratePct: number; principal: number; idx: number }> = [];
+   for (const it of snapshot.items) {
+     if (it.kind === "MORTGAGE" && it.mortgageTracks) {
+-      for (const t of it.mortgageTracks) {
+-        if (t.principalRemaining > 0) {
+-          allDebts.push({ itemId: it.id, name: `${it.name} · ${t.trackType}`, ratePct: t.annualRatePct, principal: t.principalRemaining });
+-        }
+-      }
++      it.mortgageTracks.forEach((t, idx) => {
++        if (t.principalRemaining > 0) tracks.push({ itemId: it.id, name: `${it.name} · ${t.trackType}`, ratePct: t.annualRatePct, principal: t.principalRemaining, idx });
++      });
+     }
+   }
+-  allDebts.sort((a, b) => b.ratePct - a.ratePct);
+-  const expensiveDebts = allDebts.filter((d) => d.ratePct > expensiveRate);
++  tracks.sort((a, b) => b.ratePct - a.ratePct);
++  for (const t of tracks) {
++    const expensive = t.ratePct > expensiveRate;
++    const suggested = round(Math.min(freeCash, t.principal));
++    candidates.push({
++      id: `debt:${t.itemId}:${t.idx}`, kind: expensive ? "REPAY_EXPENSIVE_DEBT" : "REPAY_DEBT",
++      editable: true, minAmount: 0, maxAmount: round(t.principal), suggestedAmount: suggested, ratePct: t.ratePct,
++      detail: `Repay part or all of "${t.name}" (${t.ratePct}%, ${nis(t.principal)} outstanding) — a guaranteed ${t.ratePct}% return${expensive ? ", above the expected investment return" : ` vs ~${expectedReturn}% (real) expected from investing`}. Get the early-repayment fee quote first.`,
++      detailHe: `פרעו חלק או הכול מ"${t.name}" (${t.ratePct}%, יתרה ${nis(t.principal)}) — תשואה מובטחת של ${t.ratePct}%${expensive ? ", מעל התשואה הצפויה מהשקעה" : ` לעומת ~${expectedReturn}% ריאלי צפוי מהשקעה`}. בקשו קודם דוח עמלת פירעון מוקדם.`,
++      goalImpact: "Lowers future obligations and monthly pressure — indirect support for every goal.",
++      goalImpactHe: "מקטין התחייבויות עתידיות ולחץ חודשי — תמיכה עקיפה בכל היעדים.",
++      evidenceItemIds: [t.itemId],
++    });
++  }
+ 
++  // tax: deposit (self-employed) or payroll-verify (employed / unknown)
+   const hish = ctx.taxRules["HISHTALMUT_CEILINGS"] as HishtalmutCeilings | undefined;
+   const pens = ctx.taxRules["PENSION_CEILINGS"] as PensionCeilings | undefined;
+   const hishCeiling = hish?.selfEmployedExemptDepositAnnualILS ?? 0;
+   const pensCeiling = pens ? (pens.qualifiedIncomeAnnualILS * pens.maxBenefitDepositPctOfQualified) / 100 : 0;
+-
+-  const depositsFor = (memberId: string, flowType: string): number => {
++  const depositsFor = (memberId: string, flowType: string) => {
+     let total = 0;
+     for (const it of snapshot.items) {
+       const cf = it.cashFlow;
+-      if (it.kind === "CASH_FLOW" && cf && cf.flowType === flowType && cf.amountBase !== null && it.ownerMemberIds.includes(memberId)) {
+-        total += annualizeDeposit(cf.amountBase, cf.frequency);
+-      }
++      if (it.kind === "CASH_FLOW" && cf && cf.flowType === flowType && cf.amountBase !== null && it.ownerMemberIds.includes(memberId)) total += annualizeDeposit(cf.amountBase, cf.frequency);
+     }
+     return total;
+   };
++  if (snapshot.baseCurrency === "ILS") {
++    for (const adult of snapshot.members.filter((m) => m.role === "ADULT")) {
++      if (adult.employmentStatus === "SELF_EMPLOYED") {
++        const hu = hishCeiling - depositsFor(adult.id, "HISHTALMUT_CONTRIBUTION");
++        if (hishCeiling > 0 && hu > 0) candidates.push({
++          id: `hish:${adult.id}`, kind: "TAX_CEILING_HISHTALMUT", editable: true, minAmount: 0, maxAmount: round(hu), suggestedAmount: round(hu), ratePct: null,
++          detail: `Deposit up to ${nis(hu)} to ${adult.name}'s keren hishtalmut — inside this year's exempt ceiling, growth is capital-gains free.`,
++          detailHe: `הפקידו עד ${nis(hu)} לקרן ההשתלמות של ${adult.name} — בתוך התקרה הפטורה השנה, הצבירה פטורה ממס רווחי הון.`,
++          goalImpact: "Tax-free compounding accelerates every long-term goal.", goalImpactHe: "צבירה פטורה ממס מאיצה כל יעד ארוך-טווח.", evidenceItemIds: [],
++        });
++        const pu = pensCeiling - depositsFor(adult.id, "PENSION_CONTRIBUTION");
++        if (pensCeiling > 0 && pu > 0) candidates.push({
++          id: `pens:${adult.id}`, kind: "TAX_CEILING_PENSION", editable: true, minAmount: 0, maxAmount: round(pu), suggestedAmount: round(pu), ratePct: null,
++          detail: `Deposit up to ${nis(pu)} to ${adult.name}'s pension within the benefit ceiling — immediate deduction/credit value.`,
++          detailHe: `הפקידו עד ${nis(pu)} לפנסיה של ${adult.name} בתוך תקרת ההטבה — שווי ניכוי/זיכוי מיידי.`,
++          goalImpact: "Strengthens the retirement goal, with an immediate tax benefit.", goalImpactHe: "מחזק את יעד הפרישה, עם הטבת מס מיידית.", evidenceItemIds: [],
++        });
++      } else {
++        candidates.push({
++          id: `verify:${adult.id}`, kind: "TAX_VERIFY_PAYROLL", editable: false, minAmount: 0, maxAmount: 0, suggestedAmount: 0, ratePct: null,
++          detail: `${adult.name}: contributions run through the employer — confirm from form 106 (or one payslip) that pension + hishtalmut deductions capture the ceilings (a section-46 supplemental deposit may apply if not).`,
++          detailHe: `${adult.name}: ההפקדות רצות דרך המעסיק — אשרו מטופס 106 (או מתלוש אחד) שניכויי הפנסיה וההשתלמות ממצים את התקרות (אם לא — ייתכן שרלוונטית הפקדה משלימה לפי סעיף 46).`,
++          goalImpact: "Confirms the tax benefits behind the retirement goal are fully captured.", goalImpactHe: "מוודא שהטבות המס שמאחורי יעד הפרישה ממוצות במלואן.", evidenceItemIds: [],
++        });
++      }
++    }
++  }
+ 
+-  const goalNames = snapshot.goals
+-    .filter((g) => g.requiredFundingBase !== null)
+-    .sort((a, b) => a.priority - b.priority)
+-    .slice(0, 2)
+-    .map((g) => g.name);
++  // invest: growth + defensive (editable up to free cash)
++  const investable = valued(snapshot.items).filter((i) => i.kind === "ACCOUNT");
++  let growth = 0, known = 0, unknown = 0;
++  for (const i of investable) {
++    const v = i.valueBase ?? 0;
++    if (i.growthSharePct !== null && i.growthSharePct !== undefined) { growth += (v * i.growthSharePct) / 100; known += v; }
++    else if (isCash(i)) known += v; else unknown += v;
++  }
++  const unknownSharePct = known + unknown > 0 ? (unknown / (known + unknown)) * 100 : 0;
++  const mixUnknown = unknownSharePct > unknownMaxPct;
++  if (mixUnknown) notes.push("MIX_UNKNOWN_INVEST_UNSPLIT");
++  const goalNames = snapshot.goals.filter((g) => g.requiredFundingBase !== null).sort((a, b) => a.priority - b.priority).slice(0, 2).map((g) => g.name);
+   const goalsLabel = goalNames.length > 0 ? goalNames.join(", ") : null;
+-
+-  const investGoalImpact = (amount: number) => ({
+-    goalImpact: goalsLabel
+-      ? `Advances ${goalsLabel}: closes roughly ${nis(amount)} of today's total goal funding gap.`
+-      : `Closes roughly ${nis(amount)} of today's total goal funding gap.`,
+-    goalImpactHe: goalsLabel
+-      ? `מקדם את ${goalsLabel}: סוגר כ-${nis(amount)} מפער המימון הכולל של היעדים כיום.`
+-      : `סוגר כ-${nis(amount)} מפער המימון הכולל של היעדים כיום.`,
++  const investGI = (amt: number) => ({
++    goalImpact: goalsLabel ? `Advances ${goalsLabel}: closes ~${nis(amt)} of today's total goal funding gap.` : `Closes ~${nis(amt)} of today's total goal funding gap.`,
++    goalImpactHe: goalsLabel ? `מקדם את ${goalsLabel}: סוגר כ-${nis(amt)} מפער המימון הכולל של היעדים כיום.` : `סוגר כ-${nis(amt)} מפער המימון הכולל של היעדים כיום.`,
++  });
++  candidates.push({
++    id: "invest:growth", kind: "INVEST_GROWTH", editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
++    detail: `Invest in growth channels (equity-type tracks in existing wrappers or a taxable investment account) — moves the mix toward your ${targetGrowthPct}% target.${mixUnknown ? " Record your accounts' growth share first for a responsible split." : ""}`,
++    detailHe: `השקיעו באפיקי צמיחה (מסלולים מוטי-צמיחה בעטיפות הקיימות או חשבון השקעות חייב) — מקרב את התמהיל ליעד ${targetGrowthPct}%.${mixUnknown ? " הזינו קודם רכיב צמיחה לחשבונות לפיצול אחראי." : ""}`,
++    ...investGI(freeCash), evidenceItemIds: [],
++  });
++  candidates.push({
++    id: "invest:defensive", kind: "INVEST_DEFENSIVE", editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
++    detail: `Place in defensive channels (bond-oriented tracks / deposits) to keep the mix at target.`,
++    detailHe: `הניחו באפיקים סולידיים (מסלולים מוטי-אג"ח / פיקדונות) לשמירת התמהיל ביעד.`,
++    ...investGI(freeCash), evidenceItemIds: [],
+   });
+ 
+-  // ---- per-variant step builder ---------------------------------------------
+-  const buildVariant = (key: DeploymentVariantKey): DeploymentVariant => {
++  // ---- policy → preset entries (cascade over free cash) ----------------------
++  const candById = new Map(candidates.map((c) => [c.id, c]));
++  const buildPreset = (policy: DeploymentVariantKey): PresetEntry[] => {
+     let remaining = freeCash;
+-    const steps: DeploymentStep[] = [];
+-    let n = 0;
+-    const push = (s: Omit<DeploymentStep, "id">) => steps.push({ id: `${key.toLowerCase()}-s${++n}`, ...s });
+-    const summary: VariantSummary = { investedBase: 0, debtRepaidBase: 0, interestSavedYearBase: 0, ceilingDepositsBase: 0 };
+-
+-    // 1. tax ceilings — deposits for the self-employed, payroll verification for employees
+-    if (snapshot.baseCurrency === "ILS") {
+-      for (const adult of snapshot.members.filter((m) => m.role === "ADULT")) {
+-        if (adult.employmentStatus === "SELF_EMPLOYED") {
+-          if (remaining > 0 && hishCeiling > 0) {
+-            const unused = hishCeiling - depositsFor(adult.id, "HISHTALMUT_CONTRIBUTION");
+-            if (unused > 0) {
+-              const amount = Math.min(remaining, unused);
+-              push({
+-                kind: "TAX_CEILING_HISHTALMUT", amountBase: round(amount),
+-                detail: `Deposit ${nis(amount)} to ${adult.name}'s keren hishtalmut — inside this year's exempt ceiling, growth is capital-gains free.`,
+-                detailHe: `הפקידו ${nis(amount)} לקרן ההשתלמות של ${adult.name} — בתוך התקרה הפטורה השנה, הצבירה פטורה ממס רווחי הון.`,
+-                goalImpact: "Tax-free compounding accelerates every long-term goal.",
+-                goalImpactHe: "צבירה פטורה ממס מאיצה כל יעד ארוך-טווח.",
+-                evidenceItemIds: [],
+-              });
+-              remaining -= amount;
+-              summary.ceilingDepositsBase += round(amount);
+-            }
+-          }
+-          if (remaining > 0 && pensCeiling > 0) {
+-            const unused = pensCeiling - depositsFor(adult.id, "PENSION_CONTRIBUTION");
+-            if (unused > 0) {
+-              const amount = Math.min(remaining, unused);
+-              push({
+-                kind: "TAX_CEILING_PENSION", amountBase: round(amount),
+-                detail: `Deposit ${nis(amount)} to ${adult.name}'s pension within the benefit ceiling — immediate deduction/credit value.`,
+-                detailHe: `הפקידו ${nis(amount)} לפנסיה של ${adult.name} בתוך תקרת ההטבה — שווי ניכוי/זיכוי מיידי.`,
+-                goalImpact: "Strengthens the retirement goal directly, with an immediate tax benefit.",
+-                goalImpactHe: "מחזק ישירות את יעד הפרישה, עם הטבת מס מיידית.",
+-                evidenceItemIds: [],
+-              });
+-              remaining -= amount;
+-              summary.ceilingDepositsBase += round(amount);
+-            }
+-          }
+-        } else {
+-          // EMPLOYED or unknown: benefits flow through payroll — verify, never deposit.
+-          push({
+-            kind: "TAX_VERIFY_PAYROLL", amountBase: 0,
+-            detail: `${adult.name}: contributions run through the employer — check one payslip confirms pension + hishtalmut deductions capture the ceilings (a section-46 supplemental deposit may apply if not).`,
+-            detailHe: `${adult.name}: ההפקדות רצות דרך המעסיק — בדקו בתלוש אחד שניכויי הפנסיה וההשתלמות ממצים את התקרות (אם לא — ייתכן שרלוונטית הפקדה משלימה לפי סעיף 46).`,
+-            goalImpact: "Confirms the tax benefits behind the retirement goal are fully captured.",
+-            goalImpactHe: "מוודא שהטבות המס שמאחורי יעד הפרישה ממוצות במלואן.",
+-            evidenceItemIds: [],
+-          });
+-        }
++    const entries: PresetEntry[] = [];
++    const take = (id: string, want: number) => {
++      const c = candById.get(id); if (!c) return;
++      const amt = Math.min(want, remaining, c.maxAmount || want);
++      if (amt > 0.5 || (!c.editable && c.kind === "TAX_VERIFY_PAYROLL")) {
++        entries.push({ candidateId: id, amount: c.kind === "TAX_VERIFY_PAYROLL" ? 0 : round(amt) });
++        if (c.kind !== "TAX_VERIFY_PAYROLL") remaining -= amt;
+       }
+-    }
+-
+-    // 2. debt repayment — per variant philosophy
+-    const debtsForVariant = key === "GROWTH" ? [] : key === "BALANCED" ? expensiveDebts : allDebts;
+-    for (const d of debtsForVariant) {
+-      if (remaining <= 0) break;
+-      const amount = Math.min(remaining, d.principal);
+-      const expensive = d.ratePct > expensiveRate;
+-      push({
+-        kind: expensive ? "REPAY_EXPENSIVE_DEBT" : "REPAY_DEBT", amountBase: round(amount),
+-        detail: `Repay ${nis(amount)} of "${d.name}" (${d.ratePct}%) — a guaranteed ${d.ratePct}% return${expensive ? ", above the expected investment return" : ` vs an expected ~${expectedReturn}% (real) from investing`}. Get the early-repayment fee quote first.`,
+-        detailHe: `פרעו ${nis(amount)} מ"${d.name}" (${d.ratePct}%) — תשואה מובטחת של ${d.ratePct}%${expensive ? ", מעל התשואה הצפויה מהשקעה" : ` לעומת ~${expectedReturn}% ריאלי צפוי מהשקעה`}. בקשו קודם דוח עמלת פירעון מוקדם.`,
+-        goalImpact: "Lowers future obligations and monthly pressure — indirect support for every goal.",
+-        goalImpactHe: "מקטין התחייבויות עתידיות ולחץ חודשי — תמיכה עקיפה בכל היעדים.",
+-        evidenceItemIds: [d.itemId],
+-      });
+-      remaining -= amount;
+-      summary.debtRepaidBase += round(amount);
+-      summary.interestSavedYearBase += round((amount * d.ratePct) / 100);
+-    }
+-
+-    // 3. invest the rest toward the risk-derived target mix
+-    if (remaining > 0) {
+-      const targetGrowthPct = deriveTargetGrowthPct(ctx.assumptions);
+-      const unknownMaxPct = Number(ctx.assumptions["allocation_mix_unknown_max_pct"] ?? 50);
+-      const investable = valued(snapshot.items).filter((i) => i.kind === "ACCOUNT");
+-      let growth = 0;
+-      let known = 0;
+-      let unknown = 0;
+-      for (const i of investable) {
+-        const v = i.valueBase ?? 0;
+-        if (i.growthSharePct !== null && i.growthSharePct !== undefined) {
+-          growth += (v * i.growthSharePct) / 100;
+-          known += v;
+-        } else if (isCash(i)) {
+-          known += v;
+-        } else {
+-          unknown += v;
+-        }
+-      }
+-      const unknownSharePct = known + unknown > 0 ? (unknown / (known + unknown)) * 100 : 0;
+-
+-      if (unknownSharePct > unknownMaxPct) {
+-        const gi = investGoalImpact(remaining);
+-        push({
+-          kind: "INVEST_GROWTH", amountBase: round(remaining),
+-          detail: `Invest the remaining ${nis(remaining)} — but first record the growth share of your accounts (too much of the portfolio is unknown to split growth/defensive responsibly).`,
+-          detailHe: `השקיעו את היתרה ${nis(remaining)} — אך קודם הזינו רכיב צמיחה לחשבונות (חלק גדול מדי מהתיק אינו ידוע כדי לפצל צמיחה/סולידי באחריות).`,
+-          ...gi, evidenceItemIds: [],
+-        });
+-        summary.investedBase += round(remaining);
+-        if (!notes.includes("MIX_UNKNOWN_INVEST_UNSPLIT")) notes.push("MIX_UNKNOWN_INVEST_UNSPLIT");
+-        remaining = 0;
+-      } else {
++    };
++    // verifies always included (0-amount reminders)
++    for (const c of candidates) if (c.kind === "TAX_VERIFY_PAYROLL") take(c.id, 0);
++    // tax deposits (self-employed) first
++    for (const c of candidates) if (c.kind === "TAX_CEILING_HISHTALMUT" || c.kind === "TAX_CEILING_PENSION") take(c.id, c.maxAmount);
++    // debt per policy
++    const debtIds = candidates.filter((c) => c.kind === "REPAY_EXPENSIVE_DEBT" || c.kind === "REPAY_DEBT")
++      .filter((c) => policy === "GROWTH" ? false : policy === "BALANCED" ? c.kind === "REPAY_EXPENSIVE_DEBT" : true)
++      .map((c) => c.id);
++    for (const id of debtIds) take(id, candById.get(id)!.maxAmount);
++    // invest the remainder split by target
++    if (remaining > 0.5) {
++      if (mixUnknown) { entries.push({ candidateId: "invest:growth", amount: round(remaining) }); remaining = 0; }
++      else {
+         const totalAfter = known + remaining;
+         const desiredGrowth = (targetGrowthPct / 100) * totalAfter;
+-        const growthAmount = Math.min(remaining, Math.max(0, desiredGrowth - growth));
+-        const defensiveAmount = remaining - growthAmount;
+-        if (growthAmount > 0.5) {
+-          const gi = investGoalImpact(growthAmount);
+-          push({
+-            kind: "INVEST_GROWTH", amountBase: round(growthAmount),
+-            detail: `Invest ${nis(growthAmount)} in growth channels (equity-type tracks in existing wrappers or a taxable investment account) — moves the mix toward your ${targetGrowthPct}% target.`,
+-            detailHe: `השקיעו ${nis(growthAmount)} באפיקי צמיחה (מסלולים מוטי-צמיחה בעטיפות הקיימות או חשבון השקעות חייב) — מקרב את התמהיל ליעד ${targetGrowthPct}%.`,
+-            ...gi, evidenceItemIds: [],
+-          });
+-          remaining -= growthAmount;
+-          summary.investedBase += round(growthAmount);
+-        }
+-        if (defensiveAmount > 0.5) {
+-          const gi = investGoalImpact(defensiveAmount);
+-          push({
+-            kind: "INVEST_DEFENSIVE", amountBase: round(defensiveAmount),
+-            detail: `Place ${nis(defensiveAmount)} in defensive channels (bond-oriented tracks / deposits) to keep the mix at target.`,
+-            detailHe: `הניחו ${nis(defensiveAmount)} באפיקים סולידיים (מסלולים מוטי-אג"ח / פיקדונות) לשמירת התמהיל ביעד.`,
+-            ...gi, evidenceItemIds: [],
+-          });
+-          remaining -= defensiveAmount;
+-          summary.investedBase += round(defensiveAmount);
+-        }
++        const g = Math.min(remaining, Math.max(0, desiredGrowth - growth));
++        const d = remaining - g;
++        if (g > 0.5) entries.push({ candidateId: "invest:growth", amount: round(g) });
++        if (d > 0.5) entries.push({ candidateId: "invest:defensive", amount: round(d) });
+       }
+     }
+-
+-    return { key, steps, leftoverBase: round(Math.max(0, remaining)), summary, ...buildNarrative(key, summary, expectedReturn, volatility, expensiveDebts.length > 0) };
++    return entries;
+   };
++  const presets = { GROWTH: buildPreset("GROWTH"), DEBT_FREE: buildPreset("DEBT_FREE"), BALANCED: buildPreset("BALANCED") };
+ 
+-  const variants = [buildVariant("BALANCED"), buildVariant("GROWTH"), buildVariant("DEBT_FREE")];
++  // ---- variants (comparison cards) derived from presets ----------------------
++  const toVariant = (key: DeploymentVariantKey): DeploymentVariant => {
++    const entries = presets[key];
++    let n = 0;
++    const steps: DeploymentStep[] = entries.map((e) => {
++      const c = candById.get(e.candidateId)!;
++      return { id: `${key.toLowerCase()}-s${++n}`, kind: c.kind, amountBase: e.amount, detail: c.detail, detailHe: c.detailHe, goalImpact: c.goalImpact, goalImpactHe: c.goalImpactHe, evidenceItemIds: c.evidenceItemIds };
++    });
++    const summary: VariantSummary = { investedBase: 0, debtRepaidBase: 0, interestSavedYearBase: 0, ceilingDepositsBase: 0 };
++    for (const e of entries) {
++      const c = candById.get(e.candidateId)!;
++      if (c.kind === "INVEST_GROWTH" || c.kind === "INVEST_DEFENSIVE") summary.investedBase += e.amount;
++      else if (c.kind === "REPAY_EXPENSIVE_DEBT" || c.kind === "REPAY_DEBT") { summary.debtRepaidBase += e.amount; summary.interestSavedYearBase += round((e.amount * (c.ratePct ?? 0)) / 100); }
++      else if (c.kind === "TAX_CEILING_HISHTALMUT" || c.kind === "TAX_CEILING_PENSION") summary.ceilingDepositsBase += e.amount;
++    }
++    const allocated = entries.reduce((t, e) => t + e.amount, 0);
++    return { key, steps, leftoverBase: round(Math.max(0, freeCash - allocated)), summary, ...buildNarrative(key, summary, expectedReturn, volatility, candidates.some((c) => c.kind === "REPAY_EXPENSIVE_DEBT")) };
++  };
++  const variants = [toVariant("BALANCED"), toVariant("GROWTH"), toVariant("DEBT_FREE")];
+ 
+-  const texts = variants.flatMap((v) => [
+-    ...v.steps.flatMap((s) => [s.detail, s.detailHe, s.goalImpact, s.goalImpactHe]),
+-    ...v.pros, ...v.prosHe, ...v.cons, ...v.consHe, ...v.risks, ...v.risksHe,
+-  ]);
++  const texts = [
++    ...candidates.flatMap((c) => [c.detail, c.detailHe, c.goalImpact, c.goalImpactHe]),
++    ...variants.flatMap((v) => [...v.pros, ...v.prosHe, ...v.cons, ...v.consHe, ...v.risks, ...v.risksHe]),
++  ];
+   const validation = validateStrategyText(texts);
+   if (!validation.valid) throw new Error(`PRODUCT_REFERENCE_IN_DEPLOYMENT:${validation.pattern}`);
+ 
+-  return {
+-    ...base,
+-    monthlyExpensesBase: round(monthlyExpenses),
+-    bufferTargetBase: round(bufferTarget),
+-    freeCashBase: round(freeCash),
+-    variants,
+-    notes,
+-  };
++  return { ...base, monthlyExpensesBase: round(monthlyExpenses), bufferTargetBase: round(bufferTarget), freeCashBase: round(freeCash), candidates, presets, variants, notes };
+ }
+ 
+-function buildNarrative(
+-  key: DeploymentVariantKey,
+-  s: VariantSummary,
+-  expectedReturn: number,
+-  volatility: number,
+-  hasExpensiveDebt: boolean,
+-): Pick<DeploymentVariant, "pros" | "prosHe" | "cons" | "consHe" | "risks" | "risksHe"> {
+-  if (key === "GROWTH") {
+-    return {
+-      pros: [
+-        `Highest expected long-run value: ${s.investedBase > 0 ? `${nis(s.investedBase)} invested` : "everything invested"} at ~${expectedReturn}% expected real return.`,
+-        "Full liquidity retained — invested money stays reachable; nothing is locked into the house.",
+-      ],
+-      prosHe: [
+-        `תוחלת הערך הגבוהה ביותר לטווח ארוך: ${s.investedBase > 0 ? `${nis(s.investedBase)} מושקעים` : "הכול מושקע"} בתשואה ריאלית צפויה של ~${expectedReturn}%.`,
+-        "נזילות מלאה נשמרת — הכסף המושקע נשאר נגיש; דבר אינו ננעל בבית.",
+-      ],
+-      cons: [
+-        `The mortgage stays fully in place — payments and interest continue${hasExpensiveDebt ? ", INCLUDING tracks above the expensive-debt line" : ""}.`,
+-        "Expected return is an average, not a promise; the debt's interest is certain.",
+-      ],
+-      consHe: [
+-        `המשכנתא נשארת במלואה — ההחזרים והריבית ממשיכים${hasExpensiveDebt ? ", כולל מסלולים מעל קו החוב היקר" : ""}.`,
+-        "התשואה הצפויה היא ממוצע, לא הבטחה; ריבית החוב ודאית.",
+-      ],
+-      risks: [
+-        `Market risk: ~${volatility}% annual volatility means multi-year drawdowns are normal; money needed within ~5 years should not ride this path.`,
+-        "Behavioral risk: a crash + a full mortgage is when households capitulate — answer the drawdown question honestly.",
+-      ],
+-      risksHe: [
+-        `סיכון שוק: תנודתיות שנתית של ~${volatility}% פירושה שירידות רב-שנתיות הן נורמליות; כסף שנדרש בתוך ~5 שנים לא צריך לרכוב על המסלול הזה.`,
+-        "סיכון התנהגותי: מפולת + משכנתא מלאה הם הרגע שבו משקי בית נשברים — ענו בכנות על שאלת הירידות בשאלון.",
+-      ],
+-    };
+-  }
+-  if (key === "DEBT_FREE") {
+-    return {
+-      pros: [
+-        `A guaranteed, tax-free "return": ${nis(s.interestSavedYearBase)} interest avoided every year on ${nis(s.debtRepaidBase)} repaid — no market can promise that.`,
+-        "Lower future obligations and real psychological relief; resilience to income shocks rises immediately.",
+-      ],
+-      prosHe: [
+-        `"תשואה" מובטחת ופטורה ממס: ${nis(s.interestSavedYearBase)} ריבית שנחסכת מדי שנה על ${nis(s.debtRepaidBase)} שנפרעו — שום שוק לא מבטיח את זה.`,
+-        "התחייבויות עתידיות נמוכות יותר והקלה פסיכולוגית אמיתית; העמידות לזעזועי הכנסה עולה מיד.",
+-      ],
+-      cons: [
+-        `Expected opportunity cost: cheap tracks repaid at ~2-4% while investing targets ~${expectedReturn}% real — over decades the gap compounds.`,
+-        "Money sunk into the house is the least liquid form of wealth; getting it back means borrowing again or selling.",
+-        "Early-repayment fees (עמלת פירעון מוקדם) can eat part of the benefit — always get the quote first.",
+-      ],
+-      consHe: [
+-        `עלות הזדמנות צפויה: מסלולים זולים נפרעים ב~2-4% בעוד ההשקעה מכוונת ל~${expectedReturn}% ריאלי — לאורך עשורים הפער מצטבר.`,
+-        "כסף ששוקע בבית הוא צורת ההון הכי פחות נזילה; להחזיר אותו פירושו ללוות שוב או למכור.",
+-        "עמלות פירעון מוקדם עלולות לאכול חלק מהתועלת — תמיד בקשו את הדוח קודם.",
+-      ],
+-      risks: [
+-        "Inflation risk reversal: unlinked cheap debt is an inflation HEDGE — repaying it gives that up; CPI-linked tracks are the better repayment targets.",
+-        "Concentration: the household becomes even more real-estate-heavy after repayment.",
+-      ],
+-      risksHe: [
+-        "היפוך סיכון אינפלציה: חוב זול לא-צמוד הוא הגנה מפני אינפלציה — פירעונו מוותר עליה; מסלולים צמודי-מדד הם יעדי הפירעון העדיפים.",
+-        "ריכוזיות: משק הבית נעשה עוד יותר מוטה-נדל\"ן אחרי הפירעון.",
+-      ],
+-    };
+-  }
++function buildNarrative(key: DeploymentVariantKey, s: VariantSummary, expectedReturn: number, volatility: number, hasExpensiveDebt: boolean): Pick<DeploymentVariant, "pros" | "prosHe" | "cons" | "consHe" | "risks" | "risksHe"> {
++  if (key === "GROWTH") return {
++    pros: [`Highest expected long-run value: ${s.investedBase > 0 ? `${nis(s.investedBase)} invested` : "everything invested"} at ~${expectedReturn}% expected real return.`, "Full liquidity retained — invested money stays reachable; nothing is locked into the house."],
++    prosHe: [`תוחלת הערך הגבוהה ביותר לטווח ארוך: ${s.investedBase > 0 ? `${nis(s.investedBase)} מושקעים` : "הכול מושקע"} בתשואה ריאלית צפויה של ~${expectedReturn}%.`, "נזילות מלאה נשמרת — הכסף המושקע נשאר נגיש; דבר אינו ננעל בבית."],
++    cons: [`The mortgage stays fully in place — payments and interest continue${hasExpensiveDebt ? ", INCLUDING tracks above the expensive-debt line" : ""}.`, "Expected return is an average, not a promise; the debt's interest is certain."],
++    consHe: [`המשכנתא נשארת במלואה — ההחזרים והריבית ממשיכים${hasExpensiveDebt ? ", כולל מסלולים מעל קו החוב היקר" : ""}.`, "התשואה הצפויה היא ממוצע, לא הבטחה; ריבית החוב ודאית."],
++    risks: [`Market risk: ~${volatility}% annual volatility means multi-year drawdowns are normal; money needed within ~5 years should not ride this path.`, "Behavioral risk: a crash + a full mortgage is when households capitulate — answer the drawdown question honestly."],
++    risksHe: [`סיכון שוק: תנודתיות שנתית של ~${volatility}% פירושה שירידות רב-שנתיות הן נורמליות; כסף שנדרש בתוך ~5 שנים לא צריך לרכוב על המסלול הזה.`, "סיכון התנהגותי: מפולת + משכנתא מלאה הם הרגע שבו משקי בית נשברים — ענו בכנות על שאלת הירידות."],
++  };
++  if (key === "DEBT_FREE") return {
++    pros: [`A guaranteed, tax-free "return": ${nis(s.interestSavedYearBase)} interest avoided every year on ${nis(s.debtRepaidBase)} repaid — no market can promise that.`, "Lower future obligations and real psychological relief; resilience to income shocks rises immediately."],
++    prosHe: [`"תשואה" מובטחת ופטורה ממס: ${nis(s.interestSavedYearBase)} ריבית שנחסכת מדי שנה על ${nis(s.debtRepaidBase)} שנפרעו — שום שוק לא מבטיח את זה.`, "התחייבויות עתידיות נמוכות יותר והקלה פסיכולוגית אמיתית; העמידות לזעזועי הכנסה עולה מיד."],
++    cons: [`Expected opportunity cost: cheap tracks repaid at ~2-4% while investing targets ~${expectedReturn}% real — over decades the gap compounds.`, "Money sunk into the house is the least liquid form of wealth; getting it back means borrowing again or selling.", "Early-repayment fees (עמלת פירעון מוקדם) can eat part of the benefit — always get the quote first."],
++    consHe: [`עלות הזדמנות צפויה: מסלולים זולים נפרעים ב~2-4% בעוד ההשקעה מכוונת ל~${expectedReturn}% ריאלי — לאורך עשורים הפער מצטבר.`, "כסף ששוקע בבית הוא צורת ההון הכי פחות נזילה; להחזיר אותו פירושו ללוות שוב או למכור.", "עמלות פירעון מוקדם עלולות לאכול חלק מהתועלת — תמיד בקשו את הדוח קודם."],
++    risks: ["Inflation risk reversal: unlinked cheap debt is an inflation HEDGE — repaying it gives that up; CPI-linked tracks are the better repayment targets.", "Concentration: the household becomes even more real-estate-heavy after repayment."],
++    risksHe: ["היפוך סיכון אינפלציה: חוב זול לא-צמוד הוא הגנה מפני אינפלציה — פירעונו מוותר עליה; מסלולים צמודי-מדד הם יעדי הפירעון העדיפים.", "ריכוזיות: משק הבית נעשה עוד יותר מוטה-נדל\"ן אחרי הפירעון."],
++  };
+   return {
+-    pros: [
+-      "Math-driven middle path: only debt priced above the expected investment return is repaid; free tax money is captured; the rest compounds at the target mix.",
+-      "Every threshold is a registry assumption you control — the plan changes when your answers change.",
+-    ],
+-    prosHe: [
+-      "דרך אמצע מונחית-חישוב: נפרע רק חוב שמתומחר מעל התשואה הצפויה מהשקעה; כסף מס חינם נתפס; והיתרה צוברת בתמהיל היעד.",
+-      "כל סף הוא הנחת רגיסטרי בשליטתכם — התוכנית משתנה כשהתשובות שלכם משתנות.",
+-    ],
+-    cons: [
+-      "Neither pure story: some debt remains AND some market risk is taken — households that want one clean philosophy may prefer the other paths.",
+-    ],
+-    consHe: [
+-      "אף סיפור טהור: נשאר קצת חוב וגם נלקח קצת סיכון שוק — משקי בית שרוצים פילוסופיה נקייה אחת עשויים להעדיף את המסלולים האחרים.",
+-    ],
+-    risks: [
+-      `Standard market risk on the invested portion (~${volatility}% annual volatility); guaranteed-return logic applies only to the repaid tracks.`,
+-    ],
+-    risksHe: [
+-      `סיכון שוק רגיל על החלק המושקע (תנודתיות שנתית ~${volatility}%); היגיון התשואה המובטחת חל רק על המסלולים שנפרעו.`,
+-    ],
++    pros: ["Math-driven middle path: only debt priced above the expected investment return is repaid; free tax money is captured; the rest compounds at the target mix.", "Every threshold is a registry assumption you control — the plan changes when your answers change."],
++    prosHe: ["דרך אמצע מונחית-חישוב: נפרע רק חוב שמתומחר מעל התשואה הצפויה מהשקעה; כסף מס חינם נתפס; והיתרה צוברת בתמהיל היעד.", "כל סף הוא הנחת רגיסטרי בשליטתכם — התוכנית משתנה כשהתשובות שלכם משתנות."],
++    cons: ["Neither pure story: some debt remains AND some market risk is taken — households wanting one clean philosophy may prefer the other paths."],
++    consHe: ["אף סיפור טהור: נשאר קצת חוב וגם נלקח קצת סיכון שוק — מי שרוצה פילוסופיה נקייה אחת עשוי להעדיף את המסלולים האחרים."],
++    risks: [`Standard market risk on the invested portion (~${volatility}% annual volatility); guaranteed-return logic applies only to the repaid tracks.`],
++    risksHe: [`סיכון שוק רגיל על החלק המושקע (תנודתיות שנתית ~${volatility}%); היגיון התשואה המובטחת חל רק על המסלולים שנפרעו.`],
+   };
+ }
+diff --git a/packages/engine-strategy/src/index.ts b/packages/engine-strategy/src/index.ts
+index cb46beb..015e57a 100644
+--- a/packages/engine-strategy/src/index.ts
++++ b/packages/engine-strategy/src/index.ts
+@@ -8,7 +8,7 @@ export type { Rationale, RecommendationDraft } from "./rationale";
+ export { validateStrategyText } from "./validator";
+ export { actionItemsFor } from "./action-items";
+ export { computeDeploymentPlans } from "./deployment";
+-export type { DeploymentPlans, DeploymentVariant, DeploymentVariantKey, DeploymentStep, DeploymentStepKind, DeploymentNote } from "./deployment";
++export type { DeploymentPlans, DeploymentVariant, DeploymentVariantKey, DeploymentStep, DeploymentStepKind, DeploymentNote, DeploymentCandidate, PresetEntry } from "./deployment";
+ export type { ActionItems } from "./action-items";
+ export { scorePriority } from "./scoring";
+ export type { PriorityWeights } from "./scoring";
+diff --git a/packages/engine-strategy/test/deployment.test.ts b/packages/engine-strategy/test/deployment.test.ts
+index 6f7d9b6..96a9fdb 100644
+--- a/packages/engine-strategy/test/deployment.test.ts
++++ b/packages/engine-strategy/test/deployment.test.ts
+@@ -5,10 +5,6 @@ import { CTX, expense, item, snapshot } from "./fixtures";
+ const ctx = (over: Record<string, unknown> = {}) => ({ assumptions: { ...CTX.assumptions, ...over }, taxRules: { ...CTX.taxRules } });
+ const noTax = (over: Record<string, unknown> = {}) => ({ assumptions: { ...CTX.assumptions, ...over }, taxRules: {} });
+ 
+-const flow = (flowType: string, monthly: number, owners: string[] = ["m1"]) =>
+-  item({ kind: "CASH_FLOW", accountType: null, valueBase: null, ownerMemberIds: owners,
+-    cashFlow: { flowType, direction: "IN", amountBase: monthly, frequency: "MONTHLY" } });
+-
+ const variant = (p: ReturnType<typeof computeDeploymentPlans>, key: DeploymentVariantKey) =>
+   p.variants.find((v) => v.key === key)!;
+ 
+@@ -109,4 +105,53 @@ describe("computeDeploymentPlans (M26 variants)", () => {
+       expect(total + v.leftoverBase, v.key).toBe(p.freeCashBase);
+     }
+   });
++
++  it("emits an editable candidate per mortgage track (partial repayment) and presets seed the working plan", () => {
++    const s2 = snapshot([
++      item({ accountType: "BANK_CHECKING", valueBase: 400_000 }),
++      expense(10_000),
++      item({
++        kind: "MORTGAGE", accountType: null, valueBase: 800_000,
++        mortgageTracks: [
++          { trackType: "PRIME", principalRemaining: 50_000, annualRatePct: 9.5, cpiLinked: false, endDate: "2040-01-01" },
++          { trackType: "FIXED_UNLINKED", principalRemaining: 100_000, annualRatePct: 3.0, cpiLinked: false, endDate: "2040-01-01" },
++        ],
++      }),
++      item({ accountType: "BROKERAGE_IL", valueBase: 100_000, growthSharePct: 60 }),
++    ]);
++    const p = computeDeploymentPlans(s2, noTax());
++    const debtCands = p.candidates.filter((c) => c.kind === "REPAY_EXPENSIVE_DEBT" || c.kind === "REPAY_DEBT");
++    expect(debtCands).toHaveLength(2);
++    // each track is editable up to its own principal (partial allowed)
++    const prime = debtCands.find((c) => c.ratePct === 9.5)!;
++    expect(prime.editable).toBe(true);
++    expect(prime.maxAmount).toBe(50_000);
++    expect(prime.minAmount).toBe(0);
++    // highest-rate candidate comes first
++    expect(debtCands[0]!.ratePct).toBe(9.5);
++    // presets reference candidate ids; GROWTH pays no debt, DEBT_FREE pays both
++    expect(p.presets.GROWTH.some((e) => e.candidateId.startsWith("debt:"))).toBe(false);
++    expect(p.presets.DEBT_FREE.filter((e) => e.candidateId.startsWith("debt:")).length).toBe(2);
++    // every preset entry points to a real candidate and respects its max
++    const byId = new Map(p.candidates.map((c) => [c.id, c]));
++    for (const key of ["GROWTH", "DEBT_FREE", "BALANCED"] as const) {
++      for (const e of p.presets[key]) {
++        const c = byId.get(e.candidateId)!;
++        expect(c).toBeDefined();
++        expect(e.amount).toBeLessThanOrEqual(c.maxAmount === 0 ? Infinity : c.maxAmount);
++      }
++      // a preset never allocates more than the free cash
++      const allocated = p.presets[key].reduce((t, e) => t + e.amount, 0);
++      expect(allocated).toBeLessThanOrEqual(p.freeCashBase + 1);
++    }
++  });
++
++  it("employed member yields a non-editable payroll-verify candidate (form 106 satisfies it)", () => {
++    const p = computeDeploymentPlans(snapshot([item({ accountType: "BANK_CHECKING", valueBase: 200_000 }), expense(10_000)]), ctx());
++    const verify = p.candidates.find((c) => c.kind === "TAX_VERIFY_PAYROLL")!;
++    expect(verify.editable).toBe(false);
++    expect(verify.maxAmount).toBe(0);
++    expect(verify.detailHe).toContain("106");
++  });
++
+ });
+diff --git a/packages/i18n/messages/en.json b/packages/i18n/messages/en.json
+index 4e033fb..8a9cee3 100644
+--- a/packages/i18n/messages/en.json
++++ b/packages/i18n/messages/en.json
+@@ -336,7 +336,8 @@
+       "MORTGAGE_SCHEDULE": "Mortgage schedule",
+       "TAX_106": "Form 106",
+       "OTHER": "Other"
+-    }
++    },
++    "updateDocType": "Update type"
+   },
+   "verification": {
+     "explainerTitle": "What is this tab?",
+@@ -988,12 +989,12 @@
+     "noSteps": "No deployment steps — the buffer consumes all available cash.",
+     "kinds": {
+       "BUFFER_TOP_UP": "Buffer top-up",
+-      "REPAY_EXPENSIVE_DEBT": "Repay expensive debt",
++      "REPAY_EXPENSIVE_DEBT": "Repay expensive track",
+       "TAX_CEILING_HISHTALMUT": "Hishtalmut ceiling",
+       "TAX_CEILING_PENSION": "Pension ceiling",
+       "INVEST_GROWTH": "Invest — growth",
+       "INVEST_DEFENSIVE": "Invest — defensive",
+-      "REPAY_DEBT": "Repay debt",
++      "REPAY_DEBT": "Repay track",
+       "TAX_VERIFY_PAYROLL": "Verify payroll"
+     },
+     "approveNote": "Note (optional)",
+@@ -1032,6 +1033,27 @@
+     "declineStep": "Decline",
+     "stepApproved": "Approved",
+     "stepDeclined": "Declined",
+-    "progress": "{decided} of {total} steps decided"
++    "progress": "{decided} of {total} steps decided",
++    "introV3": "Three philosophies for your free cash — pick one as a starting point, then edit freely: turn any action on or off, set a partial amount (repay only part of a mortgage track), and mix across paths. Approve when the plan fits your free cash.",
++    "usePreset": "Use as starting point",
++    "presetFirst": "Pick a starting point above, then fine-tune the plan.",
++    "workingTitle": "Your working plan",
++    "workingHint": "Toggle each action and set amounts. Repay part of a track by entering a smaller number. The meter keeps you within your free cash.",
++    "allocated": "Allocated",
++    "remaining": "Still free",
++    "overAllocated": "Over your free cash — reduce something.",
++    "upTo": "up to",
++    "update": "Update",
++    "enable": "Add",
++    "remove": "Remove",
++    "markDone": "Done ✓",
++    "confirm106": "Confirm from form 106",
++    "done": "Confirmed",
++    "approvePlan": "Approve plan",
++    "errors": {
++      "OVER_ALLOCATED": "That would exceed your free cash — lower an amount first.",
++      "CANDIDATE_NOT_IN_PLAN": "Unknown action.",
++      "VARIANT_NOT_IN_PLAN": "Unknown preset."
++    }
+   }
+ }
+diff --git a/packages/i18n/messages/he.json b/packages/i18n/messages/he.json
+index 5cec516..bacb54b 100644
+--- a/packages/i18n/messages/he.json
++++ b/packages/i18n/messages/he.json
+@@ -336,7 +336,8 @@
+       "MORTGAGE_SCHEDULE": "לוח סילוקין משכנתא",
+       "TAX_106": "טופס 106",
+       "OTHER": "אחר"
+-    }
++    },
++    "updateDocType": "עדכון סוג"
+   },
+   "verification": {
+     "explainerTitle": "מה זה הטאב הזה?",
+@@ -988,12 +989,12 @@
+     "noSteps": "אין צעדי פריסה — הכרית צורכת את כל המזומן הזמין.",
+     "kinds": {
+       "BUFFER_TOP_UP": "השלמת כרית",
+-      "REPAY_EXPENSIVE_DEBT": "פירעון חוב יקר",
++      "REPAY_EXPENSIVE_DEBT": "פירעון מסלול יקר",
+       "TAX_CEILING_HISHTALMUT": "תקרת השתלמות",
+       "TAX_CEILING_PENSION": "תקרת פנסיה",
+       "INVEST_GROWTH": "השקעה — צמיחה",
+       "INVEST_DEFENSIVE": "השקעה — סולידי",
+-      "REPAY_DEBT": "פירעון חוב",
++      "REPAY_DEBT": "פירעון מסלול",
+       "TAX_VERIFY_PAYROLL": "בדיקת תלוש"
+     },
+     "approveNote": "הערה (רשות)",
+@@ -1032,6 +1033,27 @@
+     "declineStep": "דחייה",
+     "stepApproved": "אושר",
+     "stepDeclined": "נדחה",
+-    "progress": "הוכרעו {decided} מתוך {total} צעדים"
++    "progress": "הוכרעו {decided} מתוך {total} צעדים",
++    "introV3": "שלוש פילוסופיות לכסף הפנוי — בחרו אחת כנקודת פתיחה, ואז ערכו בחופשיות: הדליקו או כבו כל פעולה, קבעו סכום חלקי (פירעון חלק ממסלול משכנתא) וערבבו בין המסלולים. אשרו כשהתוכנית נכנסת בתוך הכסף הפנוי.",
++    "usePreset": "שימוש כנקודת פתיחה",
++    "presetFirst": "בחרו נקודת פתיחה למעלה, ואז כווננו את התוכנית.",
++    "workingTitle": "התוכנית שלכם",
++    "workingHint": "הדליקו/כבו כל פעולה וקבעו סכומים. לפירעון חלקי של מסלול הזינו סכום קטן יותר. המד שומר אתכם בתוך הכסף הפנוי.",
++    "allocated": "מוקצה",
++    "remaining": "נותר פנוי",
++    "overAllocated": "חורג מהכסף הפנוי — הפחיתו משהו.",
++    "upTo": "עד",
++    "update": "עדכון",
++    "enable": "הוספה",
++    "remove": "הסרה",
++    "markDone": "בוצע ✓",
++    "confirm106": "אישור על סמך טופס 106",
++    "done": "אושר",
++    "approvePlan": "אישור התוכנית",
++    "errors": {
++      "OVER_ALLOCATED": "זה יחרוג מהכסף הפנוי — הפחיתו סכום קודם.",
++      "CANDIDATE_NOT_IN_PLAN": "פעולה לא מוכרת.",
++      "VARIANT_NOT_IN_PLAN": "נקודת פתיחה לא מוכרת."
++    }
+   }
+ }

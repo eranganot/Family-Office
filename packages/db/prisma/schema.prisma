@@ -662,8 +662,9 @@ model AllocationPlan {
   snapshot      HouseholdSnapshot    @relation(fields: [snapshotId], references: [id])
   engineVersion String
   plan          Json // M26: DeploymentPlans — three variants, bilingual steps + narratives
-  chosenVariant String? // GROWTH | DEBT_FREE | BALANCED — picked by the household
-  stepDecisions Json    @default("{}") // { [stepId]: "APPROVED" | "DECLINED" } — gate needs EVERY step decided
+  chosenVariant String? // last preset applied (informational)
+  stepDecisions Json    @default("{}") // legacy (M26 per-step decisions)
+  workingPlan   Json    @default("{}") // M27: { [candidateId]: { enabled: boolean, amount: number } } — the household's edited plan
   status        AllocationPlanStatus @default(PROPOSED)
   createdAt     DateTime             @default(now())
   approvedAt    DateTime?

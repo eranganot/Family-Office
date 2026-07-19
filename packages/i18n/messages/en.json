@@ -336,7 +336,8 @@
       "MORTGAGE_SCHEDULE": "Mortgage schedule",
       "TAX_106": "Form 106",
       "OTHER": "Other"
-    }
+    },
+    "updateDocType": "Update type"
   },
   "verification": {
     "explainerTitle": "What is this tab?",
@@ -988,12 +989,12 @@
     "noSteps": "No deployment steps — the buffer consumes all available cash.",
     "kinds": {
       "BUFFER_TOP_UP": "Buffer top-up",
-      "REPAY_EXPENSIVE_DEBT": "Repay expensive debt",
+      "REPAY_EXPENSIVE_DEBT": "Repay expensive track",
       "TAX_CEILING_HISHTALMUT": "Hishtalmut ceiling",
       "TAX_CEILING_PENSION": "Pension ceiling",
       "INVEST_GROWTH": "Invest — growth",
       "INVEST_DEFENSIVE": "Invest — defensive",
-      "REPAY_DEBT": "Repay debt",
+      "REPAY_DEBT": "Repay track",
       "TAX_VERIFY_PAYROLL": "Verify payroll"
     },
     "approveNote": "Note (optional)",
@@ -1032,6 +1033,27 @@
     "declineStep": "Decline",
     "stepApproved": "Approved",
     "stepDeclined": "Declined",
-    "progress": "{decided} of {total} steps decided"
+    "progress": "{decided} of {total} steps decided",
+    "introV3": "Three philosophies for your free cash — pick one as a starting point, then edit freely: turn any action on or off, set a partial amount (repay only part of a mortgage track), and mix across paths. Approve when the plan fits your free cash.",
+    "usePreset": "Use as starting point",
+    "presetFirst": "Pick a starting point above, then fine-tune the plan.",
+    "workingTitle": "Your working plan",
+    "workingHint": "Toggle each action and set amounts. Repay part of a track by entering a smaller number. The meter keeps you within your free cash.",
+    "allocated": "Allocated",
+    "remaining": "Still free",
+    "overAllocated": "Over your free cash — reduce something.",
+    "upTo": "up to",
+    "update": "Update",
+    "enable": "Add",
+    "remove": "Remove",
+    "markDone": "Done ✓",
+    "confirm106": "Confirm from form 106",
+    "done": "Confirmed",
+    "approvePlan": "Approve plan",
+    "errors": {
+      "OVER_ALLOCATED": "That would exceed your free cash — lower an amount first.",
+      "CANDIDATE_NOT_IN_PLAN": "Unknown action.",
+      "VARIANT_NOT_IN_PLAN": "Unknown preset."
+    }
   }
 }

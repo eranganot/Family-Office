@@ -57,4 +57,14 @@ export const documentsRouter = router({
         storageKey,
       });
     }),
+
+  /** M27: correct the document type after upload (chooses which adapter runs on import). */
+  setDocType: protectedProcedure
+    .input(z.object({ id: z.uuid(), docType: DocTypeSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const householdId = await requireHouseholdId(ctx.db);
+      const doc = await ctx.db.document.findUnique({ where: { id: input.id }, select: { householdId: true } });
+      if (!doc || doc.householdId !== householdId) throw new TRPCError({ code: "NOT_FOUND" });
+      return ctx.db.document.update({ where: { id: input.id }, data: { docType: input.docType } });
+    }),
 });

@@ -39,3 +39,18 @@ export async function runImportAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/documents?report=${batchId}`);
 }
+
+export async function setDocTypeAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    await trpc.documents.setDocType({
+      id: str(fd, "documentId"),
+      docType: str(fd, "docType") as never,
+    });
+  } catch (e) {
+    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "UNKNOWN";
+    redirect(`/${locale}/documents?error=${code}`);
+  }
+  redirect(`/${locale}/documents`);
+}

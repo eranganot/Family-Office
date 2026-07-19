@@ -5,10 +5,6 @@ import { CTX, expense, item, snapshot } from "./fixtures";
 const ctx = (over: Record<string, unknown> = {}) => ({ assumptions: { ...CTX.assumptions, ...over }, taxRules: { ...CTX.taxRules } });
 const noTax = (over: Record<string, unknown> = {}) => ({ assumptions: { ...CTX.assumptions, ...over }, taxRules: {} });
 
-const flow = (flowType: string, monthly: number, owners: string[] = ["m1"]) =>
-  item({ kind: "CASH_FLOW", accountType: null, valueBase: null, ownerMemberIds: owners,
-    cashFlow: { flowType, direction: "IN", amountBase: monthly, frequency: "MONTHLY" } });
-
 const variant = (p: ReturnType<typeof computeDeploymentPlans>, key: DeploymentVariantKey) =>
   p.variants.find((v) => v.key === key)!;
 
@@ -109,4 +105,53 @@ describe("computeDeploymentPlans (M26 variants)", () => {
       expect(total + v.leftoverBase, v.key).toBe(p.freeCashBase);
     }
   });
+
+  it("emits an editable candidate per mortgage track (partial repayment) and presets seed the working plan", () => {
+    const s2 = snapshot([
+      item({ accountType: "BANK_CHECKING", valueBase: 400_000 }),
+      expense(10_000),
+      item({
+        kind: "MORTGAGE", accountType: null, valueBase: 800_000,
+        mortgageTracks: [
+          { trackType: "PRIME", principalRemaining: 50_000, annualRatePct: 9.5, cpiLinked: false, endDate: "2040-01-01" },
+          { trackType: "FIXED_UNLINKED", principalRemaining: 100_000, annualRatePct: 3.0, cpiLinked: false, endDate: "2040-01-01" },
+        ],
+      }),
+      item({ accountType: "BROKERAGE_IL", valueBase: 100_000, growthSharePct: 60 }),
+    ]);
+    const p = computeDeploymentPlans(s2, noTax());
+    const debtCands = p.candidates.filter((c) => c.kind === "REPAY_EXPENSIVE_DEBT" || c.kind === "REPAY_DEBT");
+    expect(debtCands).toHaveLength(2);
+    // each track is editable up to its own principal (partial allowed)
+    const prime = debtCands.find((c) => c.ratePct === 9.5)!;
+    expect(prime.editable).toBe(true);
+    expect(prime.maxAmount).toBe(50_000);
+    expect(prime.minAmount).toBe(0);
+    // highest-rate candidate comes first
+    expect(debtCands[0]!.ratePct).toBe(9.5);
+    // presets reference candidate ids; GROWTH pays no debt, DEBT_FREE pays both
+    expect(p.presets.GROWTH.some((e) => e.candidateId.startsWith("debt:"))).toBe(false);
+    expect(p.presets.DEBT_FREE.filter((e) => e.candidateId.startsWith("debt:")).length).toBe(2);
+    // every preset entry points to a real candidate and respects its max
+    const byId = new Map(p.candidates.map((c) => [c.id, c]));
+    for (const key of ["GROWTH", "DEBT_FREE", "BALANCED"] as const) {
+      for (const e of p.presets[key]) {
+        const c = byId.get(e.candidateId)!;
+        expect(c).toBeDefined();
+        expect(e.amount).toBeLessThanOrEqual(c.maxAmount === 0 ? Infinity : c.maxAmount);
+      }
+      // a preset never allocates more than the free cash
+      const allocated = p.presets[key].reduce((t, e) => t + e.amount, 0);
+      expect(allocated).toBeLessThanOrEqual(p.freeCashBase + 1);
+    }
+  });
+
+  it("employed member yields a non-editable payroll-verify candidate (form 106 satisfies it)", () => {
+    const p = computeDeploymentPlans(snapshot([item({ accountType: "BANK_CHECKING", valueBase: 200_000 }), expense(10_000)]), ctx());
+    const verify = p.candidates.find((c) => c.kind === "TAX_VERIFY_PAYROLL")!;
+    expect(verify.editable).toBe(false);
+    expect(verify.maxAmount).toBe(0);
+    expect(verify.detailHe).toContain("106");
+  });
+
 });
