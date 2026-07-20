@@ -88,7 +88,45 @@
       "NO_FX_RATE": "חסר שער המרה"
     },
     "noHousehold": "מתחילים בהגדרת משק הבית.",
-    "setupCta": "הגדרת משק בית"
+    "setupCta": "הגדרת משק בית",
+    "goalsProgress": {
+      "title": "התקדמות מטרות",
+      "empty": "אין עדיין מטרות למעקב.",
+      "funded": "ממומן",
+      "gap": "פער {amount}",
+      "monthlySaving": "חסכו {amount}/חודש",
+      "onTrack": "בכיוון הנכון",
+      "notComputable": "דורש תאריך וסכום יעד"
+    },
+    "charts": {
+      "allocationTitle": "הקצאה לפי סוג",
+      "liquidTitle": "פירוט נכסים נזילים",
+      "growth": "צמיחה",
+      "defensive": "הגנתי",
+      "unknown": "תמהיל לא ידוע",
+      "empty": "אין עדיין נתונים להצגה."
+    },
+    "fxPanel": {
+      "title": "שערי מטבע",
+      "boiRate": "ריבית בנק ישראל",
+      "asOf": "נכון ל-{date}",
+      "none": "לא הוגדרו שערי מטבע."
+    },
+    "scenariosPanel": {
+      "title": "תרחישים",
+      "empty": "לא הורצו תרחישים עדיין.",
+      "viewAll": "צפייה בכולם",
+      "lockedPhase": "זמין בשלב האסטרטגיה."
+    },
+    "monitoringPanel": {
+      "title": "תובנות ניטור",
+      "clear": "אין התראות פתוחות — הכול תקין.",
+      "open": "{count} התראות פתוחות",
+      "high": "גבוה",
+      "medium": "בינוני",
+      "low": "נמוך",
+      "view": "צפייה בניטור"
+    }
   },
   "household": {
     "title": "משק הבית",
@@ -834,7 +872,33 @@
     "dismiss": "הסר מהרשימה",
     "markDone": "סמן כבוצע",
     "outcomePlaceholder": "מה בוצע בפועל?",
-    "actionItems": "צעדים לביצוע"
+    "actionItems": "צעדים לביצוע",
+    "synthesis": {
+      "title": "אסטרטגיית העושר שלכם",
+      "engineTag": "נוצר על ידי המנוע · מקובע",
+      "achieveLabel": "מה התוכנית מבקשת להשיג",
+      "howLabel": "איך היא עושה זאת",
+      "outcomesLabel": "תוצאות צפויות",
+      "progressLabel": "התקדמות",
+      "progressDone": "{done} / {total} הושלמו",
+      "progressHint": "השלימו את פריטי הפעולה שמטה כדי לעמוד בתוכנית.",
+      "pinsLabel": "שחזוריות",
+      "generatedOn": "נוצר ב-{date}",
+      "empty": "הריצו את מנוע האסטרטגיה כדי לייצר את התוכנית."
+    },
+    "finetune": {
+      "title": "כיוונון עדין של התוכנית",
+      "hint": "עדכנו את הנתונים למטה ואז הריצו מחדש את האסטרטגיה כדי לרענן.",
+      "goalsTitle": "עדיפויות ויעדי מטרות",
+      "priority": "עדיפות",
+      "requiredFunding": "סכום יעד (₪)",
+      "save": "שמירה",
+      "saved": "נשמר. הריצו מחדש את האסטרטגיה כדי לרענן.",
+      "noGoals": "אין עדיין מטרות פעילות.",
+      "amountsTitle": "סכומי פעולות",
+      "amountsHint": "ערכו כמה כל פעולה מקצה בתוכנית ההקצאה.",
+      "editAmounts": "עריכת סכומי ההקצאה"
+    }
   },
   "journal": {
     "explainerTitle": "מה זה הטאב הזה?",

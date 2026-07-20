@@ -6,6 +6,14 @@ import { router, workflowGuard } from "../trpc";
 export const strategyRouter = router({
   run: workflowGuard("STRATEGY").mutation(({ ctx }) => runStrategy(ctx.db, ctx.householdId)),
 
+  /** M34 — the latest pinned strategy synthesis (high-level plan narrative + metrics + pins). */
+  plan: workflowGuard("STRATEGY").query(({ ctx }) =>
+    ctx.db.strategyPlan.findFirst({
+      where: { householdId: ctx.householdId },
+      orderBy: { createdAt: "desc" },
+    }),
+  ),
+
   recommendations: workflowGuard("STRATEGY").query(({ ctx }) =>
     ctx.db.recommendation.findMany({
       where: { householdId: ctx.householdId, status: { in: ["PROPOSED", "ACCEPTED"] } },

@@ -16,3 +16,12 @@ export { scorePriority } from "./scoring";
 export type { PriorityWeights } from "./scoring";
 export { evaluateGate } from "./gate";
 export type { GateResult, GateThresholds, DataGapReport } from "./gate";
+export { synthesizeStrategy } from "./synthesis";
+export type {
+  StrategySynthesis,
+  StrategySynthesisInput,
+  StrategyNarrativeText,
+  StrategyMetrics,
+  CommittedMoves,
+  FundingSummary,
+} from "./synthesis";

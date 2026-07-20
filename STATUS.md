@@ -2,6 +2,31 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-20, session 8)
+
+- **M34 (strategy synthesis, Variant A) + M35 (dashboard v2) code-complete — patch `m34-m35.patch`,
+  one migration (20260720100000_m34_strategy_synthesis).** Owner picked the engine-pinned strategy card.
+  M34: new pure `engine-strategy/src/synthesis.ts` `synthesizeStrategy()` — deterministic bilingual
+  narrative (achieve / how / expected outcomes) + metrics (target vs current growth share from KNOWN-mix
+  only, goals funded/total, actionsTotal) from the pinned snapshot + assumptions + APPROVED allocation
+  plan; product-validated (throws on any product/security reference). New relation-free `StrategyPlan`
+  model stores narrative+metrics+reproducibility pins (assumption key@version); `runStrategy` computes a
+  funding summary (reuses engine-goals `computeFundingGaps` from the payload + earmarks) and persists the
+  artifact in the run transaction. `strategy.plan` query added. Strategy page: engine-pinned synthesis
+  card at top (4 sections + progress bar + pins/snapshot/engine-version footer) and a "Fine-tune your
+  plan" card (risk+target inline, per-goal priority/target via `goals.update` + `updateGoalPlanAction`,
+  link to the allocation cart for amounts); action-item cards unchanged.
+  M35: dashboard v2 — goal progress bars (from `goals.fundingGap`), two recharts donuts (allocation by
+  kind + liquids growth/defensive/unknown via new `networth.liquidBreakdown` query), FX+BOI panel,
+  monitoring insights (open alerts by severity), scenarios summary (STRATEGY-gated → degrades gracefully).
+  New client island `components/dashboard-charts.tsx` (recharts); `recharts@^2.15.0` added to apps/web.
+  Verified in sandbox: tsc clean (engine-strategy/api/web), prisma validate, engine synthesis runtime-
+  smoked (tsc-emit → node; both plan/no-plan branches), i18n he/en parity (1069/1069, +strategy.synthesis
+  /finetune, +dashboard.goalsProgress/charts/fxPanel/scenariosPanel/monitoringPanel). vitest not run
+  (documented sandbox rolldown SIGSEGV); CI runs the suite. **Deploys with the push (migrate creates
+  StrategyPlan). Regenerate strategy after deploy to populate the first StrategyPlan.**
+
+
 ## Current state (2026-07-19)
 
 - **PRODUCT-STRATEGY.md rewritten as v2 — combined WealthOS × InvestWise Pro strategy** (docs

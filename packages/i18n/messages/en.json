@@ -88,7 +88,45 @@
       "NO_FX_RATE": "missing FX rate"
     },
     "noHousehold": "Start by setting up your household.",
-    "setupCta": "Set up household"
+    "setupCta": "Set up household",
+    "goalsProgress": {
+      "title": "Goal progress",
+      "empty": "No goals to track yet.",
+      "funded": "Funded",
+      "gap": "Gap {amount}",
+      "monthlySaving": "Save {amount}/mo",
+      "onTrack": "On track",
+      "notComputable": "Needs a target date and amount"
+    },
+    "charts": {
+      "allocationTitle": "Allocation by type",
+      "liquidTitle": "Liquid assets breakdown",
+      "growth": "Growth",
+      "defensive": "Defensive",
+      "unknown": "Unknown mix",
+      "empty": "No data to chart yet."
+    },
+    "fxPanel": {
+      "title": "FX rates",
+      "boiRate": "BOI rate",
+      "asOf": "as of {date}",
+      "none": "No FX rates set."
+    },
+    "scenariosPanel": {
+      "title": "Scenarios",
+      "empty": "No scenarios run yet.",
+      "viewAll": "View all",
+      "lockedPhase": "Available in the strategy phase."
+    },
+    "monitoringPanel": {
+      "title": "Monitoring insights",
+      "clear": "No open alerts — all clear.",
+      "open": "{count} open alerts",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "view": "View monitoring"
+    }
   },
   "household": {
     "title": "Household",
@@ -834,7 +872,33 @@
     "dismiss": "Dismiss",
     "markDone": "Mark done",
     "outcomePlaceholder": "What was actually done?",
-    "actionItems": "Action steps"
+    "actionItems": "Action steps",
+    "synthesis": {
+      "title": "Your wealth strategy",
+      "engineTag": "Engine-generated · pinned",
+      "achieveLabel": "What it aims to achieve",
+      "howLabel": "How it gets there",
+      "outcomesLabel": "Expected outcomes",
+      "progressLabel": "Progress",
+      "progressDone": "{done} / {total} done",
+      "progressHint": "Complete the action items below to meet this plan.",
+      "pinsLabel": "Reproducibility",
+      "generatedOn": "Generated {date}",
+      "empty": "Run the strategy engine to generate your plan."
+    },
+    "finetune": {
+      "title": "Fine-tune your plan",
+      "hint": "Adjust the inputs below, then re-run strategy to refresh the plan.",
+      "goalsTitle": "Goal priorities and targets",
+      "priority": "Priority",
+      "requiredFunding": "Target amount (₪)",
+      "save": "Save",
+      "saved": "Saved. Re-run strategy to refresh the plan.",
+      "noGoals": "No active goals yet.",
+      "amountsTitle": "Action amounts",
+      "amountsHint": "Edit how much each action deploys in the allocation plan.",
+      "editAmounts": "Edit allocation amounts"
+    }
   },
   "journal": {
     "explainerTitle": "What is this tab?",

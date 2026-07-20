@@ -45,6 +45,37 @@ export const networthRouter = router({
     );
   }),
 
+  /** Liquid (ACCOUNT) assets split into growth / defensive / unknown-mix, ILS-converted.
+   *  Known-mix from growthSharePct; cash types are defensive; the rest is unknown (never guessed). */
+  liquidBreakdown: protectedProcedure.query(async ({ ctx }) => {
+    const householdId = await requireHouseholdId(ctx.db);
+    const household = await ctx.db.household.findFirstOrThrow({ select: { baseCurrency: true } });
+    const base = household.baseCurrency as string;
+    const items = await ledgerRepo.list(ctx.db, householdId);
+    const allRates = await ctx.db.fxRate.findMany({ orderBy: { asOf: "desc" } });
+    const seen = new Set<string>();
+    const rate = new Map<string, number>();
+    for (const r of allRates) { const k = `${r.from}->${r.to}`; if (seen.has(k)) continue; seen.add(k); rate.set(k, Number(r.rate)); }
+    const toBase = (v: number, ccy: string): number | null => {
+      if (ccy === base) return v;
+      const d = rate.get(`${ccy}->${base}`); if (d) return v * d;
+      const inv = rate.get(`${base}->${ccy}`); if (inv) return v / inv;
+      return null;
+    };
+    const CASH = new Set(["BANK_CHECKING", "BANK_SAVINGS", "BANK_DEPOSIT", "CASH_OTHER"]);
+    let growth = 0, defensive = 0, unknown = 0;
+    for (const i of items) {
+      if (i.kind !== "ACCOUNT" || !i.latestValuation) continue;
+      const v = toBase(Number(i.latestValuation.value), i.currency);
+      if (v === null) continue;
+      const gs = i.accountDetail?.growthSharePct;
+      if (gs !== null && gs !== undefined) { growth += (v * Number(gs)) / 100; defensive += (v * (100 - Number(gs))) / 100; }
+      else if (CASH.has(i.accountDetail?.accountType ?? "")) { defensive += v; }
+      else { unknown += v; }
+    }
+    return { base, growthILS: Math.round(growth), defensiveILS: Math.round(defensive), unknownILS: Math.round(unknown) };
+  }),
+
   fxRates: protectedProcedure.query(({ ctx }) =>
     ctx.db.fxRate.findMany({ orderBy: [{ from: "asc" }, { to: "asc" }, { asOf: "desc" }] }),
   ),

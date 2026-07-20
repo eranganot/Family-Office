@@ -774,3 +774,23 @@ model MonitoringAlert {
 }
 
 // END OF SCHEMA DRAFT
+
+/// M34 — the strategy synthesis artifact (Variant A). A pinned, bilingual
+/// high-level plan narrative (achieve / how / expected outcomes) generated on a
+/// strategy run from the same snapshot + assumptions the recommendations use.
+/// Reproducibility pins live in `pins` (assumption key@version); regenerated only
+/// on the next run, so the plan the owner reads is the plan that produced the
+/// action items. Relation-free by design (scalar householdId/snapshotId) to keep
+/// the migration surface minimal.
+model StrategyPlan {
+  id            String   @id @default(uuid())
+  householdId   String
+  snapshotId    String
+  engineVersion String
+  narrative     Json // { en: { achieve, how, outcomes[] }, he: { ... } }
+  metrics       Json // { targetGrowthPct, currentGrowthPct, goalsTotal, goalsFunded, topGoalName, topGoalMonthlySavingILS, actionsTotal, horizonYears }
+  pins          Json // reproducibility: [{ key, version }]
+  createdAt     DateTime @default(now())
+
+  @@index([householdId, createdAt])
+}

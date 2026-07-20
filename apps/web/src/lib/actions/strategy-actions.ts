@@ -20,6 +20,19 @@ export async function runStrategyAction(fd: FormData): Promise<void> {
   redirect(`/${locale}/strategy${query}`);
 }
 
+export async function updateGoalPlanAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  const priorityRaw = opt(fd, "priority");
+  const requiredRaw = opt(fd, "requiredFunding");
+  await trpc.goals.update({
+    id: str(fd, "id"),
+    ...(priorityRaw ? { priority: Number(priorityRaw) } : {}),
+    ...(requiredRaw ? { requiredFunding: requiredRaw } : {}),
+  } as never);
+  redirect(`/${locale}/strategy?ok=goalTuned`);
+}
+
 export async function decideAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const trpc = await serverCaller();
