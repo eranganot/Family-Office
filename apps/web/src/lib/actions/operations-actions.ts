@@ -177,3 +177,72 @@ export async function setTransactionStatusAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/operations?${status === "VOID" ? "removed" : "restored"}=1`);
 }
+
+/**
+ * Upload a statement and jump straight to its preview. Uses the existing documents
+ * pipeline so the original file lands in the access-controlled Document store — which
+ * is where the un-redacted bytes stay, and the only place they exist.
+ */
+export async function uploadStatementAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const file = fd.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/${locale}/operations?error=nofile`);
+  }
+  const bytes = Buffer.from(await (file as File).arrayBuffer());
+  const trpc = await serverCaller();
+  let documentId: string | undefined;
+  try {
+    const doc = await trpc.documents.upload({
+      filename: (file as File).name,
+      mimeType: (file as File).type || "application/octet-stream",
+      institutionName: str(fd, "institutionName") || undefined,
+      contentBase64: bytes.toString("base64"),
+    });
+    documentId = (doc as { id: string }).id;
+  } catch (e) {
+    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 60)) : "UNKNOWN";
+    redirect(`/${locale}/operations?error=${code}`);
+  }
+  redirect(`/${locale}/operations?preview=${documentId}`);
+}
+
+export async function commitStatementAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const documentId = str(fd, "documentId");
+  const amountMode = str(fd, "amountMode") as "SIGNED" | "DEBIT_CREDIT";
+  const col = (n: string): string | undefined => str(fd, n) || undefined;
+
+  const mapping = {
+    amountMode,
+    defaultCurrency: (str(fd, "defaultCurrency") || "ILS") as never,
+    dayFirst: true,
+    columns: {
+      date: str(fd, "col_date"),
+      description: str(fd, "col_description"),
+      amount: col("col_amount"),
+      debit: col("col_debit"),
+      credit: col("col_credit"),
+      currency: col("col_currency"),
+      valueDate: col("col_valueDate"),
+      reference: col("col_reference"),
+      pendingMarker: col("col_pendingMarker"),
+    },
+  };
+  const saveAs = str(fd, "saveProfileAs");
+
+  const trpc = await serverCaller();
+  let result: { inserted: number; duplicates: number } | undefined;
+  try {
+    result = await trpc.operations.import.commit({
+      documentId,
+      adapterId: "generic-tabular",
+      mapping: mapping as never,
+      ...(saveAs ? { saveProfileAs: saveAs } : {}),
+    });
+  } catch (e) {
+    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 60)) : "IMPORT_FAILED";
+    redirect(`/${locale}/operations?error=${code}&preview=${documentId}`);
+  }
+  redirect(`/${locale}/operations?imported=${result?.inserted ?? 0}&dupes=${result?.duplicates ?? 0}`);
+}

@@ -7,8 +7,10 @@ import {
   createManualTransactionAction,
   recomputePeriodAction,
   reopenPeriodAction,
+  commitStatementAction,
   setTransactionStatusAction,
   updateTransactionAction,
+  uploadStatementAction,
   upsertCategoryAction,
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
@@ -41,6 +43,7 @@ export default async function OperationsPage({
     error?: string; created?: string; classified?: string; categorySaved?: string;
     recomputed?: string; closed?: string; reopened?: string; tab?: string;
     updated?: string; removed?: string; restored?: string; edit?: string;
+    preview?: string; imported?: string; dupes?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -53,6 +56,10 @@ export default async function OperationsPage({
   const cats = await trpc.operations.categories.tree();
   const meta = await trpc.operations.meta();
   const { rows: txns } = await trpc.operations.transactions.list({ limit: 50 });
+  // Preview is a mutation (it does real parsing work) but persists nothing.
+  const preview = sp.preview
+    ? await trpc.operations.import.preview({ documentId: sp.preview }).catch(() => null)
+    : null;
   const period = await trpc.operations.period.current();
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
   const { year, month, row: periodRow, computed } = period;
@@ -75,6 +82,141 @@ export default async function OperationsPage({
       <Explainer title={t("explainer.title")} paragraphs={[t("explainer.p1"), t("explainer.p2")]} />
 
       <ErrorBanner message={errorMsg} />
+
+      {/* ---------------------------------------------------------- M38b --- */}
+      <Card title={t("importTitle")}>
+        <p className="mb-4 text-xs text-neutral-500">{t("importHint")}</p>
+        <form action={uploadStatementAction} className="flex flex-wrap items-end gap-4">
+          <input type="hidden" name="locale" value={locale} />
+          <Field label={t("importFile")}>
+            <input type="file" name="file" required accept=".csv,.txt,.tsv,.html,.htm,text/csv,text/html" className="text-sm" />
+          </Field>
+          <Field label={t("importInstitution")}>
+            <TextInput name="institutionName" placeholder={t("importInstitutionPlaceholder")} />
+          </Field>
+          <SubmitButton label={t("importUpload")} />
+        </form>
+
+        {preview ? (
+          preview.unsupportedReason ? (
+            <div className="mt-6 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p className="font-medium">{t(`importUnsupported.${preview.unsupportedReason}`)}</p>
+            </div>
+          ) : (
+            <div className="mt-6 border-t border-neutral-100 pt-6">
+              <h3 className="mb-1 text-sm font-semibold">{t("previewTitle")}</h3>
+              <p className="mb-4 text-xs text-neutral-500">
+                {t("previewSummary", {
+                  rows: preview.totalRows,
+                  usable: preview.drafts.length,
+                  dupes: preview.duplicates,
+                  skipped: preview.issues.length,
+                })}
+                {preview.detectedRange
+                  ? ` · ${t("previewRange", {
+                      start: preview.detectedRange.start,
+                      end: preview.detectedRange.end,
+                      days: preview.detectedRange.days,
+                    })}`
+                  : ""}
+                {` · ${t("previewEncoding", { encoding: preview.encoding, format: preview.format })}`}
+              </p>
+              <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-800">
+                {t("previewRedaction", { n: preview.redactedFields, version: preview.redactionVersion })}
+              </p>
+
+              {preview.drafts.length > 0 ? (
+                <table className="mb-6 w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-neutral-200 text-neutral-500">
+                      <th className="py-1 text-start">{t("date")}</th>
+                      <th className="py-1 text-start">{t("description")}</th>
+                      <th className="py-1 text-start">{t("amount")}</th>
+                      <th className="py-1 text-start">{t("currency")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.drafts.slice(0, 8).map((d, i) => (
+                      <tr key={`${d.externalRef ?? i}`} className="border-b border-neutral-100">
+                        <td className="py-1 whitespace-nowrap">{d.bookedAt}</td>
+                        <td className="py-1">
+                          {d.descriptionRedacted}
+                          {d.status === "PENDING" ? (
+                            <span className="ms-2 rounded bg-neutral-100 px-1 text-neutral-600">{t("pendingBadge")}</span>
+                          ) : null}
+                          {d.instalmentTotal ? (
+                            <span className="ms-2 rounded bg-amber-50 px-1 text-amber-700">
+                              {d.instalmentNumber}/{d.instalmentTotal}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className={`py-1 tabular-nums ${Number(d.amount) < 0 ? "" : "text-green-700"}`}>{d.amount}</td>
+                        <td className="py-1">{d.currency}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="mb-4 text-sm text-amber-700">{t("previewNoRows")}</p>
+              )}
+
+              <form action={commitStatementAction} className="grid grid-cols-2 items-end gap-3 md:grid-cols-4">
+                <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="documentId" value={sp.preview ?? ""} />
+                <Field label={t("mapAmountMode")}>
+                  <Select name="amountMode" defaultValue={String(preview.guessedMapping["amountMode"] ?? "SIGNED")}>
+                    <option value="SIGNED">{t("modeSigned")}</option>
+                    <option value="DEBIT_CREDIT">{t("modeDebitCredit")}</option>
+                  </Select>
+                </Field>
+                {([
+                  ["col_date", "date", true],
+                  ["col_description", "description", true],
+                  ["col_amount", "amount", false],
+                  ["col_debit", "debit", false],
+                  ["col_credit", "credit", false],
+                  ["col_currency", "currency", false],
+                  ["col_reference", "reference", false],
+                ] as const).map(([field, key, required]) => (
+                  <Field key={field} label={t(`mapCol.${key}`)}>
+                    <Select
+                      name={field}
+                      defaultValue={String(preview.guessedMapping[key] ?? "")}
+                      required={required}
+                    >
+                      <option value="">{t("mapNone")}</option>
+                      {preview.headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                    </Select>
+                  </Field>
+                ))}
+                <Field label={t("mapPendingMarker")}>
+                  <TextInput name="col_pendingMarker" placeholder="בתהליך קליטה" />
+                </Field>
+                <Field label={t("mapCurrencyDefault")}>
+                  <Select name="defaultCurrency" defaultValue="ILS">
+                    {["ILS", "USD", "EUR"].map((c) => <option key={c} value={c}>{c}</option>)}
+                  </Select>
+                </Field>
+                <Field label={t("saveProfileAs")}>
+                  <TextInput name="saveProfileAs" placeholder={t("saveProfilePlaceholder")} />
+                </Field>
+                <SubmitButton label={t("importCommit")} />
+              </form>
+
+              {preview.issues.length > 0 ? (
+                <details className="mt-4 text-xs text-neutral-500">
+                  <summary className="cursor-pointer">{t("previewIssues", { n: preview.issues.length })}</summary>
+                  <ul className="mt-2">
+                    {preview.issues.slice(0, 10).map((iss, i) => (
+                      <li key={i}>{t(`issue.${iss.reason}`)} — {iss.raw.slice(0, 60)}</li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+            </div>
+          )
+        ) : null}
+      </Card>
       <SuccessBanner
         message={
           sp.created ? t("created")
@@ -86,6 +228,7 @@ export default async function OperationsPage({
           : sp.updated ? t("updatedOk")
           : sp.removed ? t("removedOk")
           : sp.restored ? t("restoredOk")
+          : sp.imported ? t("importedOk", { n: sp.imported, dupes: sp.dupes ?? "0" })
           : undefined
         }
       />

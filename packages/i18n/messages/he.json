@@ -1294,6 +1294,49 @@
       "RULE": "כלל בית עסק",
       "CARRIED_FORWARD": "הועבר מסיווג קודם",
       "FALLBACK": "לא נמצא כלל מתאים"
+    },
+    "importTitle": "ייבוא דף חשבון",
+    "importHint": "קבצי CSV ו-HTML מהבנק או מחברת האשראי. הקובץ עצמו נשמר בגישה מוגבלת; בספר התנועות נשמרת אך ורק גרסה מצונזרת של התיאור.",
+    "importFile": "קובץ הדף",
+    "importInstitution": "מקור (רשות)",
+    "importInstitutionPlaceholder": "לדוגמה: הבינלאומי, ישראכרט",
+    "importUpload": "העלאה ותצוגה מקדימה",
+    "importCommit": "ייבוא התנועות",
+    "importedOk": "יובאו {n} תנועות ({dupes} כבר היו קיימות ודולגו).",
+    "previewTitle": "תצוגה מקדימה — עדיין לא נשמר דבר",
+    "previewSummary": "{rows} שורות נקראו · {usable} שמישות · {dupes} כבר יובאו · {skipped} דולגו",
+    "previewRange": "בטווח {start} ← {end} ({days} ימים)",
+    "previewEncoding": "{format}, {encoding}",
+    "previewRedaction": "{n} שדות מידע אישי הוסרו לפני שנשמר משהו ({version}). מספרי ת״ז, חשבון וכרטיס ושמות בני הבית אינם מגיעים לטבלת התנועות.",
+    "previewNoRows": "אין שורות שמישות עם מיפוי העמודות הנוכחי. התאימו את העמודות למטה והעלו שוב.",
+    "previewIssues": "{n} שורות דולגו — למה?",
+    "pendingBadge": "בתהליך",
+    "mapAmountMode": "מבנה הסכום",
+    "modeSigned": "עמודה אחת עם סימן",
+    "modeDebitCredit": "חובה / זכות בנפרד",
+    "mapNone": "— ללא —",
+    "mapPendingMarker": "טקסט שמסמן ״בתהליך״",
+    "mapCurrencyDefault": "מטבע ברירת מחדל",
+    "saveProfileAs": "שמירת המיפוי בשם",
+    "saveProfilePlaceholder": "לדוגמה: עו״ש הבינלאומי",
+    "mapCol": {
+      "date": "עמודת תאריך",
+      "description": "עמודת תיאור",
+      "amount": "עמודת סכום",
+      "debit": "עמודת חובה",
+      "credit": "עמודת זכות",
+      "currency": "עמודת מטבע",
+      "reference": "עמודת אסמכתא"
+    },
+    "issue": {
+      "NO_DATE": "אין תאריך קריא",
+      "NO_AMOUNT": "אין סכום קריא",
+      "ZERO_AMOUNT": "הסכום היה אפס"
+    },
+    "importUnsupported": {
+      "LEGACY_XLS": "זהו קובץ Excel ישן מסוג ‎.xls. ייצאו אותו מחדש כ-CSV מהבנק והעלו שוב — הספרייה היחידה שקוראת את הפורמט הבינארי הזה אינה מתוחזקת ויש בה התראות אבטחה ידועות, ולכן בכוונה אינה בשימוש כאן.",
+      "XLSX_NOT_YET_SUPPORTED": "פורמט ‎.xlsx עדיין אינו נתמך. ייצאו בינתיים כ-CSV.",
+      "UNRECOGNISED_FORMAT": "הקובץ אינו CSV ואינו טבלת HTML. ייבוא דפי PDF יגיע בשלב מאוחר יותר."
     }
   }
 }

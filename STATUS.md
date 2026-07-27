@@ -2,6 +2,58 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-27, session 11)
+
+- **M38b (statement import) code-complete — `m38b.patch`. NO MIGRATION, NO LOCKFILE CHANGE,
+  NO NEW DEPENDENCIES.** You can now import statements instead of typing transactions.
+  - **`redact()` PII boundary** (`packages/ingestion/src/redact.ts`, 18 tests). Runs INSIDE
+    `applyMapping`, so raw text cannot reach the DB on any route — there is no code path that
+    persists an un-redacted description. Redacts: Teudat Zehut (**check-digit validated**, so
+    9-digit voucher numbers and amounts survive — a naive rule would corrupt the import),
+    card PANs (**Luhn-validated**), IL IBANs, bank/branch account numbers, and household member
+    names (no `\b` — it fails next to Hebrew, a known sharp edge in this repo). Idempotent and
+    version-stamped. Bias: false positives are cheap for account/card numbers, so those patterns
+    are broad; the ID check is exact because over-matching there destroys real data.
+  - **Generic tabular adapter**: CSV (papaparse, already a dep) + **HTML tables** (regex reader,
+    no new dependency — picks the LARGEST table, since layout tables come first). Encoding
+    sniffing (UTF-8 vs Windows-1255 via UTF-8 validity + CP1255 Hebrew range), **header-row
+    detection** (statements carry title/account preamble above the real header, so assuming
+    row 0 silently mis-parses the file), visual-order Hebrew repair across the grid.
+  - **`IL_STATEMENT_LEXICON` added as a tie-breaker.** The lexicon-independent detector keys on
+    Hebrew final letters, but "משכורת" has no final form and is therefore orthographically
+    undecidable. Statement vocabulary is small and fixed, so a lexicon closes exactly that gap
+    without weakening the general rule. (Caught by a test.)
+  - **Mapping**: SIGNED or DEBIT_CREDIT mode, U+2212 minus normalisation (real refunds use it),
+    instalment parsing (`תשלום N מתוך M`), `הוראת קבע` → recurring candidate, pending-marker →
+    `status=PENDING`. Unusable rows are **reported, not silently dropped** — statements carry
+    subtotal/footer rows, and a short total with no explanation is worse than a visible skip count.
+  - **Idempotent re-import** via `externalRef`: the statement's own reference when present, else
+    a stable digest of (date, amount, description). Bank exports are range-based, so overlapping
+    re-imports are inevitable and must not duplicate.
+  - **preview (persists NOTHING) → commit**: preview shows rows read / usable / already-imported /
+    skipped, the detected date range, format+encoding, and **how many PII fields were removed**.
+    Commit records an `ImportBatch` (payload = the redacted profile + row count, never the raw
+    file) and auto-classifies what landed. Mappings saveable as `ImportMappingProfile`.
+  - **Legacy `.xls` is deliberately NOT supported.** The only npm-published BIFF reader is
+    SheetJS's `xlsx`, whose npm distribution is unmaintained and carries known prototype-pollution
+    and ReDoS advisories. Pulling that into a household financial system to read a format the bank
+    also exports as CSV is a bad trade — the UI says exactly that and asks for a CSV re-export.
+    **This means the owner's OneZero `.xls` needs re-exporting as CSV; the Isracard HTML works as-is.**
+  - **Verified:** ingestion 58 tests (39 new), engine-operations 66, api guard 9, domain 49,
+    tsc clean, eslint clean, i18n parity 1106/1106, `prisma validate` OK, `npm ci --dry-run` exit 0.
+
+### Known blind spot
+No Postgres and no root in the sandbox, so **DB-bound suites (`packages/db`, `packages/api`
+integration) only run in CI.** The statement-import service is DB-bound and therefore verified
+by unit tests of its pure parts (parsing, mapping, redaction) plus type-checking, not end-to-end.
+
+## Next up
+
+**M38c — institution adapters:** FIBI PDF (`extract_tables`-friendly), Isracard PDF and CAL PDF
+(bespoke line parsers), plus `us-bank-chase-csv` once the Chase export arrives. Then **M39**
+(financial calendar + recurring decisions), whose statutory figures still depend on owner
+verification of B3/B4.
+
 ## Current state (2026-07-27, session 10)
 
 - **M38a (transaction editing + provenance + guard test) code-complete — `m38a.patch` on M37.

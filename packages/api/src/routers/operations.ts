@@ -4,6 +4,7 @@ import { UNCLASSIFIED_KEY } from "@wealthos/domain";
 import { normalizeMerchantKey, OPERATIONS_ENGINE_VERSION } from "@wealthos/engine-operations";
 import { operationsProcedure, router } from "../trpc";
 import { autoClassify, computePeriod, operationsAssumptions } from "../services/operations-service";
+import { commitStatement, previewStatement } from "../services/statement-import-service";
 import {
   ArchiveCategorySchema,
   BulkClassifyByMerchantSchema,
@@ -11,7 +12,10 @@ import {
   UpdateTransactionSchema,
   ClassifyTransactionsSchema,
   ClosePeriodSchema,
+  CommitStatementSchema,
   CreateManualTransactionSchema,
+  PreviewStatementSchema,
+  SaveMappingProfileSchema,
   ListTransactionsSchema,
   PeriodRefSchema,
   UpsertCategorySchema,
@@ -438,5 +442,74 @@ export const operationsRouter = router({
         const { minConfidence } = await operationsAssumptions(ctx.db, ctx.householdId);
         return { rows, minConfidence };
       }),
+  }),
+
+  // ------------------------------------------------------------------ M38b --
+  /**
+   * Statement import. `preview` persists NOTHING — it parses, redacts and maps so the
+   * household can see exactly what will land before committing. Both paths run the
+   * redaction boundary, so raw PII never reaches the database on any route.
+   */
+  import: router({
+    preview: operationsProcedure.input(PreviewStatementSchema).mutation(async ({ ctx, input }) => {
+      try {
+        return await previewStatement(ctx.db, ctx.householdId, input.documentId, input.mapping);
+      } catch (e) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: e instanceof Error ? e.message : "PREVIEW_FAILED",
+        });
+      }
+    }),
+
+    commit: operationsProcedure.input(CommitStatementSchema).mutation(async ({ ctx, input }) => {
+      let result;
+      try {
+        result = await commitStatement(
+          ctx.db, ctx.householdId, input.documentId, input.adapterId, input.mapping,
+        );
+      } catch (e) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: e instanceof Error ? e.message : "IMPORT_FAILED",
+        });
+      }
+      if (input.saveProfileAs && input.mapping) {
+        await ctx.db.importMappingProfile.upsert({
+          where: { householdId_name: { householdId: ctx.householdId, name: input.saveProfileAs } },
+          create: {
+            householdId: ctx.householdId,
+            name: input.saveProfileAs,
+            adapterId: input.adapterId,
+            mapping: JSON.parse(JSON.stringify(input.mapping)),
+          },
+          update: { mapping: JSON.parse(JSON.stringify(input.mapping)), adapterId: input.adapterId },
+        });
+      }
+      // Classify what just landed so the household sees categories immediately.
+      const classified = await autoClassify(ctx.db, ctx.householdId);
+      return { ...result, ...classified };
+    }),
+
+    profiles: operationsProcedure.query(async ({ ctx }) =>
+      ctx.db.importMappingProfile.findMany({
+        where: { householdId: ctx.householdId },
+        orderBy: { name: "asc" },
+      }),
+    ),
+
+    saveProfile: operationsProcedure.input(SaveMappingProfileSchema).mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.importMappingProfile.upsert({
+        where: { householdId_name: { householdId: ctx.householdId, name: input.name } },
+        create: {
+          householdId: ctx.householdId,
+          name: input.name,
+          adapterId: input.adapterId,
+          mapping: JSON.parse(JSON.stringify(input.mapping)),
+        },
+        update: { mapping: JSON.parse(JSON.stringify(input.mapping)), adapterId: input.adapterId },
+      });
+      return { id: row.id };
+    }),
   }),
 });

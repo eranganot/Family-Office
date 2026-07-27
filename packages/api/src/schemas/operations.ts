@@ -161,3 +161,52 @@ export const SetTransactionStatusSchema = z.object({
   id: z.uuid(),
   status: z.enum(["BOOKED", "PENDING", "VOID"]),
 });
+
+// ------------------------------------------------------------------ M38b --
+
+export const AmountModeSchema = z.enum(["SIGNED", "DEBIT_CREDIT"]);
+
+export const ColumnMappingSchema = z.object({
+  date: z.string().min(1),
+  description: z.string().min(1),
+  amount: z.string().optional(),
+  debit: z.string().optional(),
+  credit: z.string().optional(),
+  currency: z.string().optional(),
+  valueDate: z.string().optional(),
+  reference: z.string().optional(),
+  balance: z.string().optional(),
+  pendingMarker: z.string().optional(),
+});
+
+export const MappingProfileSchema = z
+  .object({
+    amountMode: AmountModeSchema,
+    columns: ColumnMappingSchema,
+    defaultCurrency: CurrencyCodeSchema.default("ILS"),
+    dayFirst: z.boolean().default(true),
+  })
+  .refine(
+    (v) =>
+      v.amountMode === "SIGNED" ? Boolean(v.columns.amount) : Boolean(v.columns.debit || v.columns.credit),
+    { message: "SIGNED needs an amount column; DEBIT_CREDIT needs a debit and/or credit column", path: ["columns"] },
+  );
+
+export const PreviewStatementSchema = z.object({
+  documentId: z.uuid(),
+  mapping: MappingProfileSchema.optional(),
+});
+
+export const CommitStatementSchema = z.object({
+  documentId: z.uuid(),
+  adapterId: z.string().min(1).max(80).default("generic-tabular"),
+  mapping: MappingProfileSchema.optional(),
+  /** Persist this mapping for reuse next time this source is imported. */
+  saveProfileAs: z.string().min(1).max(120).optional(),
+});
+
+export const SaveMappingProfileSchema = z.object({
+  name: z.string().min(1).max(120),
+  adapterId: z.string().min(1).max(80).default("generic-tabular"),
+  mapping: MappingProfileSchema,
+});

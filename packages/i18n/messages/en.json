@@ -1294,6 +1294,49 @@
       "RULE": "a merchant rule",
       "CARRIED_FORWARD": "carried forward",
       "FALLBACK": "no rule matched"
+    },
+    "importTitle": "Import a statement",
+    "importHint": "CSV and HTML exports from your bank or card issuer. The file itself is stored access-controlled; only a redacted version of each description is ever saved to the transaction ledger.",
+    "importFile": "Statement file",
+    "importInstitution": "Source (optional)",
+    "importInstitutionPlaceholder": "e.g. FIBI, Isracard",
+    "importUpload": "Upload & preview",
+    "importCommit": "Import these transactions",
+    "importedOk": "Imported {n} transactions ({dupes} already existed and were skipped).",
+    "previewTitle": "Preview — nothing has been saved yet",
+    "previewSummary": "{rows} rows read · {usable} usable · {dupes} already imported · {skipped} skipped",
+    "previewRange": "covering {start} → {end} ({days} days)",
+    "previewEncoding": "{format}, {encoding}",
+    "previewRedaction": "{n} personal-data fields removed before anything was stored ({version}). ID numbers, account and card numbers, and household names never reach the transaction table.",
+    "previewNoRows": "No usable rows with the current column mapping. Adjust the columns below and re-upload.",
+    "previewIssues": "{n} rows skipped — see why",
+    "pendingBadge": "pending",
+    "mapAmountMode": "Amount format",
+    "modeSigned": "One signed column",
+    "modeDebitCredit": "Separate debit / credit",
+    "mapNone": "— none —",
+    "mapPendingMarker": "Pending marker text",
+    "mapCurrencyDefault": "Default currency",
+    "saveProfileAs": "Save this mapping as",
+    "saveProfilePlaceholder": "e.g. FIBI current account",
+    "mapCol": {
+      "date": "Date column",
+      "description": "Description column",
+      "amount": "Amount column",
+      "debit": "Debit column",
+      "credit": "Credit column",
+      "currency": "Currency column",
+      "reference": "Reference column"
+    },
+    "issue": {
+      "NO_DATE": "No readable date",
+      "NO_AMOUNT": "No readable amount",
+      "ZERO_AMOUNT": "Amount was zero"
+    },
+    "importUnsupported": {
+      "LEGACY_XLS": "This is a legacy Excel .xls file. Re-export it as CSV from your bank and upload again — the only library that reads this binary format is unmaintained and carries known security advisories, so it is deliberately not used here.",
+      "XLSX_NOT_YET_SUPPORTED": "Modern .xlsx is not supported yet. Re-export as CSV for now.",
+      "UNRECOGNISED_FORMAT": "This file is not a CSV or an HTML table. PDF statements are supported in a later phase."
     }
   }
 }

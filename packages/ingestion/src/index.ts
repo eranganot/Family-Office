@@ -26,3 +26,17 @@ export function registerBuiltinAdapters(): void {
   registerAdapter(ilPensionPdfAdapter);
 }
 registerBuiltinAdapters();
+export { redact, redactRow, isValidTeudatZehut, isLuhnValid, REDACTION_VERSION } from "./redact";
+export type { RedactionResult, RedactionHit, RedactionKind } from "./redact";
+export {
+  sniffFormat, sniffEncoding, decodeBytes, parseCsvGrid, parseHtmlGrid,
+  detectHeaderRow, normaliseGrid, toRecords, IL_STATEMENT_LEXICON,
+} from "./tabular";
+export type { TabularFormat, SniffResult, TableGrid, ParsedTable } from "./tabular";
+export {
+  applyMapping, guessMapping, parseInstalments, looksRecurring, normaliseMinus,
+  buildExternalRef, HEADER_SYNONYMS,
+} from "./statement-mapping";
+export type {
+  ColumnMapping, AmountMode, MappingProfile, MappingGuess, TransactionDraft, MappingIssue, MappedResult,
+} from "./statement-mapping";
