@@ -95,6 +95,7 @@ export default async function OperationsPage({
       <ErrorBanner message={errorMsg} />
 
       {/* ---------------------------------------------------------- M38b --- */}
+      <div id="import" />
       <Card title={t("importTitle")}>
         <p className="mb-4 text-xs text-neutral-500">{t("importHint")}</p>
         <form action={uploadStatementAction} className="flex flex-wrap items-end gap-4">
@@ -108,6 +109,12 @@ export default async function OperationsPage({
               accept=".csv,.txt,.tsv,.html,.htm,.pdf,text/csv,text/html,application/pdf"
               className="text-sm"
             />
+          </Field>
+          <Field label={t("statementType")}>
+            <Select name="statementType" defaultValue="BANK_STATEMENT">
+              <option value="BANK_STATEMENT">{t("typeBank")}</option>
+              <option value="CARD_STATEMENT">{t("typeCard")}</option>
+            </Select>
           </Field>
           <Field label={t("importInstitution")}>
             <TextInput name="institutionName" placeholder={t("importInstitutionPlaceholder")} />
@@ -205,6 +212,17 @@ export default async function OperationsPage({
                   : ""}
                 {` · ${t("previewEncoding", { encoding: preview.encoding, format: preview.format })}`}
               </p>
+              {preview.statementTotal !== undefined ? (
+                <p className={`mb-4 rounded-lg px-3 py-2 text-sm ${preview.reconciles ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
+                  {preview.reconciles
+                    ? t("reconcilesOk", { total: preview.statementTotal.toFixed(2) })
+                    : t("reconcilesFail", {
+                        statement: preview.statementTotal.toFixed(2),
+                        parsed: Math.abs(preview.parsedTotal ?? 0).toFixed(2),
+                      })}
+                </p>
+              ) : null}
+
               <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-800">
                 {t("previewRedaction", { n: preview.redactedFields, version: preview.redactionVersion })}
               </p>
@@ -349,6 +367,7 @@ export default async function OperationsPage({
       />
 
       {/* ---------------------------------------------------------- M37 --- */}
+      <div id="month" />
       <Card title={t("monthTitle", { month: String(month).padStart(2, "0"), year })}>
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <form action={recomputePeriodAction}>
@@ -489,6 +508,7 @@ export default async function OperationsPage({
         )}
       </Card>
 
+      <div id="suspense" />
       <Card title={t("suspenseTitle")}>
         <p className="mb-4 text-xs text-neutral-500">{t("suspenseHint", { threshold: Math.round(suspense.minConfidence * 100) })}</p>
         {suspense.rows.length === 0 ? (
@@ -626,6 +646,7 @@ export default async function OperationsPage({
               const voided = tx.status === "VOID";
               return (
                 <div
+                  id={`tx-${tx.id}`}
                   key={tx.id}
                   className={`rounded-xl border p-4 ${voided ? "border-neutral-200 bg-neutral-50 opacity-60" : "border-neutral-200"}`}
                 >
@@ -745,6 +766,7 @@ export default async function OperationsPage({
         )}
       </Card>
 
+      <div id="categories" />
       <Card title={t("categories")}>
         <p className="mb-4 text-xs text-neutral-500">{t("categoriesHint", { count: flat.length })}</p>
         <div className="mb-6 grid gap-6 md:grid-cols-2">

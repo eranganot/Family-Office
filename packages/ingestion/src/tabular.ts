@@ -1,5 +1,6 @@
 import Papa from "papaparse";
-import { cleanHebrew, repairVisualOrder, stripBidiControls } from "@wealthos/domain";
+import { cleanHebrew, looksVisualOrder, stripBidiControls } from "@wealthos/domain";
+import { toggleVisualHebrewLine } from "./normalize";
 
 /**
  * Generic tabular statement reader: CSV and HTML-table exports.
@@ -169,13 +170,25 @@ export const IL_STATEMENT_LEXICON = [
   "קצבת", "ילדים", "שוק", "מרכז", "חניון", "חניה", "נסיעות", "תחבורה", "רכב", "טיסה",
 ];
 
-/** Repair visual-order Hebrew in headers and cells (real exports ship reversed text). */
+/**
+ * Repair visual-order Hebrew in headers and cells (some HTML/XLS exports ship it).
+ *
+ * Uses `toggleVisualHebrewLine`, which reverses TOKEN order and the characters of
+ * Hebrew tokens only — NOT a full character reversal. Full reversal fixes the Hebrew
+ * but also reverses digits, turning "תשלום 12 מתוך 12" into instalment 21 of 21.
+ * Mixed Hebrew+number cells are the norm in statements, so this distinction matters.
+ */
 export function normaliseGrid(grid: TableGrid): TableGrid {
   return {
     rows: grid.rows.map((r) =>
       r.map((c) => {
         const stripped = stripBidiControls(c);
-        return /[֐-׿]/.test(stripped) ? repairVisualOrder(stripped, IL_STATEMENT_LEXICON) : stripped;
+        if (!/[֐-׿]/.test(stripped)) return stripped;
+        const hit = IL_STATEMENT_LEXICON.some((w) => stripped.includes(w));
+        if (hit) return stripped; // already logical order
+        return looksVisualOrder(stripped) || IL_STATEMENT_LEXICON.some((w) => toggleVisualHebrewLine(stripped).includes(w))
+          ? toggleVisualHebrewLine(stripped)
+          : stripped;
       }),
     ),
   };

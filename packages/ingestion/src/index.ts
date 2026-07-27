@@ -46,3 +46,5 @@ export { extractPdfCellLines } from "./pdf/extract";
 export type { CellLine, TextCell } from "./pdf/extract";
 export { parsePdfTable } from "./pdf-table";
 export type { PdfTableRow, PdfTableResult, TableKind } from "./pdf-table";
+export { parseSettlementLine, detectCardLast4 } from "./card-identity";
+export type { SettlementRef } from "./card-identity";

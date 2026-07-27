@@ -1359,6 +1359,12 @@
     "undoImport": "Undo",
     "undoneOk": "Undone — {n} transactions removed. Press “Reclassify & recompute” to refresh the figures.",
     "bankColumnsFailed": "This looks like a bank statement, but its table columns could not be identified, so nothing was imported. Importing plausible-but-wrong numbers into your ledger would be worse than importing nothing — send me the file's layout and I'll fix the parser.",
-    "allOutflow": "All amounts are charges (card statement)"
+    "allOutflow": "All amounts are charges (card statement)",
+    "statementType": "Statement type",
+    "typeBank": "Bank account",
+    "typeCard": "Credit card",
+    "statementTypeHint": "Card statements are charges (a refund shows a minus). Bank statements carry both income and expenses. Telling us which avoids guessing the sign.",
+    "reconcilesOk": "Reconciled: the parsed rows total ₪{total}, matching the statement's own printed total.",
+    "reconcilesFail": "DOES NOT RECONCILE — the statement says ₪{statement} but the parsed rows total ₪{parsed}. Something was dropped, duplicated or read with the wrong sign. Do not import; send me this file."
   }
 }

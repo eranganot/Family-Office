@@ -65,7 +65,7 @@ export async function upsertCategoryAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=category&tab=categories`);
   }
-  redirect(`/${locale}/operations?categorySaved=1&tab=categories`);
+  redirect(`/${locale}/operations?categorySaved=1&tab=categories#categories`);
 }
 
 export async function recomputePeriodAction(fd: FormData): Promise<void> {
@@ -79,7 +79,7 @@ export async function recomputePeriodAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=recompute`);
   }
-  redirect(`/${locale}/operations?recomputed=1`);
+  redirect(`/${locale}/operations?recomputed=1#month`);
 }
 
 export async function closePeriodAction(fd: FormData): Promise<void> {
@@ -95,7 +95,7 @@ export async function closePeriodAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=close`);
   }
-  redirect(`/${locale}/operations?closed=1`);
+  redirect(`/${locale}/operations?closed=1#month`);
 }
 
 export async function reopenPeriodAction(fd: FormData): Promise<void> {
@@ -109,7 +109,7 @@ export async function reopenPeriodAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=reopen`);
   }
-  redirect(`/${locale}/operations?reopened=1`);
+  redirect(`/${locale}/operations?reopened=1#month`);
 }
 
 /**
@@ -130,7 +130,7 @@ export async function bulkClassifyMerchantAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=classify`);
   }
-  redirect(`/${locale}/operations?classified=1`);
+  redirect(`/${locale}/operations?classified=1#suspense`);
 }
 
 export async function updateTransactionAction(fd: FormData): Promise<void> {
@@ -164,7 +164,7 @@ export async function updateTransactionAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=update&edit=${str(fd, "id")}`);
   }
-  redirect(`/${locale}/operations?updated=1`);
+  redirect(`/${locale}/operations?updated=1#tx-${str(fd, "id")}`);
 }
 
 /** Remove = VOID (reversible, keeps the classification history). Restore = BOOKED. */
@@ -177,7 +177,7 @@ export async function setTransactionStatusAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=status`);
   }
-  redirect(`/${locale}/operations?${status === "VOID" ? "removed" : "restored"}=1`);
+  redirect(`/${locale}/operations?${status === "VOID" ? "removed" : "restored"}=1#tx-${str(fd, "id")}`);
 }
 
 /**
@@ -207,6 +207,8 @@ export async function uploadStatementAction(fd: FormData): Promise<void> {
       const doc = await trpc.documents.upload({
         filename: file.name,
         mimeType: file.type || "application/octet-stream",
+        // Declared by the owner; sign conventions differ between the two kinds.
+        docType: (str(fd, "statementType") || "BANK_STATEMENT") as never,
         institutionName: str(fd, "institutionName") || undefined,
         contentBase64: bytes.toString("base64"),
       });
@@ -221,7 +223,7 @@ export async function uploadStatementAction(fd: FormData): Promise<void> {
     redirect(`/${locale}/operations?error=allfailed&n=${encodeURIComponent(String(failed.length))}`);
   }
   // Land on the first upload's preview; the rest queue up in the pending list.
-  redirect(`/${locale}/operations?preview=${ids[0]}&uploaded=${ids.length}&failed=${failed.length}`);
+  redirect(`/${locale}/operations?preview=${ids[0]}&uploaded=${ids.length}&failed=${failed.length}#import`);
 }
 
 export async function commitStatementAction(fd: FormData): Promise<void> {
@@ -264,7 +266,7 @@ export async function commitStatementAction(fd: FormData): Promise<void> {
     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 60)) : "IMPORT_FAILED";
     redirect(`/${locale}/operations?error=${code}&preview=${documentId}`);
   }
-  redirect(`/${locale}/operations?imported=${result?.inserted ?? 0}&dupes=${result?.duplicates ?? 0}`);
+  redirect(`/${locale}/operations?imported=${result?.inserted ?? 0}&dupes=${result?.duplicates ?? 0}#import`);
 }
 
 /**
@@ -322,7 +324,7 @@ export async function commitAllPendingAction(fd: FormData): Promise<void> {
     redirect(`/${locale}/operations?error=${code}`);
   }
   redirect(
-    `/${locale}/operations?imported=${r?.inserted ?? 0}&dupes=${r?.duplicates ?? 0}&skipped=${r?.skipped.length ?? 0}`,
+    `/${locale}/operations?imported=${r?.inserted ?? 0}&dupes=${r?.duplicates ?? 0}&skipped=${r?.skipped.length ?? 0}#import`,
   );
 }
 
@@ -337,5 +339,5 @@ export async function undoImportAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=undo`);
   }
-  redirect(`/${locale}/operations?undone=${removed}`);
+  redirect(`/${locale}/operations?undone=${removed}#import`);
 }

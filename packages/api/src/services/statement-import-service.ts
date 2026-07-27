@@ -2,7 +2,7 @@ import type { PrismaClient } from "@wealthos/db";
 import { fileStore } from "@wealthos/db";
 import {
   applyMapping, decodeBytes, detectHeaderRow, guessMapping, normaliseGrid, parseCsvGrid,
-  parseHtmlGrid, extractPdfCellLines, parsePdfTable, pdfRowsToDrafts, REDACTION_VERSION, sniffFormat, toRecords,
+  parseHtmlGrid, extractPdfCellLines, parsePdfTable, pdfRowsToDrafts, detectCardLast4, REDACTION_VERSION, sniffFormat, toRecords,
   type MappingProfile, type TransactionDraft,
 } from "@wealthos/ingestion";
 
@@ -33,6 +33,10 @@ export interface ImportPreview {
   redactedFields: number;
   redactionVersion: string;
   detectedRange?: { start: string; end: string; days: number } | undefined;
+  /** Reconciliation against the statement's OWN printed total (PDF only). */
+  statementTotal?: number | undefined;
+  parsedTotal?: number | undefined;
+  reconciles?: boolean | undefined;
 }
 
 async function loadFile(db: PrismaClient, documentId: string) {
@@ -40,6 +44,18 @@ async function loadFile(db: PrismaClient, documentId: string) {
   if (!doc) throw new Error("DOCUMENT_NOT_FOUND");
   const bytes = await fileStore().get(doc.storageKey);
   return { doc, bytes, sniff: sniffFormat(bytes, doc.filename) };
+}
+
+/**
+ * The owner declares the statement type at upload. There are exactly two
+ * (owner, 2026-07-28): CARD — charges only, income solely as a minus-signed refund;
+ * BANK — both directions. Declared beats inferred: sign conventions differ, and a
+ * wrong guess flips every row on the statement.
+ */
+function declaredKind(docType: string | null): "BANK" | "CARD" | undefined {
+  if (docType === "CARD_STATEMENT") return "CARD";
+  if (docType === "BANK_STATEMENT") return "BANK";
+  return undefined;
 }
 
 function buildTable(bytes: Uint8Array, format: string, encoding: "utf-8" | "windows-1255") {
@@ -79,7 +95,7 @@ export async function previewStatement(
   documentId: string,
   overrideMapping?: MappingProfile | undefined,
 ): Promise<ImportPreview> {
-  const { bytes, sniff } = await loadFile(db, documentId);
+  const { doc, bytes, sniff } = await loadFile(db, documentId);
 
   if (sniff.format === "UNSUPPORTED_XLS" || sniff.format === "UNKNOWN") {
     return {
@@ -99,17 +115,23 @@ export async function previewStatement(
   let sampleRows: Array<Record<string, string>> = [];
   let totalRows = 0;
   let guessed: Record<string, unknown> = {};
+  let statementTotal: number | undefined;
+  let parsedTotal: number | undefined;
+  let reconciles: boolean | undefined;
 
   if (sniff.format === "PDF") {
     // PDFs have no columns to map — the layout IS the format, so there is no mapping
     // wizard for them. Rows go through pdfRowsToDrafts, which calls the same redact().
-    const parsed = parsePdfTable(await extractPdfCellLines(bytes));
+    const parsed = parsePdfTable(await extractPdfCellLines(bytes), declaredKind(doc.docType));
     drafts = pdfRowsToDrafts(parsed.rows, memberNames);
     issues = parsed.columnsFound
       ? parsed.unparsed.map((raw: string, i: number) => ({ rowIndex: i, reason: "UNPARSED_LINE", raw }))
       : [{ rowIndex: 0, reason: "UNPARSED_LINE", raw: "BANK_COLUMNS_NOT_DETECTED" }];
     totalRows = parsed.rows.length + parsed.unparsed.length;
     guessed = { issuer: parsed.kind ?? "UNKNOWN", columns: parsed.detectedColumns.join(",") };
+    statementTotal = parsed.statementTotal;
+    parsedTotal = parsed.parsedTotal;
+    reconciles = parsed.reconciles;
   } else {
     const built = buildTable(bytes, sniff.format, sniff.encoding);
     headerRowIndex = built.headerRowIndex;
@@ -151,6 +173,9 @@ export async function previewStatement(
     redactedFields: drafts.reduce((n, d) => n + d.redactionHits.length, 0),
     redactionVersion: REDACTION_VERSION,
     detectedRange,
+    statementTotal,
+    parsedTotal,
+    reconciles,
   };
 }
 
@@ -166,7 +191,7 @@ export async function commitStatement(
   adapterId: string,
   overrideMapping?: MappingProfile | undefined,
 ): Promise<{ batchId: string; inserted: number; duplicates: number }> {
-  const { bytes, sniff } = await loadFile(db, documentId);
+  const { doc, bytes, sniff } = await loadFile(db, documentId);
   if (sniff.format === "UNSUPPORTED_XLS" || sniff.format === "UNKNOWN") {
     throw new Error(`UNSUPPORTED_FORMAT:${sniff.reason ?? "UNKNOWN"}`);
   }
@@ -177,13 +202,17 @@ export async function commitStatement(
   let drafts: TransactionDraft[];
   let profile: MappingProfile | { issuer: string };
   if (sniff.format === "PDF") {
-    const parsed = parsePdfTable(await extractPdfCellLines(bytes));
+    const parsed = parsePdfTable(await extractPdfCellLines(bytes), declaredKind(doc.docType));
     if (!parsed.columnsFound) throw new Error("BANK_COLUMNS_NOT_DETECTED");
     drafts = pdfRowsToDrafts(parsed.rows, memberNames);
     profile = { issuer: parsed.kind ?? "UNKNOWN" };
   } else {
     const { table } = buildTable(bytes, sniff.format, sniff.encoding);
-    const p = overrideMapping ?? defaultProfile(table.headers);
+    const base = overrideMapping ?? defaultProfile(table.headers);
+    // A CARD statement lists every charge as a POSITIVE number. Without this, each
+    // card expense imports as income - the owner's "numbers are opposite" report.
+    const p: MappingProfile =
+      declaredKind(doc.docType) === "CARD" ? { ...base, allOutflow: true } : base;
     drafts = applyMapping(table, p, memberNames).drafts;
     profile = p;
   }
@@ -195,7 +224,20 @@ export async function commitStatement(
       adapterVersion: REDACTION_VERSION,
       status: "RUNNING",
       // Provenance without PII: the redacted drafts are the payload, never the raw file.
-      rawPayload: JSON.parse(JSON.stringify({ kind: "STATEMENT_IMPORT", profile, rows: drafts.length })),
+      rawPayload: JSON.parse(
+        JSON.stringify({
+          kind: "STATEMENT_IMPORT",
+          statementType: doc.docType ?? null,
+          // Recorded so a bank aggregate card-bill line can later be matched to the
+          // detail and excluded, instead of double-counting the same money.
+          cardLast4:
+            declaredKind(doc.docType) === "CARD"
+              ? (detectCardLast4(drafts.map((d) => d.descriptionRedacted).join(" "), doc.filename) ?? null)
+              : null,
+          profile,
+          rows: drafts.length,
+        }),
+      ),
     },
   });
 

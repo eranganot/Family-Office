@@ -6,6 +6,7 @@ import { normalizeMerchantKey, OPERATIONS_ENGINE_VERSION } from "@wealthos/engin
 import { operationsProcedure, router } from "../trpc";
 import { autoClassify, computePeriod, operationsAssumptions } from "../services/operations-service";
 import { commitStatement, previewStatement } from "../services/statement-import-service";
+import { linkCardSettlements } from "../services/settlement-service";
 import {
   ArchiveCategorySchema,
   BulkClassifyByMerchantSchema,
@@ -351,6 +352,9 @@ export const operationsRouter = router({
     /** Runs the deterministic classifier over everything unconfirmed, then recomputes. */
     recompute: operationsProcedure.input(PeriodRefSchema).mutation(async ({ ctx, input }) => {
       const cls = await autoClassify(ctx.db, ctx.householdId);
+      // Re-link settlements too: a card statement imported AFTER its bank line must
+      // still retro-actively suppress that aggregate.
+      await linkCardSettlements(ctx.db, ctx.householdId);
       const r = await computePeriod(ctx.db, ctx.householdId, input.year, input.month);
       const surplusBase = r.surplus.ok ? r.surplus.monthlyBase.toFixed(4) : null;
       const provisional = r.surplus.ok ? r.surplus.provisional : true;
@@ -487,9 +491,11 @@ export const operationsRouter = router({
           update: { mapping: JSON.parse(JSON.stringify(input.mapping)), adapterId: input.adapterId },
         });
       }
-      // Classify what just landed so the household sees categories immediately.
+      // Classify what just landed, then link any bank card-bill line to its detail so
+      // the same money is never counted twice.
       const classified = await autoClassify(ctx.db, ctx.householdId);
-      return { ...result, ...classified };
+      const settlements = await linkCardSettlements(ctx.db, ctx.householdId);
+      return { ...result, ...classified, settlementsLinked: settlements.linked };
     }),
 
     /**
@@ -556,6 +562,7 @@ export const operationsRouter = router({
       }
 
       const classified = inserted > 0 ? await autoClassify(ctx.db, ctx.householdId) : { classified: 0, suspense: 0 };
+      if (inserted > 0) await linkCardSettlements(ctx.db, ctx.householdId);
       // `considered` makes the on-screen numbers reconcile: considered = imported + skipped.
       return { considered: docs.length, inserted, duplicates, imported, skipped, ...classified };
     }),

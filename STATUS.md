@@ -2,6 +2,66 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 18)
+
+- **M38f — statement import verified E2E against the REAL files. `m38f.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE.** ⚠️ **Owner must UNDO all previous imports and re-import.**
+- **ALL THREE CARD STATEMENTS NOW RECONCILE EXACTLY TO THE TOTAL THE ISSUER PRINTS ON THEM.**
+  This is the headline: correctness is no longer asserted, it is *proved* by the issuer's own
+  arithmetic. Measured: card 1069 −5,611.17 vs printed ₪5,611.17; card 7796 −3,610.09 vs
+  ₪3,610.09; CAL 1401 −11,709.80 vs ₪11,709.80. Bank: 111 rows, 23 income / 88 expense,
+  **7 monthly salaries recovered**, **0 direction conflicts** against the bank's own סו"פ codes.
+
+  ### Owner-supplied domain facts (2026-07-28) — now encoded
+  Two statement kinds only: **CARD** (charges; income only as a minus-signed refund) and
+  **BANK** (both directions). Declared at upload, never inferred — sign conventions differ and a
+  wrong guess flips every row. Card columns: סכום עסקה = full deal, **סכום חיוב = the charge for
+  this period (already NET of any הנחה — owner-confirmed, so the discount is recorded but never
+  subtracted)**, מס שובר = txn no, פירוט נוסף = metadata. Bank: זכות = income, חובה = expense,
+  יתרה = balance, אסמכתא = txn no, תאריך ערך = actual date; **סו"פ 162 = expense, 222 = income,
+  271 = ATM**, now used as an independent cross-check that FLAGS (never overrides) a disagreement.
+
+  ### Four faults the reconciliation check exposed — each invisible to inspection
+  1. **Refunds lost.** `−₪603.00` uses **U+2212**, not ASCII `-`; the sign test ran before
+     normalisation, so every refund imported as another charge.
+  2. **Whole rows dropped.** Merchant text at x≈474 sits nearer the *date* header (504) than the
+     *description* header (438); pure geometry swallowed it, destroying the date and dropping the
+     row. **₪1,798 missing from one card.** Fixed by making dates and money **content-identified**,
+     with geometry only as a tiebreak.
+  3. **Discount read as the charge.** A fully-discounted card fee (charge ₪0.00, הנחה ₪14.18 in
+     the far-left zone) imported as a ₪14.18 expense. Money left of the reference column is
+     metadata, never the charge.
+  4. **Split amounts truncated.** CAL renders "₪130." + "85" as two items; the fragment is not
+     money on its own, so the charge parsed as "130." and the row was lost. Adjacent numeric
+     fragments are now absorbed.
+  Also: the HTML grid repair used a **full character reversal**, which fixes Hebrew but reverses
+  DIGITS — instalment "12 מתוך 12" became 21/21. Now token-order repair, which preserves numbers.
+
+  ### Permanent safeguard
+  **`findStatementTotal` + reconciliation is now part of every PDF import.** The preview shows
+  green when the parsed rows match the issuer's printed total and RED with both figures when they
+  do not, telling the owner not to import. It catches dropped, duplicated and sign-flipped rows
+  without needing to know the cause — it found all four faults above.
+
+  ### Also in this patch
+  - **Card-settlement dedup wired** (`settlement-service.ts`): a bank aggregate card-bill line
+    ("ישראכרט בע\"מ - 6170") becomes a TRANSFER **only** when itemised transactions for that
+    card's last 4 exist and reconcile within tolerance; otherwise the aggregate STANDS, because
+    suppressing it would silently delete real spending. Runs after every import and on recompute,
+    so a card statement imported *after* its bank line still retro-actively suppresses it.
+  - **Card CSV/HTML forced to outflow** — the "numbers are opposite" report. 71 HTML rows now all
+    negative, instalments correct.
+  - **No more scroll-jump**: every action redirects to an anchor (`#tx-<id>`, `#month`,
+    `#suspense`, `#import`) instead of the top of the page.
+  - **Verified:** ingestion 113 tests (7 new regressions carrying REAL cell coordinates), tsc
+    clean, eslint clean, i18n parity 1134/1134, `npm ci --dry-run` exit 0.
+
+### Method lesson (the important one)
+Every earlier fault survived because tests used fixtures I wrote from my own *description* of the
+files. **Run the real artefact through the real code path and reconcile against a number the
+document states about itself.** `/tmp/e2e.mts` does exactly that and should be re-run whenever the
+parser changes.
+
 ## Current state (2026-07-28, session 17)
 
 - **M38e — PDF import rebuilt against the REAL files. `m38e.patch`. NO MIGRATION, NO LOCKFILE CHANGE.**

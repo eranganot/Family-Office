@@ -51,15 +51,28 @@ export interface PdfTableRow {
   originalCurrency?: string | undefined;
   balance?: string | undefined;
   reference?: string | undefined;
+  /** הנחה shown in פירוט נוסף. Informational — the charge is already net of it. */
+  discount?: string | undefined;
   instalmentNumber?: number | undefined;
   instalmentTotal?: number | undefined;
   isRecurringCandidate: boolean;
   pending: boolean;
+  /** True when the bank's own operation code disagrees with the debit/credit columns. */
+  directionConflict?: boolean | undefined;
   page: number;
 }
 
 export interface PdfTableResult {
   rows: PdfTableRow[];
+  /**
+   * The issuer's OWN printed total, and whether the parsed rows reconcile to it.
+   * This is the strongest available correctness check: it catches a dropped row, a
+   * double-counted row or a flipped sign without needing to know the cause. Three
+   * separate parser faults were found by it, all invisible to inspection.
+   */
+  statementTotal?: number | undefined;
+  parsedTotal: number;
+  reconciles?: boolean | undefined;
   unparsed: string[];
   kind: TableKind | null;
   /** False when no header could be identified — the caller MUST NOT guess instead. */
@@ -184,13 +197,47 @@ function money(raw: string): { value: string; currency: string } | undefined {
   return v ? { value: v, currency } : undefined;
 }
 
-const isNumericOnly = (s: string): boolean => /^[\d\s.,\-/]+$/.test(s) && /\d/.test(s);
+const isNumericOnly = (s: string): boolean => /^[\d\s.,\-/\u2212]+$/.test(s) && /\d/.test(s);
 
-export function parsePdfTable(lines: CellLine[]): PdfTableResult {
+/** A money cell carries a currency symbol or a 2-decimal amount. */
+function isMoneyCell(text: string): boolean {
+  const t = normaliseMinus(text);
+  return /[₪$€]/.test(t) || /^-?\d{1,3}(,\d{3})*\.\d{2}$/.test(t.trim());
+}
+
+const hasLetters = (s: string): boolean => /\p{L}/u.test(s);
+
+/**
+ * The statement's OWN printed total ("סה"כ לחיוב החודש בכרטיס ₪5,611.17" /
+ * "עסקאות לחיוב ב-..."). Parsed so the import can be reconciled against the issuer's
+ * own arithmetic — the single most effective check available, because it catches any
+ * dropped or double-counted row without needing to know why.
+ */
+export function findStatementTotal(lines: CellLine[]): number | undefined {
+  for (const l of lines) {
+    const joined = joinRtl([...l.cells]);
+    if (!/סה"כ|סה״כ|לחיוב החודש/.test(joined)) continue;
+    const moneyCell = l.cells.find((c) => isMoneyCell(c.text));
+    if (!moneyCell) continue;
+    const v = money(joinRtl(l.cells.filter((c) => isMoneyCell(c.text))));
+    if (v) return Math.abs(Number(v.value));
+  }
+  return undefined;
+}
+
+/**
+ * `declaredKind` comes from the owner at upload time. There are exactly two kinds of
+ * statement (owner, 2026-07-28): CARD (charges; income only as a refund, printed with
+ * a minus) and BANK (both directions). Being told beats inferring — sign and column
+ * semantics differ between them, and a wrong guess corrupts every row.
+ */
+export function parsePdfTable(lines: CellLine[], declaredKind?: TableKind | undefined): PdfTableResult {
   const bankCols = detectHeader(lines, BANK_HEADERS);
   const cardCols = detectHeader(lines, CARD_HEADERS);
   const kind: TableKind | null =
-    bankCols.length >= cardCols.length && bankCols.length > 0 ? "BANK"
+    declaredKind === "BANK" && bankCols.length > 0 ? "BANK"
+    : declaredKind === "CARD" && cardCols.length > 0 ? "CARD"
+    : bankCols.length >= cardCols.length && bankCols.length > 0 ? "BANK"
     : cardCols.length > 0 ? "CARD"
     : null;
   let columns = kind === "BANK" ? bankCols : kind === "CARD" ? cardCols : [];
@@ -210,7 +257,7 @@ export function parsePdfTable(lines: CellLine[]): PdfTableResult {
       const left = l.cells[0]!;
       return Boolean(parseStatementDate(cleanHebrew(right.text))) && /[₪$€]/.test(left.text);
     });
-    if (shaped.length >= 5) {
+    if (shaped.length >= 5 && declaredKind !== "BANK") {
       const dateX = shaped.reduce((s2, l) => s2 + l.cells[l.cells.length - 1]!.x, 0) / shaped.length;
       const amtX = shaped.reduce((s2, l) => s2 + l.cells[0]!.x, 0) / shaped.length;
       // The merchant column is where the TEXT-BEARING middle cells are. Averaging all
@@ -233,28 +280,96 @@ export function parsePdfTable(lines: CellLine[]): PdfTableResult {
   }
 
   if (!effectiveKind || columns.length === 0) {
-    return { rows: [], unparsed: [], kind: null, columnsFound: false, detectedColumns: [] };
+    return { rows: [], unparsed: [], kind: null, columnsFound: false, detectedColumns: [], parsedTotal: 0 };
   }
   const kindFinal = effectiveKind;
 
-  const dateCol = columns.find((c) => c.key === "date");
   // The header row itself must never be mistaken for a description line.
   const headerIdx = lines.findIndex((l) => {
     const j = [...l.cells].sort((a, b) => b.x - a.x).map((c) => cleanHebrew(c.text)).join(" ");
     return (kindFinal === "BANK" ? ["תיאור", "יתרה"] : ["סכום חיוב", "שם בית עסק"]).every((lbl) => j.includes(lbl));
   });
 
-  interface Classified { line: CellLine; isData: boolean; bucket: Partial<Record<ColKey, Array<{ x: number; text: string }>>>; date?: string | undefined }
+  interface Classified {
+    line: CellLine;
+    isData: boolean;
+    bucket: Partial<Record<ColKey, Array<{ x: number; text: string }>>>;
+    date?: string | undefined;
+    moneyCells: Array<{ x: number; text: string }>;
+    textCells: Array<{ x: number; text: string }>;
+  }
+
+  /**
+   * CONTENT-FIRST classification, with geometry only as a tiebreak.
+   *
+   * Pure geometry failed on the real statements: the merchant column header sits at
+   * x=438 while the date header sits at x=504, so a merchant word rendered at x=474 is
+   * NEARER the date column and was swallowed by it — which destroyed the date and
+   * silently dropped the whole row (two rows and ₪1,798 missing from one card).
+   *
+   * Dates and money are unambiguous by CONTENT, so they are identified by what they
+   * are, not where they sit. Only the remaining cells are placed by column.
+   */
   const classified: Classified[] = lines.map((line) => {
+    const dateCandidates = line.cells.filter((c) => parseStatementDate(cleanHebrew(c.text)));
+    // Rightmost date wins: statements put the transaction date at the right edge.
+    const dateCell = dateCandidates.sort((a, b) => b.x - a.x)[0];
+    const date = dateCell ? parseStatementDate(cleanHebrew(dateCell.text)) : undefined;
+
+    /**
+     * Producers split one amount across items ("₪130." + "85"), and the trailing
+     * fragment is not recognisable as money on its own — so it must be absorbed by its
+     * neighbour or the amount parses as "130." and the row is lost entirely.
+     */
+    const seeds = line.cells.filter((c) => c !== dateCell && isMoneyCell(c.text));
+    const moneyCells = line.cells.filter(
+      (c) =>
+        c !== dateCell &&
+        (seeds.includes(c) ||
+          (isNumericOnly(c.text) && seeds.some((m) => Math.abs(m.x - c.x) < 40))),
+    );
+    const rest = line.cells.filter((c) => c !== dateCell && !moneyCells.includes(c));
+    const textCells = rest.filter((c) => hasLetters(c.text));
+
     const bucket: Partial<Record<ColKey, Array<{ x: number; text: string }>>> = {};
-    for (const cell of line.cells) {
+    for (const cell of rest) {
       const key = nearest(columns, cell.x);
-      if (!key) continue;
+      if (!key || key === "date") continue; // the date is settled by content
       (bucket[key] ??= []).push(cell);
     }
-    const rawDate = dateCol ? joinRtl([...(bucket.date ?? [])]) : "";
-    const date = parseStatementDate(cleanHebrew(rawDate));
-    return { line, isData: Boolean(date), bucket, date };
+    if (dateCell) bucket.date = [dateCell];
+
+    // Money is assigned by column for BANK (balance / debit / credit are far apart and
+    // semantically distinct) and by ORDER for CARD (charge is always left of the
+    // transaction amount), which no longer depends on header alignment.
+    if (kindFinal === "BANK") {
+      for (const c of moneyCells) {
+        const key = nearest(columns, c.x);
+        if (key === "balance" || key === "debit" || key === "credit") (bucket[key] ??= []).push(c);
+      }
+    } else {
+      /**
+       * On a card statement the far-left "פירוט נוסף" zone also carries money
+       * (הנחה ₪14.18). Treating that as the charge overstated a fully-discounted card
+       * fee and broke reconciliation against the statement's own total, so money left
+       * of the reference column is metadata, never the charge.
+       */
+      const extraXc = columns.find((col) => col.key === "extra")?.x;
+      const refXc = columns.find((col) => col.key === "reference")?.x;
+      const cutoff = extraXc !== undefined && refXc !== undefined ? (extraXc + refXc) / 2 : -Infinity;
+      const ordered = [...moneyCells].filter((m) => m.x > cutoff).sort((a, b) => a.x - b.x);
+      // Fragments of one split amount share a column; group them before assigning.
+      const groups: Array<Array<{ x: number; text: string }>> = [];
+      for (const c of ordered) {
+        const last = groups[groups.length - 1];
+        if (last && c.x - last[last.length - 1]!.x < 40) last.push(c);
+        else groups.push([c]);
+      }
+      if (groups[0]) bucket.chargeAmount = groups[0];
+      if (groups[1]) bucket.txnAmount = groups[1];
+    }
+
+    return { line, isData: Boolean(date), bucket, date, moneyCells, textCells };
   });
 
   const rows: PdfTableRow[] = [];
@@ -280,7 +395,19 @@ export function parsePdfTable(lines: CellLine[]): PdfTableResult {
      */
     const parts: string[] = [];
     const extraContext: string[] = [];
-    const inline = joinRtl([...(c.bucket.description ?? [])]);
+    /**
+     * The merchant/operation name is whatever LETTER-BEARING cells remain once the date
+     * and the money are removed — except the far-left "פירוט נוסף" zone on card
+     * statements, which is metadata (אתר חו"ל / הוראת קבע / הנחה), not the name.
+     */
+    const extraX = columns.find((col) => col.key === "extra")?.x;
+    const refX = columns.find((col) => col.key === "reference")?.x;
+    const nameCells = c.textCells.filter((cell) => {
+      if (kindFinal !== "CARD") return true;
+      if (extraX !== undefined && refX !== undefined) return cell.x > (extraX + refX) / 2;
+      return true;
+    });
+    const inline = joinRtl([...nameCells]);
 
     if (kindFinal === "BANK") {
       const before = classified[i - 1];
@@ -296,7 +423,10 @@ export function parsePdfTable(lines: CellLine[]): PdfTableResult {
       }
     } else {
       if (inline) parts.push(inline);
-      // Metadata lines beneath a card row, until the next data row.
+      // The row's own far-left metadata (אתר חו"ל / הוראת קבע / הנחה)...
+      const own = c.textCells.filter((cell) => !nameCells.includes(cell));
+      if (own.length > 0) extraContext.push(joinRtl([...own]));
+      // ...plus the metadata lines beneath it, until the next data row.
       for (let j = i + 1; j < classified.length; j += 1) {
         const nxt = classified[j];
         if (!nxt || nxt.isData) break;
@@ -309,6 +439,7 @@ export function parsePdfTable(lines: CellLine[]): PdfTableResult {
     let originalAmount: string | undefined;
     let originalCurrency: string | undefined;
     let balance: string | undefined;
+    let directionConflict = false;
 
     if (kindFinal === "BANK") {
       const debit = money(joinRtl([...(c.bucket.debit ?? [])]));
@@ -316,6 +447,16 @@ export function parsePdfTable(lines: CellLine[]): PdfTableResult {
       balance = money(joinRtl([...(c.bucket.balance ?? [])]))?.value;
       if (debit && Number(debit.value) !== 0) amount = String(-Math.abs(Number(debit.value)));
       else if (credit && Number(credit.value) !== 0) amount = String(Math.abs(Number(credit.value)));
+
+      /**
+       * Cross-check against the bank's own operation code (owner-supplied meanings):
+       * 162 = expense, 222 = income, 271 = ATM withdrawal. The debit/credit columns are
+       * authoritative; this only FLAGS a disagreement rather than overriding, because a
+       * silent override would hide a column-detection fault instead of surfacing it.
+       */
+      const sopf = joinRtl([...(c.bucket.sopf ?? [])]).trim();
+      if (amount && (sopf === "162" || sopf === "271") && Number(amount) > 0) directionConflict = true;
+      if (amount && sopf === "222" && Number(amount) < 0) directionConflict = true;
     } else {
       const charge = money(joinRtl([...(c.bucket.chargeAmount ?? [])]));
       const txn = money(joinRtl([...(c.bucket.txnAmount ?? [])]));
@@ -323,7 +464,9 @@ export function parsePdfTable(lines: CellLine[]): PdfTableResult {
         // A card charge is an OUTFLOW unless the statement prints an explicit minus
         // (a refund). Card statements list charges unsigned, so without this every
         // card expense would import as income.
-        const negative = joinRtl([...(c.bucket.chargeAmount ?? [])]).includes("-");
+        // U+2212 MINUS SIGN, not ASCII '-', is what the issuer actually prints. Testing
+        // the raw text missed every refund and imported it as another charge.
+        const negative = normaliseMinus(joinRtl([...(c.bucket.chargeAmount ?? [])])).includes("-");
         amount = String((negative ? 1 : -1) * Math.abs(Number(charge.value)));
         currency = "ILS"; // the charge column is always in the billing currency
         if (txn && (txn.currency !== "ILS" || txn.value !== charge.value)) {
@@ -340,6 +483,11 @@ export function parsePdfTable(lines: CellLine[]): PdfTableResult {
 
     const extra = joinRtl([...(c.bucket.extra ?? [])]);
     const context = `${parts.join(" ")} ${extra} ${extraContext.join(" ")}`;
+    // הנחה is informational: the charge column already reflects it (owner-confirmed),
+    // so it is recorded for visibility and NEVER subtracted — subtracting would break
+    // reconciliation against the bank's aggregate settlement line.
+    const discountMatch = /הנחה\s*[₪]?\s*([\d.,]+)/.exec(context);
+    const discount = discountMatch ? parseLocalizedDecimal(discountMatch[1]!) : undefined;
     const inst = parseInstalments(context);
 
     rows.push({
@@ -351,13 +499,31 @@ export function parsePdfTable(lines: CellLine[]): PdfTableResult {
       originalCurrency,
       balance,
       reference: joinRtl([...(c.bucket.reference ?? [])]) || undefined,
+      discount: discount ?? undefined,
       instalmentNumber: inst?.number,
       instalmentTotal: inst?.total,
       isRecurringCandidate: looksRecurring(context),
       pending: pendingSection,
+      directionConflict,
       page: c.line.page,
     });
   });
 
-  return { rows, unparsed, kind: kindFinal, columnsFound: true, detectedColumns: columns.map((c) => c.key) };
+  const statementTotal = findStatementTotal(lines);
+  const parsedTotal = rows.filter((r) => !r.pending).reduce((sum, r) => sum + Number(r.amount), 0);
+  const reconciles =
+    statementTotal === undefined
+      ? undefined
+      : Math.abs(Math.abs(parsedTotal) - statementTotal) <= Math.max(1, statementTotal * 0.005);
+
+  return {
+    rows,
+    unparsed,
+    kind: kindFinal,
+    columnsFound: true,
+    detectedColumns: columns.map((c) => c.key),
+    statementTotal,
+    parsedTotal: Math.round(parsedTotal * 100) / 100,
+    reconciles,
+  };
 }

@@ -133,3 +133,94 @@ describe("refusal", () => {
     expect(r.rows).toHaveLength(0);
   });
 });
+
+/**
+ * Regression suite for the faults found by running the OWNER'S REAL statements through
+ * the parser and reconciling against the totals the issuers print on them. Each of
+ * these shipped once and was invisible to inspection — only the arithmetic exposed them.
+ */
+describe("real-statement regressions", () => {
+  const CARD_HEADER = line(1, 700, [
+    [78, "נוסף"], [99, "פירוט"], [153, "שובר"], [176, "מס'"], [225, "חיוב"], [245, "סכום"],
+    [292, "עסקה"], [319, "סכום"], [438, "עסק"], [459, "בית"], [476, "שם"], [504, "רכישה"], [533, "תאריך"],
+  ]);
+
+  it("reads a refund printed with U+2212 as a CREDIT, not another charge", () => {
+    // "−₪603.00" uses MINUS SIGN, not ASCII hyphen. Testing the raw text missed every
+    // refund; card 1069 was short by exactly twice this amount.
+    const refund = line(1, 690, [
+      [150, "579191249"], [224, "−₪603.00"], [298, "−₪603.00"],
+      [394, "הספנו"], [421, "רשות"], [451, "התחבורה"], [526, "21.06.26"],
+    ]);
+    const { rows } = parsePdfTable([CARD_HEADER, refund], "CARD");
+    expect(Number(rows[0]?.amount)).toBe(603);
+  });
+
+  it("keeps a row whose merchant text sits nearer the DATE header than the description header", () => {
+    // Merchant words at x=474 are closer to the date header (504) than to the
+    // description header (438). Pure geometry swallowed them into the date column,
+    // which destroyed the date and dropped the whole row - ₪1,798 lost from one card.
+    const row = line(1, 690, [
+      [145, "492081084"], [230, "₪598.00"], [304, "₪598.00"],
+      [406, 'בע"מ'], [430, "אגשח"], [456, "שאן"], [474, "שמן"], [523, "06.06.26"],
+    ]);
+    const { rows } = parsePdfTable([CARD_HEADER, row], "CARD");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.amount).toBe("-598");
+    expect(rows[0]?.descriptionRaw).toContain("שמן");
+  });
+
+  it("never treats a הנחה in the far-left detail zone as the charge", () => {
+    // A fully-discounted card fee: charge ₪0.00, discount ₪14.18 printed on the left.
+    // Reading the discount as the charge overstated card 7796 by exactly ₪14.18.
+    const fee = line(1, 690, [
+      [72, "₪14.18"], [100, "הנחה"], [145, "605315383"], [230, "₪0.00"], [304, "₪14.18"],
+      [430, "כרטיס"], [470, "דמי"], [523, "28.06.26"],
+    ]);
+    const { rows } = parsePdfTable([CARD_HEADER, fee], "CARD");
+    // Zero charge -> no transaction at all, rather than a phantom ₪14.18 expense.
+    expect(rows).toHaveLength(0);
+  });
+
+  it("reconciles against the statement's own printed total", () => {
+    const a = line(1, 690, [[145, "1"], [230, "₪100.00"], [304, "₪100.00"], [450, "חנות"], [523, "01.06.26"]]);
+    const b = line(1, 680, [[145, "2"], [230, "₪50.00"], [304, "₪50.00"], [450, "חנות"], [523, "02.06.26"]]);
+    const total = line(1, 600, [[229, "₪150.00"], [378, "בכרטיס"], [412, "החודש"], [443, "לחיוב"], [468, 'סה"כ']]);
+    const r = parsePdfTable([CARD_HEADER, a, b, total], "CARD");
+    expect(r.statementTotal).toBe(150);
+    expect(Math.abs(r.parsedTotal)).toBe(150);
+    expect(r.reconciles).toBe(true);
+  });
+
+  it("FLAGS a mismatch rather than importing silently wrong numbers", () => {
+    const a = line(1, 690, [[145, "1"], [230, "₪100.00"], [304, "₪100.00"], [450, "חנות"], [523, "01.06.26"]]);
+    const total = line(1, 600, [[229, "₪150.00"], [443, "לחיוב"], [468, 'סה"כ']]);
+    const r = parsePdfTable([CARD_HEADER, a, total], "CARD");
+    expect(r.reconciles).toBe(false);
+  });
+
+  it("honours the DECLARED statement type instead of inferring it", () => {
+    const bankHeader = line(1, 700, [
+      [62, "תאריך ערך"], [185, "אסמכתא"], [285, "יתרה"], [357, "חובה"], [434, "זכות"],
+      [554, "תיאור"], [636, "תאריך"],
+    ]);
+    const salary = line(1, 690, [
+      [54, "01/01/2026"], [196, "99411"], [255, "33001.18"], [401, "36986.94"],
+      [545, "משכורת"], [602, "01/01/2026"],
+    ]);
+    expect(parsePdfTable([bankHeader, salary], "BANK").kind).toBe("BANK");
+  });
+
+  it("cross-checks the bank's own operation code against the debit/credit columns", () => {
+    const bankHeader = line(1, 700, [
+      [62, "תאריך ערך"], [139, 'סו"פ'], [185, "אסמכתא"], [285, "יתרה"], [357, "חובה"],
+      [434, "זכות"], [554, "תיאור"], [636, "תאריך"],
+    ]);
+    // sopf 222 = income, but the amount landed in the DEBIT column -> conflict flagged.
+    const bad = line(1, 690, [
+      [54, "01/01/2026"], [142, "222"], [196, "1"], [357, "500.00"], [545, "משכורת"], [602, "01/01/2026"],
+    ]);
+    const { rows } = parsePdfTable([bankHeader, bad], "BANK");
+    expect(rows[0]?.directionConflict).toBe(true);
+  });
+});
