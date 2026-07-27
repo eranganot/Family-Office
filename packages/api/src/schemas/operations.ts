@@ -99,3 +99,25 @@ export const ClassifyTransactionsSchema = z.object({
   categoryId: z.uuid(),
   behavioralClass: BehavioralClassSchema,
 });
+
+// ------------------------------------------------------------------- M37 --
+
+export const PeriodRefSchema = z.object({
+  year: z.number().int().min(2000).max(2100),
+  month: z.number().int().min(1).max(12),
+});
+
+export const ClosePeriodSchema = PeriodRefSchema.extend({
+  reviewNote: z.string().max(2000).optional(),
+});
+
+/**
+ * Apply one decision to every transaction from the same merchant. This is the
+ * mechanism by which the household teaches the deterministic classifier — no model,
+ * just an owner decision that future transactions inherit.
+ */
+export const BulkClassifyByMerchantSchema = z.object({
+  merchantKey: z.string().min(1).max(200),
+  categoryId: z.uuid(),
+  behavioralClass: BehavioralClassSchema,
+});

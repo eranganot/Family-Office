@@ -3,11 +3,15 @@ import { operationsRepo } from "@wealthos/db";
 import { UNCLASSIFIED_KEY } from "@wealthos/domain";
 import { normalizeMerchantKey, OPERATIONS_ENGINE_VERSION } from "@wealthos/engine-operations";
 import { operationsProcedure, router } from "../trpc";
+import { autoClassify, computePeriod, operationsAssumptions } from "../services/operations-service";
 import {
   ArchiveCategorySchema,
+  BulkClassifyByMerchantSchema,
   ClassifyTransactionsSchema,
+  ClosePeriodSchema,
   CreateManualTransactionSchema,
   ListTransactionsSchema,
+  PeriodRefSchema,
   UpsertCategorySchema,
 } from "../schemas/operations";
 
@@ -174,6 +178,178 @@ export const operationsRouter = router({
           decidedBy: ctx.session.email,
         });
         return { updated };
+      }),
+
+    /**
+     * Teach the classifier: apply one decision to EVERY transaction sharing a merchant
+     * key, past and future. Because merchant keys strip per-transaction reference codes,
+     * "SPOTIFY P43CD5B1CB" and "SPOTIFY Q99XX1A2BC" are the same merchant, so one
+     * correction covers both. This is the whole learning loop — deterministic, auditable,
+     * and reversible, with no model in the path (owner decision D3).
+     */
+    bulkClassifyByMerchant: operationsProcedure
+      .input(BulkClassifyByMerchantSchema)
+      .mutation(async ({ ctx, input }) => {
+        const cat = await ctx.db.cashFlowCategory.findUnique({
+          where: { id: input.categoryId },
+          select: { householdId: true },
+        });
+        if (!cat || cat.householdId !== ctx.householdId) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "CATEGORY_NOT_FOUND" });
+        }
+        const rows = await ctx.db.transaction.findMany({
+          where: { householdId: ctx.householdId, merchantKey: input.merchantKey },
+          select: { id: true },
+        });
+        if (rows.length === 0) return { updated: 0 };
+        const updated = await operationsRepo.classify(ctx.db, {
+          transactionIds: rows.map((r) => r.id),
+          categoryId: input.categoryId,
+          behavioralClass: input.behavioralClass,
+          decidedBy: ctx.session.email,
+        });
+        return { updated };
+      }),
+  }),
+
+  // ------------------------------------------------------------------ M37 --
+  /**
+   * The dual-axis engine. Every figure below is computed on demand from the
+   * transaction ledger; nothing is cached until a period is CLOSED, at which point
+   * `computed` + `pins` + `engineVersion` are frozen for reproducibility.
+   */
+  cashflow: router({
+    dualAxis: operationsProcedure.input(PeriodRefSchema).query(async ({ ctx, input }) => {
+      const r = await computePeriod(ctx.db, ctx.householdId, input.year, input.month);
+      const categories = await ctx.db.cashFlowCategory.findMany({
+        where: { householdId: ctx.householdId },
+        select: { id: true, key: true, nameEn: true, nameHe: true, axis: true, parentId: true },
+      });
+      return { ...r, categories };
+    }),
+  }),
+
+  surplus: router({
+    get: operationsProcedure.input(PeriodRefSchema).query(async ({ ctx, input }) => {
+      const r = await computePeriod(ctx.db, ctx.householdId, input.year, input.month);
+      return { surplus: r.surplus, flow: r.flow, engineVersion: r.engineVersion, pins: r.pins };
+    }),
+    safeToSpend: operationsProcedure.input(PeriodRefSchema).query(async ({ ctx, input }) => {
+      const r = await computePeriod(ctx.db, ctx.householdId, input.year, input.month);
+      return {
+        safeToSpend: r.safeToSpend,
+        workingCapital: r.workingCapital,
+        committedInstalmentsBase: r.committedInstalmentsBase,
+      };
+    }),
+  }),
+
+  period: router({
+    current: operationsProcedure.query(async ({ ctx }) => {
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const month = now.getUTCMonth() + 1;
+      const row = await ctx.db.operatingPeriod.findUnique({
+        where: { householdId_year_month: { householdId: ctx.householdId, year, month } },
+      });
+      const computed = await computePeriod(ctx.db, ctx.householdId, year, month);
+      return { year, month, row, computed };
+    }),
+
+    /** Runs the deterministic classifier over everything unconfirmed, then recomputes. */
+    recompute: operationsProcedure.input(PeriodRefSchema).mutation(async ({ ctx, input }) => {
+      const cls = await autoClassify(ctx.db, ctx.householdId);
+      const r = await computePeriod(ctx.db, ctx.householdId, input.year, input.month);
+      const surplusBase = r.surplus.ok ? r.surplus.monthlyBase.toFixed(4) : null;
+      const provisional = r.surplus.ok ? r.surplus.provisional : true;
+      const coverage = r.flow.ok ? r.flow.coverage : "PARTIAL";
+      await ctx.db.operatingPeriod.upsert({
+        where: { householdId_year_month: { householdId: ctx.householdId, year: input.year, month: input.month } },
+        create: {
+          householdId: ctx.householdId, year: input.year, month: input.month,
+          surplusBase, surplusIsProvisional: provisional, coverage,
+          unverifiedCount: r.flow.ok ? r.flow.unverifiedCount : 0,
+          unverifiedAmountBase: r.flow.ok ? r.flow.unverifiedAmountBase.toFixed(4) : null,
+        },
+        update: {
+          surplusBase, surplusIsProvisional: provisional, coverage,
+          unverifiedCount: r.flow.ok ? r.flow.unverifiedCount : 0,
+          unverifiedAmountBase: r.flow.ok ? r.flow.unverifiedAmountBase.toFixed(4) : null,
+        },
+      });
+      return { ...cls, ...r };
+    }),
+
+    /**
+     * Freeze the month. `computed` + `pins` + `engineVersion` are stored so a closed
+     * period is reproducible later even after assumptions or rules change.
+     * Closing with unverified rows is ALLOWED (the non-blocking rule) and recorded.
+     */
+    close: operationsProcedure.input(ClosePeriodSchema).mutation(async ({ ctx, input }) => {
+      const r = await computePeriod(ctx.db, ctx.householdId, input.year, input.month);
+      if (!r.flow.ok) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: `CANNOT_CLOSE:${r.flow.reason}` });
+      }
+      const row = await ctx.db.operatingPeriod.upsert({
+        where: { householdId_year_month: { householdId: ctx.householdId, year: input.year, month: input.month } },
+        create: {
+          householdId: ctx.householdId, year: input.year, month: input.month,
+          status: "CLOSED", closedAt: new Date(), engineVersion: r.engineVersion,
+          computed: JSON.parse(JSON.stringify(r)), pins: r.pins,
+          surplusBase: r.surplus.ok ? r.surplus.monthlyBase.toFixed(4) : null,
+          surplusIsProvisional: r.surplus.ok ? r.surplus.provisional : true,
+          coverage: r.flow.coverage,
+          unverifiedCount: r.flow.unverifiedCount,
+          unverifiedAmountBase: r.flow.unverifiedAmountBase.toFixed(4),
+          reviewNote: input.reviewNote ?? null,
+        },
+        update: {
+          status: "CLOSED", closedAt: new Date(), engineVersion: r.engineVersion,
+          computed: JSON.parse(JSON.stringify(r)), pins: r.pins,
+          surplusBase: r.surplus.ok ? r.surplus.monthlyBase.toFixed(4) : null,
+          surplusIsProvisional: r.surplus.ok ? r.surplus.provisional : true,
+          coverage: r.flow.coverage,
+          unverifiedCount: r.flow.unverifiedCount,
+          unverifiedAmountBase: r.flow.unverifiedAmountBase.toFixed(4),
+          reviewNote: input.reviewNote ?? null,
+        },
+      });
+      return { id: row.id, status: row.status, provisional: row.surplusIsProvisional };
+    }),
+
+    reopen: operationsProcedure.input(PeriodRefSchema).mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.operatingPeriod.update({
+        where: { householdId_year_month: { householdId: ctx.householdId, year: input.year, month: input.month } },
+        data: { status: "OPEN", closedAt: null },
+      });
+      return { id: row.id, status: row.status };
+    }),
+  }),
+
+  suspense: router({
+    /**
+     * Everything the classifier was not confident enough to apply. These amounts ARE
+     * counted in the month (non-blocking rule) — this queue is about confirming them,
+     * not about unblocking the numbers.
+     */
+    queue: operationsProcedure
+      .input(ListTransactionsSchema.pick({ limit: true, cursor: true }).partial())
+      .query(async ({ ctx, input }) => {
+        const rows = await ctx.db.transaction.findMany({
+          where: { householdId: ctx.householdId, classifications: { some: { status: "SUSPENSE" } } },
+          orderBy: [{ bookedAt: "desc" }, { id: "desc" }],
+          take: input?.limit ?? 50,
+          include: {
+            category: { select: { id: true, key: true, nameEn: true, nameHe: true } },
+            classifications: {
+              where: { status: { not: "SUPERSEDED" } },
+              select: { confidence: true, method: true, ruleVersion: true },
+              take: 1,
+            },
+          },
+        });
+        const { minConfidence } = await operationsAssumptions(ctx.db, ctx.householdId);
+        return { rows, minConfidence };
       }),
   }),
 });

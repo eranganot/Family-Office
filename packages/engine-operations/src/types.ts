@@ -29,6 +29,11 @@ export interface CategoryTotal {
   amountBase: number;
 }
 
+/**
+ * Behavioural totals are EXPENSE-SIDE ONLY (plus TRANSFER, which is its own excluded
+ * bucket). Income is never classified as "fixed" or "discretionary" here — including it
+ * would inflate the fixed bucket and make the Safe-to-Spend floor nonsensical.
+ */
 export interface BehavioralTotals {
   FIXED_CONTRACTUAL: number;
   VARIABLE_DISCRETIONARY: number;

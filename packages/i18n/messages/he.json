@@ -1230,6 +1230,52 @@
       "SAVINGS_FLOW": "זרם חיסכון",
       "TRANSFER": "העברה (לא נספר)"
     },
-    "engineVersion": "מנוע תפעול {version}"
+    "engineVersion": "מנוע תפעול {version}",
+    "monthTitle": "חודש תפעולי {month}/{year}",
+    "recompute": "סיווג וחישוב מחדש",
+    "recomputed": "בוצע סיווג וחישוב מחדש.",
+    "closeMonth": "סגירת החודש",
+    "closedOk": "החודש נסגר והוקפא.",
+    "reopen": "פתיחה מחדש",
+    "reopenedOk": "החודש נפתח מחדש.",
+    "periodClosed": "סגור",
+    "reviewNotePlaceholder": "הערת סקירה (רשות)",
+    "cannotCompute": "לא ניתן עדיין לחשב את החודש הזה",
+    "provisionalBanner": "מכיל תנועות לא מאומתות — {count} פריטים, {amount}. העודף המוצג זמני עד לאישורן.",
+    "surplusTitle": "עודף חודשי",
+    "netIncome": "הכנסה נטו",
+    "debtService": "שירות חוב (מהספר)",
+    "verifiedSurplus": "עודף מאומת",
+    "savingsNote": "חיסכון והפקדות בסך {amount} אינם נספרים כהוצאה — זהו הון שכבר הופנה, לא כסף שהוצא.",
+    "transfersNote": "העברות בסך {amount} הוחרגו משני הצדדים (חיובי כרטיסי אשראי והעברות בין חשבונות שלכם).",
+    "behavioralTitle": "פילוח התנהגותי",
+    "safeToSpendTitle": "בטוח להוצאה",
+    "safeToSpendHint": "מה שנותר אחרי הוצאות קבועות, חוב והתחייבויות ב-{days} הימים הקרובים. תקרה לבחירה, לא גבול שחצִיתם.",
+    "instalmentsCommitted": "כולל {amount} של תשלומים עתידיים שמועד חיובם בתוך החלון.",
+    "byCategoryTitle": "לפי קטגוריה",
+    "noCategoryTotals": "אין תנועות מסווגות החודש.",
+    "workingCapitalTitle": "הון חוזר",
+    "wcAvailable": "זמין",
+    "wcTarget": "יעד",
+    "wcGap": "פער",
+    "suspenseTitle": "תור בירור",
+    "suspenseHint": "רמת הביטחון של המסווג כאן הייתה מתחת ל-{threshold}%. הסכומים האלה כן נספרים בחודש — האישור רק מסיר את סימון הזמניות.",
+    "suspenseEmpty": "אין פריטים הממתינים לאישור.",
+    "guessed": "ניחוש מיטבי",
+    "confidence": "ביטחון",
+    "confirmForMerchant": "אישור",
+    "applyToMerchant": "החל על בית העסק",
+    "coverage": {
+      "PARTIAL": "כיסוי חלקי: מקור ידוע לא יובא לחודש הזה, ולכן הנתונים נמוכים מהמציאות.",
+      "AGGREGATE_ONLY": "מצרפי בלבד: לא ניתן היה להתאים חיוב כרטיס אשראי לדף מפורט, ולכן הוצאות הכרטיס נספרות כסכום אחד.",
+      "COMPLETE": "כיסוי מלא."
+    },
+    "refusal": {
+      "NO_INCOME_MAPPED": "לא מופתה הכנסה לחודש הזה, ולכן לא ניתן לחשב עודף. הוסיפו את המשכורת כתנועה או כזרם תזרים.",
+      "NO_EXPENSES_MAPPED": "עדיין לא מופו תנועות לחודש הזה.",
+      "INSUFFICIENT_COVERAGE": "מעט מדי ימי נתונים כדי להפיק נתון חודשי. המנוע מסרב להסיק במקום לנחש.",
+      "MISSING_FX_RATE": "לתנועה במטבע חוץ אין שער חליפין לתאריך שלה. הוסיפו שער במסך מט״ח — סכום חלקי הוא סכום שגוי.",
+      "NO_CLOSED_PERIOD": "אין עדיין חודש סגור."
+    }
   }
 }

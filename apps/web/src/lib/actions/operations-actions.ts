@@ -82,3 +82,66 @@ export async function upsertCategoryAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/operations?categorySaved=1&tab=categories`);
 }
+
+export async function recomputePeriodAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    await trpc.operations.period.recompute({
+      year: Number(str(fd, "year")),
+      month: Number(str(fd, "month")),
+    });
+  } catch {
+    redirect(`/${locale}/operations?error=recompute`);
+  }
+  redirect(`/${locale}/operations?recomputed=1`);
+}
+
+export async function closePeriodAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const note = str(fd, "reviewNote");
+  const trpc = await serverCaller();
+  try {
+    await trpc.operations.period.close({
+      year: Number(str(fd, "year")),
+      month: Number(str(fd, "month")),
+      ...(note ? { reviewNote: note } : {}),
+    });
+  } catch {
+    redirect(`/${locale}/operations?error=close`);
+  }
+  redirect(`/${locale}/operations?closed=1`);
+}
+
+export async function reopenPeriodAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    await trpc.operations.period.reopen({
+      year: Number(str(fd, "year")),
+      month: Number(str(fd, "month")),
+    });
+  } catch {
+    redirect(`/${locale}/operations?error=reopen`);
+  }
+  redirect(`/${locale}/operations?reopened=1`);
+}
+
+/**
+ * Teach the classifier from the suspense queue: one decision applies to every past and
+ * future transaction from the same merchant.
+ */
+export async function bulkClassifyMerchantAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    await trpc.operations.transactions.bulkClassifyByMerchant({
+      merchantKey: str(fd, "merchantKey"),
+      categoryId: str(fd, "categoryId"),
+      behavioralClass: str(fd, "behavioralClass") as never,
+    });
+  } catch {
+    redirect(`/${locale}/operations?error=classify`);
+  }
+  redirect(`/${locale}/operations?classified=1`);
+}

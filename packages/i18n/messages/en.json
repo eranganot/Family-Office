@@ -1230,6 +1230,52 @@
       "SAVINGS_FLOW": "Savings flow",
       "TRANSFER": "Transfer (not counted)"
     },
-    "engineVersion": "Operations engine {version}"
+    "engineVersion": "Operations engine {version}",
+    "monthTitle": "Operating month {month}/{year}",
+    "recompute": "Reclassify & recompute",
+    "recomputed": "Reclassified and recomputed.",
+    "closeMonth": "Close month",
+    "closedOk": "Month closed and frozen.",
+    "reopen": "Reopen",
+    "reopenedOk": "Month reopened.",
+    "periodClosed": "Closed",
+    "reviewNotePlaceholder": "Review note (optional)",
+    "cannotCompute": "This month cannot be computed yet",
+    "provisionalBanner": "Contains unverified transactions — {count} item(s), {amount}. The surplus below is provisional until you confirm them.",
+    "surplusTitle": "Monthly surplus",
+    "netIncome": "Net income",
+    "debtService": "Debt service (from ledger)",
+    "verifiedSurplus": "Verified surplus",
+    "savingsNote": "Savings & contributions of {amount} are excluded from expenses — that is capital already deployed, not money spent.",
+    "transfersNote": "Transfers of {amount} excluded from both sides (card settlements and moves between your own accounts).",
+    "behavioralTitle": "Behavioural breakdown",
+    "safeToSpendTitle": "Safe to spend",
+    "safeToSpendHint": "Left after fixed costs, debt and commitments over the next {days} days. A ceiling on choice, not a limit you have broken.",
+    "instalmentsCommitted": "Includes {amount} of committed instalments falling due in the window.",
+    "byCategoryTitle": "By category",
+    "noCategoryTotals": "No categorised transactions this month.",
+    "workingCapitalTitle": "Working capital",
+    "wcAvailable": "Available",
+    "wcTarget": "Target",
+    "wcGap": "Gap",
+    "suspenseTitle": "Suspense queue",
+    "suspenseHint": "The classifier was less than {threshold}% confident here. These amounts ARE counted in the month — confirming them only removes the provisional flag.",
+    "suspenseEmpty": "Nothing awaiting confirmation.",
+    "guessed": "Best guess",
+    "confidence": "Confidence",
+    "confirmForMerchant": "Confirm",
+    "applyToMerchant": "Apply to this merchant",
+    "coverage": {
+      "PARTIAL": "Partial coverage: a known source has not been imported for this month, so these figures understate reality.",
+      "AGGREGATE_ONLY": "Aggregate only: a credit-card settlement could not be matched to an itemised statement, so card spending is counted as one lump sum.",
+      "COMPLETE": "Complete coverage."
+    },
+    "refusal": {
+      "NO_INCOME_MAPPED": "No income is mapped for this month, so surplus cannot be computed. Add your salary as a transaction or a cash-flow stream.",
+      "NO_EXPENSES_MAPPED": "No transactions are mapped for this month yet.",
+      "INSUFFICIENT_COVERAGE": "Too few days of data to produce a monthly figure. The engine refuses to extrapolate rather than guess.",
+      "MISSING_FX_RATE": "A foreign-currency transaction has no exchange rate for its date. Add the rate under FX — a partial total would be a wrong total.",
+      "NO_CLOSED_PERIOD": "No closed month yet."
+    }
   }
 }

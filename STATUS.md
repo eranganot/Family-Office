@@ -2,6 +2,61 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-27, session 9)
+
+- **M37 (Financial Operations — dual-axis engine) code-complete — `m37.patch` on the M36 lockfix.
+  NO MIGRATION** (M36's schema already carries everything M37 needs).
+  - **Deterministic classifier (owner decision D3 — no LLM anywhere).** 103 versioned merchant
+    rules in `packages/domain/src/operations/merchant-rules.ts`
+    (`MERCHANT_RULES_VERSION`, stamped onto every classification). Precedence:
+    **OWNER > RULE > FALLBACK.** Patterns are authored in natural Hebrew/Latin and compiled
+    through the same uppercase + final-form folding as merchant keys, so visual-order Hebrew
+    from real statements classifies identically to logical order.
+  - **Owner memory IS the learning loop.** Built from CONFIRMED classifications keyed by
+    `merchantKey`; because keys strip per-transaction reference codes, confirming
+    "SPOTIFY P43CD5B1CB" also covers "SPOTIFY Q99XX1A2BC". One decision, applied past and
+    future, via `transactions.bulkClassifyByMerchant`. Reproducible, auditable, reversible.
+  - **`reconcileWithSign`:** a rule that disagrees with the amount's SIGN (a "משכורת" line that
+    is an outflow) is demoted to Suspense instead of mis-booked. Owner decisions are exempt.
+  - **Surplus (D7, net-of-payroll):** `surplus = netIncome − expenses − ledgerDebtService`.
+    SAVINGS_FLOW and TRANSFER are excluded from expenses by construction, so pension/hishtalmut
+    never reduce surplus. Debt service comes from the **ledger** (mortgage tracks + loans), not
+    from transactions — the ledger is canonical, transactions are evidence.
+  - **Refusals, not guesses:** a missing FX rate REFUSES the whole period rather than treating
+    the row as zero; `normaliseToMonthly` refuses below `operations_normalisation_min_days`;
+    `baselineFromMonths` never averages a missing month in as a zero.
+  - **Non-blocking rule implemented literally:** sub-threshold rows are counted in the month
+    inside Other/Unclassified, and the period is flagged provisional with count + amount.
+  - **Settlement linking (Appendix B.3):** a bank-side card debit becomes TRANSFER only when a
+    card statement reconciles within tolerance (max(₪1, 0.5%), ±3 days, same last-4); otherwise
+    it stands as the expense and the period reports `AGGREGATE_ONLY`. Never silently erases spend.
+  - **Instalments:** remaining תשלומים are projected as dated future claims and reduce
+    Safe-to-Spend inside the window (not counted as this month's expense).
+  - **Safe-to-Spend** subtracts fixed + debt + calendar commitments + buffer top-up, but
+    deliberately NOT discretionary spend (that would be circular). Framed as a ceiling on
+    choice, never as a limit the household has broken.
+  - **API:** `cashflow.dualAxis`, `surplus.get`/`safeToSpend`, `period.current`/`recompute`/
+    `close`/`reopen`, `suspense.queue`, `transactions.bulkClassifyByMerchant`. Closing a period
+    freezes `computed` + `pins` + `engineVersion` (same reproducibility contract as StrategyPlan).
+  - **UI:** surplus waterfall, behavioural bars, category totals, working capital, Safe-to-Spend,
+    provisional/coverage banners, and a suspense queue whose confirm button teaches the classifier.
+    Server-rendered CSS bars (no client bundle for five numbers); logical properties throughout.
+  - **BUG CAUGHT BY TEST:** `byBehavioral` was accumulating income alongside expenses, so a salary
+    tagged FIXED_CONTRACTUAL inflated the fixed bucket and drove Safe-to-Spend negative
+    (−17,600 instead of +10,400). The behavioural axis is now **expense-side only**, documented
+    on `BehavioralTotals`.
+  - **Verified:** engine-operations 66 tests (49 new), domain 49, engine-strategy 61, ingestion 17,
+    tsc clean (domain/db/registry/api/engine-operations/web), eslint clean, i18n parity 1053/1053,
+    `prisma validate` OK, **`npm ci --dry-run` exit 0** (lockfile untouched by M37).
+
+## Next up
+
+**M38a — generic tabular adapter + `redact()`:** CSV/XLSX with saved column-mapping profiles
+(encoding sniffing for Windows-1255, header detection, debit/credit vs signed), statement-range
+detection, PII redaction at the persistence boundary, import preview/commit. Covers the OneZero
+XLS and Isracard HTML almost unchanged. Then M38b: the five institution adapters
+(FIBI PDF, OneZero XLS, Isracard PDF, Isracard HTML, CAL PDF) + `us-bank-chase-csv`.
+
 ## Current state (2026-07-27, session 8)
 
 - **M36 (Financial Operations — core context) code-complete — `m36.patch` on 6961e95. HAS A MIGRATION.**

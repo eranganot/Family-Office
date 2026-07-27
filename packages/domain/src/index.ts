@@ -38,3 +38,5 @@ export {
   flattenCategoryTree,
 } from "./operations/categories";
 export type { SeedCategory, BehavioralClassKey, CategoryAxisKey } from "./operations/categories";
+export { MERCHANT_RULES, MERCHANT_RULES_VERSION } from "./operations/merchant-rules";
+export type { MerchantRule } from "./operations/merchant-rules";
