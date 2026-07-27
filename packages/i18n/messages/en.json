@@ -1346,6 +1346,8 @@
     "pdfIssuer": "Detected issuer: {issuer}",
     "pdfNoMapping": "PDFs have no columns to map — the layout is the format. Review the rows below and import.",
     "noMerchantKey": "No merchant name to group by",
-    "editInstead": "edit this row instead"
+    "editInstead": "edit this row instead",
+    "errorTooLarge": "That batch is too large ({mb} MB). Upload fewer files at a time — around 15 MB per batch is safe.",
+    "categoryOrPick": "Search, or pick from the list"
   }
 }

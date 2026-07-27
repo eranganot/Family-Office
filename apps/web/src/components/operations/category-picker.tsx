@@ -1,20 +1,20 @@
 /**
- * Type-to-search category picker.
+ * Category picker: a type-to-search box AND a full dropdown, side by side.
  *
- * The category tree is ~117 entries; a flat <select> forces the user to scroll a wall
- * of options. This uses a native <input list> + <datalist>, which gives real typeahead
- * with NO client JavaScript — it stays a server component, keeps RTL behaviour correct,
- * and degrades to a plain text field if datalist is unsupported.
+ * The tree is ~117 entries, so a bare <select> means scrolling a wall of options — but
+ * search alone removes the ability to BROWSE, which matters when you don't yet know
+ * what the tree contains. Both controls are rendered and both are submitted; the
+ * server action prefers the search box when it has text, and falls back to the select.
  *
- * The submitted value is the display label ("דיור › ארנונה"), which the server action
- * resolves back to an id. Labels are made unique by including the parent path, so the
- * lookup is unambiguous even where leaf names repeat (e.g. "אחר" under two parents).
+ * Native <input list> + <datalist> gives real typeahead with NO client JavaScript, so
+ * this stays a server component and RTL keeps working.
  */
 export interface PickerCategory {
   id: string;
   key: string;
   nameEn: string;
   nameHe: string;
+  axis: "INCOME" | "EXPENSE";
   parentId: string | null;
 }
 
@@ -35,6 +35,12 @@ export function categoryLabel(
   return parts.join(" › ");
 }
 
+/** Indented so hierarchy is readable inside a flat <select>. */
+function indentedLabel(c: PickerCategory, locale: string): string {
+  const depth = c.key.split(".").length - 1;
+  return `${"  ".repeat(depth)}${locale === "he" ? c.nameHe : c.nameEn}`;
+}
+
 export function CategoryPicker({
   name,
   categories,
@@ -43,8 +49,10 @@ export function CategoryPicker({
   placeholder,
   required,
   listId,
-  className,
+  compact,
+  labels,
 }: {
+  /** Base field name. Submits `${name}Label` (search) and `${name}Id` (dropdown). */
   name: string;
   categories: PickerCategory[];
   locale: string;
@@ -53,32 +61,44 @@ export function CategoryPicker({
   required?: boolean | undefined;
   /** Datalists are shared by id; pass a stable one so the options render once. */
   listId: string;
-  className?: string | undefined;
+  compact?: boolean | undefined;
+  labels: { none: string; income: string; expense: string };
 }) {
   const byId = new Map(categories.map((c) => [c.id, c]));
-  const current = defaultCategoryId ? byId.get(defaultCategoryId) : undefined;
+  const income = categories.filter((c) => c.axis === "INCOME");
+  const expense = categories.filter((c) => c.axis === "EXPENSE");
+  const cls = compact
+    ? "min-w-44 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-xs"
+    : "w-full min-w-48 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm";
+
   return (
-    <>
+    <span className="flex flex-wrap items-center gap-2">
       <input
         type="text"
-        name={name}
+        name={`${name}Label`}
         list={listId}
-        defaultValue={current ? categoryLabel(current, byId, locale) : ""}
         placeholder={placeholder}
-        required={required}
         autoComplete="off"
-        className={
-          className ??
-          // min-w matters: inside a narrow table cell, w-full alone collapses the field
-          // to the width of its dropdown arrow and the control becomes unusable.
-          "w-full min-w-48 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
-        }
+        className={cls}
       />
+      <select name={`${name}Id`} defaultValue={defaultCategoryId ?? ""} required={required} className={cls}>
+        <option value="">{labels.none}</option>
+        <optgroup label={labels.expense}>
+          {expense.map((c) => (
+            <option key={c.id} value={c.id}>{indentedLabel(c, locale)}</option>
+          ))}
+        </optgroup>
+        <optgroup label={labels.income}>
+          {income.map((c) => (
+            <option key={c.id} value={c.id}>{indentedLabel(c, locale)}</option>
+          ))}
+        </optgroup>
+      </select>
       <datalist id={listId}>
         {categories.map((c) => (
           <option key={c.id} value={categoryLabel(c, byId, locale)} />
         ))}
       </datalist>
-    </>
+    </span>
   );
 }

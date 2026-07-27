@@ -2,6 +2,31 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-27, session 13)
+
+- **M38c-fix (multi-upload 500 + picker browse) code-complete — `m38c-fix.patch` on f5128b5.
+  NO MIGRATION, NO LOCKFILE CHANGE.** Both owner-reported.
+  - **Multi-file upload returned an opaque "A server error occurred".** Root cause: **Next caps
+    Server Action bodies at 1 MB by default** and none was configured. Statement upload sends
+    files as base64 inside a Server Action (~34% inflation), so two PDFs alone exceed the cap and
+    the request dies *before any application code runs* — which is why nothing appeared in the
+    logs and why it looked like an app bug. `next.config.ts` now sets
+    `experimental.serverActions.bodySizeLimit: "25mb"`; the action also pre-checks the batch size
+    so an oversized upload gets a plain message rather than a platform 500.
+  - Added the long-missing **`@wealthos/engine-operations` to `transpilePackages`** — an oversight
+    since M36 that had not yet bitten, but would.
+  - **Category picker now renders search AND the dropdown** (owner request), not search instead of
+    it. Both fields submit; the typed label wins when present (the more deliberate act), otherwise
+    the dropdown selection is used. Search alone had removed the ability to BROWSE the tree, which
+    matters before you know what is in it. Parent-category picker uses "top level" as its empty
+    label rather than "uncategorised".
+  - **Verified:** tsc clean, eslint clean, i18n parity 1117/1117.
+
+### Standing note on patch delivery
+The owner sometimes pushes a phase while the next fix is being prepared. **Always re-check
+`origin/main` and rebase the fix as its own patch** rather than amending an already-pushed commit —
+amending produces a conflicting patch that cannot apply.
+
 ## Current state (2026-07-27, session 12)
 
 - **M38c (PDF statements, multi-upload, searchable categories) code-complete — `m38c.patch`.

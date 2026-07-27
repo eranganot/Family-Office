@@ -39,6 +39,7 @@ export default async function OperationsPage({
     recomputed?: string; closed?: string; reopened?: string; tab?: string;
     updated?: string; removed?: string; restored?: string; edit?: string;
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
+    mb?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -70,7 +71,11 @@ export default async function OperationsPage({
   const today = new Date().toISOString().slice(0, 10);
   const loc = locale as Locale;
 
-  const errorMsg = sp.error ? tf("error") : undefined;
+  const errorMsg = sp.error
+    ? sp.error === "toolarge"
+      ? t("errorTooLarge", { mb: (sp as { mb?: string }).mb ?? "?" })
+      : tf("error")
+    : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -447,14 +452,15 @@ export default async function OperationsPage({
                       <input type="hidden" name="locale" value={locale} />
                       <input type="hidden" name="merchantKey" value={tx.merchantKey ?? ""} />
                       <CategoryPicker
-                        name="categoryLabel"
+                        name="category"
                         categories={pickerCats}
                         locale={locale}
                         defaultCategoryId={tx.categoryId}
-                        placeholder={t("categorySearchPlaceholder")}
+                        placeholder={t("categoryOrPick")}
                         required
                         listId="cats-all"
-                        className="min-w-56 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-xs"
+                        compact
+                        labels={{ none: t("uncategorised"), income: t("axis.INCOME"), expense: t("axis.EXPENSE") }}
                       />
                       <Select name="behavioralClass" defaultValue={tx.behavioralClass ?? "VARIABLE_DISCRETIONARY"}>
                         {BEHAVIORAL.map((b) => <option key={b} value={b}>{t(`behavioralClass.${b}`)}</option>)}
@@ -507,11 +513,12 @@ export default async function OperationsPage({
           </Field>
           <Field label={t("category")}>
             <CategoryPicker
-              name="categoryLabel"
+              name="category"
               categories={pickerCats}
               locale={locale}
-              placeholder={t("categorySearchPlaceholder")}
+              placeholder={t("categoryOrPick")}
               listId="cats-create"
+              labels={{ none: t("uncategorised"), income: t("axis.INCOME"), expense: t("axis.EXPENSE") }}
             />
           </Field>
           <Field label={t("behavioral")}>
@@ -633,12 +640,13 @@ export default async function OperationsPage({
                       </Field>
                       <Field label={t("category")}>
                         <CategoryPicker
-                          name="categoryLabel"
+                          name="category"
                           categories={pickerCats}
                           locale={locale}
                           defaultCategoryId={tx.categoryId}
-                          placeholder={t("categorySearchPlaceholder")}
+                          placeholder={t("categoryOrPick")}
                           listId="cats-all"
+                        labels={{ none: t("uncategorised"), income: t("axis.INCOME"), expense: t("axis.EXPENSE") }}
                         />
                       </Field>
                       <Field label={t("behavioral")}>
@@ -696,11 +704,12 @@ export default async function OperationsPage({
           </Field>
           <Field label={t("parent")}>
             <CategoryPicker
-              name="parentLabel"
+              name="parent"
               categories={pickerCats}
               locale={locale}
               placeholder={t("noParent")}
               listId="cats-all"
+              labels={{ none: t("noParent"), income: t("axis.INCOME"), expense: t("axis.EXPENSE") }}
             />
           </Field>
           <Field label={t("categoryKey")}>

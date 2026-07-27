@@ -24,7 +24,7 @@ export async function createManualTransactionAction(fd: FormData): Promise<void>
   // positive number, which is far less error-prone than asking for a signed value.
   const amount = direction === "IN" ? String(magnitude) : String(-magnitude);
 
-  const categoryId = await resolveCategoryLabel(str(fd, "categoryLabel"), locale);
+  const categoryId = await resolveCategoryField(fd, "category", locale);
   const behavioralClass = str(fd, "behavioralClass");
   const instalmentNumber = str(fd, "instalmentNumber");
   const instalmentTotal = str(fd, "instalmentTotal");
@@ -51,7 +51,7 @@ export async function createManualTransactionAction(fd: FormData): Promise<void>
 
 export async function upsertCategoryAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
-  const parentId = await resolveCategoryLabel(str(fd, "parentLabel"), locale);
+  const parentId = await resolveCategoryField(fd, "parent", locale);
   const trpc = await serverCaller();
   try {
     await trpc.operations.categories.upsert({
@@ -120,7 +120,7 @@ export async function bulkClassifyMerchantAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const trpc = await serverCaller();
   try {
-    const categoryId = await resolveCategoryLabel(str(fd, "categoryLabel"), locale);
+    const categoryId = await resolveCategoryField(fd, "category", locale);
     if (!categoryId) redirect(`/${locale}/operations?error=badcategory`);
     await trpc.operations.transactions.bulkClassifyByMerchant({
       merchantKey: str(fd, "merchantKey"),
@@ -142,7 +142,7 @@ export async function updateTransactionAction(fd: FormData): Promise<void> {
     redirect(`/${locale}/operations?error=amount`);
   }
   const amount = direction === "IN" ? String(magnitude) : String(-magnitude);
-  const categoryId = await resolveCategoryLabel(str(fd, "categoryLabel"), locale);
+  const categoryId = await resolveCategoryField(fd, "category", locale);
   const behavioralClass = str(fd, "behavioralClass");
   const instalmentNumber = str(fd, "instalmentNumber");
   const instalmentTotal = str(fd, "instalmentTotal");
@@ -189,6 +189,14 @@ export async function uploadStatementAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const files = fd.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) redirect(`/${locale}/operations?error=nofile`);
+
+  // Server Actions cap the request body (next.config sets 25 MB). Base64 inflates
+  // files ~34%, so check the real budget here and say so plainly — the platform's
+  // own failure mode is an opaque "A server error occurred" with nothing in the logs.
+  const totalBytes = files.reduce((n, f) => n + f.size, 0);
+  if (totalBytes * 1.34 > 24 * 1024 * 1024) {
+    redirect(`/${locale}/operations?error=toolarge&mb=${Math.round(totalBytes / 1024 / 1024)}`);
+  }
 
   const trpc = await serverCaller();
   const ids: string[] = [];
@@ -259,12 +267,21 @@ export async function commitStatementAction(fd: FormData): Promise<void> {
 }
 
 /**
- * Resolve a category picker label ("דיור › ארנונה") back to an id.
+ * Resolve the category picker's two fields to an id.
  *
- * Labels carry the full parent path, so they are unique. Falls back to a leaf-name
- * match for a label typed by hand, and returns null when nothing matches — an
- * unrecognised category is left unset rather than silently guessed at.
+ * The picker submits BOTH a search label (`<name>Label`) and a dropdown id
+ * (`<name>Id`). The typed label wins when present — it is the more deliberate act —
+ * otherwise the dropdown selection is used. An unrecognised label returns null, so an
+ * unmatched category is left unset rather than silently guessed at.
  */
+async function resolveCategoryField(fd: FormData, name: string, locale: string): Promise<string | null> {
+  const label = str(fd, `${name}Label`).trim();
+  const selected = str(fd, `${name}Id`).trim();
+  if (!label) return selected || null;
+  const byLabel = await resolveCategoryLabel(label, locale);
+  return byLabel ?? (selected || null);
+}
+
 async function resolveCategoryLabel(label: string, locale: string): Promise<string | null> {
   const clean = label.trim();
   if (!clean) return null;
@@ -290,4 +307,4 @@ async function resolveCategoryLabel(label: string, locale: string): Promise<stri
   return byLeaf.length === 1 ? byLeaf[0]!.id : null;
 }
 
-export { resolveCategoryLabel };
+export { resolveCategoryLabel, resolveCategoryField };
