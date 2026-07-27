@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { logout } from "../../../lib/auth-actions";
 import { serverCaller } from "../../../lib/trpc-server";
 import { Link } from "../../../i18n/navigation";
+import { LocaleSwitch } from "../../../components/locale-switch";
 import { NavLinks } from "../../../components/nav-links";
 
 export default async function AppLayout({
@@ -29,9 +30,7 @@ export default async function AppLayout({
               {t("phase.label")}: {t(`phase.${household.workflowState}`)}
             </span>
           ) : null}
-          <Link href="/" locale={locale === "he" ? "en" : "he"} className="text-sm underline">
-            {t("nav.switchLocale")}
-          </Link>
+          <LocaleSwitch currentLocale={locale} label={t("nav.switchLocale")} />
           <form action={logout}>
             <input type="hidden" name="locale" value={locale} />
             <button type="submit" className="text-sm text-neutral-500 underline">

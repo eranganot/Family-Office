@@ -25,6 +25,16 @@
     no Postgres needed): every probe × every phase, plus the property that distinguishes it from
     `workflowGuard` — once reached, it STAYS open in later phases. This was a real coverage gap:
     M36 shipped the guard with no test at all.
+  - **Locale switch now stays on the current page** (owner-reported). It hard-coded `href="/"`,
+    so changing language always bounced you back to the dashboard mid-task. New client component
+    `components/locale-switch.tsx` uses next-intl's `usePathname`, which returns the path WITHOUT
+    the locale prefix — exactly what the localised `Link` re-prefixes for the target locale.
+    Query params are deliberately dropped: they are transient UI state here (`?created=1`,
+    `?edit=<id>`) and carrying them across would re-fire success banners.
+  - **CI note (correcting my own bad advice):** do NOT press "Re-run jobs" on the failed run —
+    GitHub re-runs a workflow at its ORIGINAL commit, so run #45 (pinned to `90a37bd`, M36,
+    before the lockfix) will fail forever. Check the run for the NEWEST commit at
+    Actions → branch `main` instead.
   - Dead single-row `classifyTransactionAction` removed (superseded by the edit form); the
     `transactions.classify` API procedure is retained.
   - **Verified:** api guard tests 9 (6 new), engine-operations 66, domain 49, tsc clean, eslint
