@@ -1348,6 +1348,10 @@
     "noMerchantKey": "No merchant name to group by",
     "editInstead": "edit this row instead",
     "errorTooLarge": "That batch is too large ({mb} MB). Upload fewer files at a time — around 15 MB per batch is safe.",
-    "categoryOrPick": "Search, or pick from the list"
+    "categoryOrPick": "Search, or pick from the list",
+    "previewFailed": "Could not read this statement. The exact error is below — send it to me and I'll fix the parser.",
+    "importAllPending": "Import all {n}",
+    "importAllHint": "“Import all” commits every file that needs no column mapping (PDFs). Files needing a mapping decision are left for you to preview.",
+    "importedSome": "Imported {n} transactions ({dupes} duplicates skipped). {skipped} file(s) still need attention — preview them below."
   }
 }

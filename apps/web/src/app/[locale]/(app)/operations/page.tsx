@@ -7,6 +7,7 @@ import {
   createManualTransactionAction,
   recomputePeriodAction,
   reopenPeriodAction,
+  commitAllPendingAction,
   commitStatementAction,
   setTransactionStatusAction,
   updateTransactionAction,
@@ -39,7 +40,7 @@ export default async function OperationsPage({
     recomputed?: string; closed?: string; reopened?: string; tab?: string;
     updated?: string; removed?: string; restored?: string; edit?: string;
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
-    mb?: string;
+    mb?: string; skipped?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -53,9 +54,17 @@ export default async function OperationsPage({
   const meta = await trpc.operations.meta();
   const { rows: txns } = await trpc.operations.transactions.list({ limit: 50 });
   // Preview is a mutation (it does real parsing work) but persists nothing.
-  const preview = sp.preview
-    ? await trpc.operations.import.preview({ documentId: sp.preview }).catch(() => null)
-    : null;
+  // NEVER swallow this: a silent catch here renders an empty card and looks like the
+  // feature simply does not exist. Surface the reason instead.
+  let preview: Awaited<ReturnType<typeof trpc.operations.import.preview>> | null = null;
+  let previewError: string | null = null;
+  if (sp.preview) {
+    try {
+      preview = await trpc.operations.import.preview({ documentId: sp.preview });
+    } catch (e) {
+      previewError = e instanceof Error ? e.message : "PREVIEW_FAILED";
+    }
+  }
   const pending = await trpc.operations.import.pending().catch(() => []);
   const period = await trpc.operations.period.current();
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
@@ -112,7 +121,16 @@ export default async function OperationsPage({
 
         {pending.length > 0 ? (
           <div className="mt-4 rounded-lg bg-neutral-50 px-3 py-2">
-            <p className="mb-2 text-xs font-medium text-neutral-600">{t("pendingStatements")}</p>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-medium text-neutral-600">{t("pendingStatements")}</p>
+              <form action={commitAllPendingAction}>
+                <input type="hidden" name="locale" value={locale} />
+                <button type="submit" className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white">
+                  {t("importAllPending", { n: pending.length })}
+                </button>
+              </form>
+            </div>
+            <p className="mb-2 text-xs text-neutral-500">{t("importAllHint")}</p>
             <ul className="flex flex-col gap-1 text-xs">
               {pending.map((d) => (
                 <li key={d.id} className="flex items-center justify-between gap-3">
@@ -126,6 +144,13 @@ export default async function OperationsPage({
                 </li>
               ))}
             </ul>
+          </div>
+        ) : null}
+
+        {previewError ? (
+          <div className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">
+            <p className="font-medium">{t("previewFailed")}</p>
+            <p className="mt-1 font-mono text-xs break-all">{previewError}</p>
           </div>
         ) : null}
 
@@ -277,7 +302,10 @@ export default async function OperationsPage({
           : sp.updated ? t("updatedOk")
           : sp.removed ? t("removedOk")
           : sp.restored ? t("restoredOk")
-          : sp.imported ? t("importedOk", { n: sp.imported, dupes: sp.dupes ?? "0" })
+          : sp.imported
+            ? sp.skipped && sp.skipped !== "0"
+              ? t("importedSome", { n: sp.imported, dupes: sp.dupes ?? "0", skipped: sp.skipped })
+              : t("importedOk", { n: sp.imported, dupes: sp.dupes ?? "0" })
           : undefined
         }
       />

@@ -511,6 +511,66 @@ export const operationsRouter = router({
       return docs.filter((d) => !done.has(d.id));
     }),
 
+    /**
+     * Import every pending statement that needs no column mapping (PDF, and HTML/CSV
+     * whose headers the guesser resolves on its own). Preview exists so a CSV's column
+     * mapping can be checked before it lands — but a PDF has no mapping to check, so
+     * forcing a preview round-trip per file is pure friction. Files that DO need a
+     * mapping decision are skipped and reported, not guessed at.
+     */
+    commitAllPending: operationsProcedure.mutation(async ({ ctx }) => {
+      const docs = await ctx.db.document.findMany({
+        where: { householdId: ctx.householdId },
+        orderBy: { uploadedAt: "asc" },
+        take: 25,
+        select: { id: true, filename: true },
+      });
+      const done = new Set(
+        (
+          await ctx.db.importBatch.findMany({
+            where: { status: "COMPLETED", documentId: { in: docs.map((d) => d.id) } },
+            select: { documentId: true },
+          })
+        ).map((b) => b.documentId),
+      );
+
+      let inserted = 0;
+      let duplicates = 0;
+      const imported: string[] = [];
+      const skipped: Array<{ filename: string; reason: string }> = [];
+
+      for (const doc of docs) {
+        if (done.has(doc.id)) continue;
+        try {
+          const pv = await previewStatement(ctx.db, ctx.householdId, doc.id);
+          if (pv.unsupportedReason) {
+            skipped.push({ filename: doc.filename, reason: pv.unsupportedReason });
+            continue;
+          }
+          if (pv.drafts.length === 0) {
+            // Needs a human mapping decision — never guess one.
+            skipped.push({ filename: doc.filename, reason: "NEEDS_MAPPING" });
+            continue;
+          }
+          const r = await commitStatement(
+            ctx.db, ctx.householdId, doc.id,
+            pv.format === "PDF" ? "pdf-statement" : "generic-tabular",
+          );
+          inserted += r.inserted;
+          duplicates += r.duplicates;
+          imported.push(doc.filename);
+        } catch (e) {
+          skipped.push({
+            filename: doc.filename,
+            reason: e instanceof Error ? e.message.slice(0, 120) : "FAILED",
+          });
+        }
+      }
+
+      const classified = inserted > 0 ? await autoClassify(ctx.db, ctx.householdId) : { classified: 0, suspense: 0 };
+      return { inserted, duplicates, imported, skipped, ...classified };
+    }),
+
     profiles: operationsProcedure.query(async ({ ctx }) =>
       ctx.db.importMappingProfile.findMany({
         where: { householdId: ctx.householdId },

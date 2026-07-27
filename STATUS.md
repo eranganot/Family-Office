@@ -2,6 +2,33 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-27, session 14)
+
+- **M38c-fix2 (PDF preview blank + Import all) — `m38c-fix2.patch` on b1a032d.
+  NO MIGRATION, NO LOCKFILE CHANGE.** Owner-reported: clicking Preview on an uploaded PDF
+  showed nothing at all — no preview section, no import button.
+  - **Root cause 1 — the failure was invisible by construction.** The page did
+    `trpc.operations.import.preview(...).catch(() => null)`, so ANY error rendered an empty
+    card, which looks exactly like "the feature does not exist". Now the error is caught,
+    displayed, and the raw message shown verbatim so it can be reported. **Never swallow an
+    error whose only visible effect is an empty UI.**
+  - **Root cause 2 — pdfjs was being bundled.** `@wealthos/ingestion` is in `transpilePackages`,
+    so Next follows its dynamic `import("pdfjs-dist/legacy/build/pdf.mjs")` into the server
+    bundle, where pdfjs's worker / optional-canvas resolution breaks at runtime. Fixed with
+    `serverExternalPackages: ["pdfjs-dist"]` so it loads as a plain Node module.
+    **This also affects the pre-existing M2 pension-PDF import path**, which had the same latent
+    problem and had probably never been exercised against a real PDF in production.
+  - **"Import all" added** (owner friction: 5 monthly statements = 5 preview round-trips).
+    `import.commitAllPending` commits every pending file that needs no mapping decision. A PDF
+    has no columns to map, so the preview step is pure friction there; a CSV whose headers the
+    guesser cannot resolve is **skipped and reported**, never guessed at. Runs `autoClassify`
+    once at the end.
+  - **Verified:** tsc clean, eslint clean, i18n parity 1121/1121.
+
+### Standing note on patch delivery
+The owner sometimes pushes a phase while the next fix is being prepared. **Always re-check
+`origin/main` and rebase the fix as its own patch** rather than amending an already-pushed commit.
+
 ## Current state (2026-07-27, session 13)
 
 - **M38c-fix (multi-upload 500 + picker browse) code-complete — `m38c-fix.patch` on f5128b5.

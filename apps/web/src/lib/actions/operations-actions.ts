@@ -308,3 +308,19 @@ async function resolveCategoryLabel(label: string, locale: string): Promise<stri
 }
 
 export { resolveCategoryLabel, resolveCategoryField };
+
+/** Import every pending statement that needs no mapping decision (mainly PDFs). */
+export async function commitAllPendingAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  let r: { inserted: number; duplicates: number; skipped: Array<{ filename: string }> } | undefined;
+  try {
+    r = await trpc.operations.import.commitAllPending();
+  } catch (e) {
+    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "BULK_FAILED";
+    redirect(`/${locale}/operations?error=${code}`);
+  }
+  redirect(
+    `/${locale}/operations?imported=${r?.inserted ?? 0}&dupes=${r?.duplicates ?? 0}&skipped=${r?.skipped.length ?? 0}`,
+  );
+}
