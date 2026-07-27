@@ -11,6 +11,7 @@ import {
   commitStatementAction,
   setTransactionStatusAction,
   updateTransactionAction,
+  undoImportAction,
   uploadStatementAction,
   upsertCategoryAction,
 } from "../../../../lib/actions/operations-actions";
@@ -40,7 +41,7 @@ export default async function OperationsPage({
     recomputed?: string; closed?: string; reopened?: string; tab?: string;
     updated?: string; removed?: string; restored?: string; edit?: string;
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
-    mb?: string; skipped?: string;
+    mb?: string; skipped?: string; undone?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -66,6 +67,7 @@ export default async function OperationsPage({
     }
   }
   const pending = await trpc.operations.import.pending().catch(() => []);
+  const batches = await trpc.operations.import.batches().catch(() => []);
   const period = await trpc.operations.period.current();
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
   const { year, month, row: periodRow, computed } = period;
@@ -147,6 +149,31 @@ export default async function OperationsPage({
           </div>
         ) : null}
 
+        {batches.length > 0 ? (
+          <details className="mt-4 text-xs">
+            <summary className="cursor-pointer text-neutral-600">{t("importHistory")}</summary>
+            <p className="mt-2 text-neutral-500">{t("undoHint")}</p>
+            <ul className="mt-2 flex flex-col gap-1">
+              {batches.map((b) => (
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 py-1">
+                  <span className="truncate">
+                    {b.document?.filename ?? b.adapterId}
+                    {" · "}
+                    {new Date(b.startedAt).toISOString().slice(0, 10)}
+                    {" · "}
+                    {t("batchRows", { n: b._count.transactions })}
+                  </span>
+                  <form action={undoImportAction}>
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="batchId" value={b.id} />
+                    <button type="submit" className="text-red-600 underline">{t("undoImport")}</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+
         {previewError ? (
           <div className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">
             <p className="font-medium">{t("previewFailed")}</p>
@@ -181,6 +208,12 @@ export default async function OperationsPage({
               <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-800">
                 {t("previewRedaction", { n: preview.redactedFields, version: preview.redactionVersion })}
               </p>
+
+              {preview.issues.some((i) => i.raw === "BANK_COLUMNS_NOT_DETECTED") ? (
+                <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {t("bankColumnsFailed")}
+                </p>
+              ) : null}
 
               {preview.drafts.length > 0 ? (
                 <table className="mb-6 w-full text-xs">
@@ -302,6 +335,7 @@ export default async function OperationsPage({
           : sp.updated ? t("updatedOk")
           : sp.removed ? t("removedOk")
           : sp.restored ? t("restoredOk")
+          : sp.undone ? t("undoneOk", { n: sp.undone })
           : sp.imported
             ? sp.skipped && sp.skipped !== "0"
               ? t("importedSome", { n: sp.imported, dupes: sp.dupes ?? "0", skipped: sp.skipped })

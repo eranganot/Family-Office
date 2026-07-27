@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import { operationsRepo } from "@wealthos/db";
 import { UNCLASSIFIED_KEY } from "@wealthos/domain";
 import { normalizeMerchantKey, OPERATIONS_ENGINE_VERSION } from "@wealthos/engine-operations";
@@ -558,6 +559,49 @@ export const operationsRouter = router({
       // `considered` makes the on-screen numbers reconcile: considered = imported + skipped.
       return { considered: docs.length, inserted, duplicates, imported, skipped, ...classified };
     }),
+
+    /** Import batches, newest first, with how many transactions each produced. */
+    batches: operationsProcedure.query(async ({ ctx }) => {
+      const batches = await ctx.db.importBatch.findMany({
+        where: { document: { householdId: ctx.householdId } },
+        orderBy: { startedAt: "desc" },
+        take: 30,
+        select: {
+          id: true, adapterId: true, status: true, startedAt: true,
+          document: { select: { filename: true } },
+          _count: { select: { transactions: true } },
+        },
+      });
+      return batches;
+    }),
+
+    /**
+     * Undo an import: delete every transaction it created.
+     *
+     * Safe because transactions are the OBSERVATION layer (owner decision D5) — nothing
+     * downstream depends on them structurally, and classification history cascades with
+     * the row. This is a real DELETE rather than a VOID: a bad import is not evidence of
+     * anything, it is noise that should leave no trace. Re-importing the file afterwards
+     * is clean, because dedupe is keyed on externalRef which goes away with the rows.
+     */
+    undo: operationsProcedure
+      .input(z.object({ batchId: z.uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const batch = await ctx.db.importBatch.findUnique({
+          where: { id: input.batchId },
+          select: { id: true, document: { select: { householdId: true } } },
+        });
+        if (!batch || batch.document?.householdId !== ctx.householdId) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "BATCH_NOT_FOUND" });
+        }
+        const removed = await ctx.db.transaction.deleteMany({
+          where: { importBatchId: input.batchId, householdId: ctx.householdId },
+        });
+        // Drop the batch too, so the document returns to the pending list and can be
+        // re-imported once the parser is fixed.
+        await ctx.db.importBatch.delete({ where: { id: input.batchId } });
+        return { removed: removed.count };
+      }),
 
     profiles: operationsProcedure.query(async ({ ctx }) =>
       ctx.db.importMappingProfile.findMany({

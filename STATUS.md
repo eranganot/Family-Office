@@ -2,6 +2,40 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-27, session 16)
+
+- **M38d — bank-PDF column parser + undo import. `m38d.patch`. NO MIGRATION, NO LOCKFILE CHANGE.**
+  **⚠️ Owner must UNDO the earlier bank-PDF imports — those rows are wrong.**
+  - **DATA-INTEGRITY BUG (owner-reported, worst so far).** The generic line parser took
+    "the first amount" on a bank line. But a FIBI row is a TABLE:
+    `תאריך | סופ"פ | אסמכתא | יתרה | חובה | זכות | תיאור`, e.g.
+    `01/01/2026 | 222 | 99411 | 33001.18 (BALANCE) | — | 36986.94 (CREDIT) | משכורת`.
+    The heuristic grabbed **33001.18, the running balance**, signed it negative, and
+    **discarded the 36,986.94 salary credit entirely.** Symptoms the owner saw: income showing
+    ₪2,108 (all real credits lost) and variable spend at −₪45,265 (balances imported as
+    expenses), plus numeric-only descriptions (reference columns bled into the description).
+  - **Fix: `pdf-bank-table.ts` — column-aware parsing.** New `extractPdfCellLines` keeps each
+    text item's **x coordinate** (the old extractor threw it away, which is precisely why the
+    numbers were indistinguishable). The header row is located by its Hebrew labels after RTL
+    repair, each label's x defines a column centre, and every cell is assigned to its nearest
+    column. Debit → negative, credit → positive, balance kept as metadata and **never** treated
+    as a movement.
+  - **It REFUSES rather than guesses.** If the columns cannot be identified, the bank path
+    returns zero rows and says so — it does **not** fall back to the line heuristic. Importing
+    plausible-but-wrong numbers into a household ledger is strictly worse than importing nothing.
+  - **Undo import** (`import.undo` + history UI). A real DELETE, not a VOID: a bad import is not
+    evidence of anything. Removing the batch returns the document to the pending list so it can
+    be re-imported cleanly once the parser is right (dedupe is keyed on `externalRef`, which
+    goes away with the rows).
+  - **Verified:** ingestion 95 tests (10 new, covering exactly the balance-vs-credit bug),
+    engine-operations 66, domain 49, tsc clean, eslint clean, i18n parity 1127/1127.
+
+### Lesson recorded
+Card statements are line-shaped; bank statements are table-shaped. A heuristic that reads
+"an amount" from a line **cannot** be correct on a table with balance + debit + credit columns,
+and its failure mode is silent and plausible. Column geometry must be reconstructed, or the
+parser must refuse.
+
 ## Current state (2026-07-27, session 15)
 
 - **M38c-fix3 — `m38c-fix3.patch`. NO MIGRATION, NO LOCKFILE CHANGE.** All owner-reported.

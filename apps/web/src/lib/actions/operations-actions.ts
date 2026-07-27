@@ -324,3 +324,17 @@ export async function commitAllPendingAction(fd: FormData): Promise<void> {
     `/${locale}/operations?imported=${r?.inserted ?? 0}&dupes=${r?.duplicates ?? 0}&skipped=${r?.skipped.length ?? 0}`,
   );
 }
+
+/** Undo an import: delete every transaction it created, and free the file to re-import. */
+export async function undoImportAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  let removed = 0;
+  try {
+    const r = await trpc.operations.import.undo({ batchId: str(fd, "batchId") });
+    removed = r.removed;
+  } catch {
+    redirect(`/${locale}/operations?error=undo`);
+  }
+  redirect(`/${locale}/operations?undone=${removed}`);
+}

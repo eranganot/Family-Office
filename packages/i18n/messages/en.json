@@ -1352,6 +1352,12 @@
     "previewFailed": "Could not read this statement. The exact error is below — send it to me and I'll fix the parser.",
     "importAllPending": "Import all {n}",
     "importAllHint": "“Import all” commits every file that needs no column mapping (PDFs). Files needing a mapping decision are left for you to preview.",
-    "importedSome": "Imported {n} transactions ({dupes} duplicates skipped). {skipped} file(s) still need attention — preview them below."
+    "importedSome": "Imported {n} transactions ({dupes} duplicates skipped). {skipped} file(s) still need attention — preview them below.",
+    "importHistory": "Import history / undo an import",
+    "undoHint": "Undo deletes every transaction that import created and returns the file to the pending list, so you can re-import it cleanly.",
+    "batchRows": "{n} transactions",
+    "undoImport": "Undo",
+    "undoneOk": "Undone — {n} transactions removed. Press “Reclassify & recompute” to refresh the figures.",
+    "bankColumnsFailed": "This looks like a bank statement, but its table columns could not be identified, so nothing was imported. Importing plausible-but-wrong numbers into your ledger would be worse than importing nothing — send me the file's layout and I'll fix the parser."
   }
 }
