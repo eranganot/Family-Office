@@ -1276,6 +1276,24 @@
       "INSUFFICIENT_COVERAGE": "Too few days of data to produce a monthly figure. The engine refuses to extrapolate rather than guess.",
       "MISSING_FX_RATE": "A foreign-currency transaction has no exchange rate for its date. Add the rate under FX — a partial total would be a wrong total.",
       "NO_CLOSED_PERIOD": "No closed month yet."
+    },
+    "transactionsHint": "Every row is editable. Removing a transaction voids it — it stops counting immediately but keeps its history, and you can restore it.",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "saveChanges": "Save changes",
+    "remove": "Remove",
+    "restore": "Restore",
+    "removedBadge": "Removed",
+    "updatedOk": "Transaction updated.",
+    "removedOk": "Transaction removed — it no longer counts towards any figure.",
+    "restoredOk": "Transaction restored.",
+    "provenance": "Categorised by: {method} · {confidence}% confidence",
+    "provenanceNone": "Not yet classified — run “Reclassify & recompute”.",
+    "method": {
+      "OWNER": "your decision",
+      "RULE": "a merchant rule",
+      "CARRIED_FORWARD": "carried forward",
+      "FALLBACK": "no rule matched"
     }
   }
 }

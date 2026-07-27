@@ -7,6 +7,8 @@ import { autoClassify, computePeriod, operationsAssumptions } from "../services/
 import {
   ArchiveCategorySchema,
   BulkClassifyByMerchantSchema,
+  SetTransactionStatusSchema,
+  UpdateTransactionSchema,
   ClassifyTransactionsSchema,
   ClosePeriodSchema,
   CreateManualTransactionSchema,
@@ -111,13 +113,32 @@ export const operationsRouter = router({
   }),
 
   transactions: router({
+    /**
+     * Includes the ACTIVE classification so the UI can answer "why does this row have
+     * this category?" — method (OWNER / RULE / FALLBACK), the rule that fired, the
+     * confidence, and who decided. Without this, a surprising category is a mystery,
+     * and a mystery in a financial tool is a trust problem.
+     */
     list: operationsProcedure.input(ListTransactionsSchema).query(async ({ ctx, input }) => {
-      const rows = await operationsRepo.listTransactions(ctx.db, ctx.householdId, {
-        from: input.from,
-        to: input.to,
-        categoryId: input.categoryId,
-        limit: input.limit,
-        cursor: input.cursor,
+      const rows = await ctx.db.transaction.findMany({
+        where: {
+          householdId: ctx.householdId,
+          ...(input.from || input.to
+            ? { bookedAt: { ...(input.from ? { gte: input.from } : {}), ...(input.to ? { lte: input.to } : {}) } }
+            : {}),
+          ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+        },
+        orderBy: [{ bookedAt: "desc" }, { id: "desc" }],
+        take: input.limit,
+        ...(input.cursor ? { skip: 1, cursor: { id: input.cursor } } : {}),
+        include: {
+          classifications: {
+            where: { status: { not: "SUPERSEDED" } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { method: true, confidence: true, ruleVersion: true, status: true, decidedBy: true, createdAt: true },
+          },
+        },
       });
       const nextCursor = rows.length === input.limit ? rows[rows.length - 1]?.id : undefined;
       return { rows, nextCursor };
@@ -179,6 +200,72 @@ export const operationsRouter = router({
         });
         return { updated };
       }),
+
+    /** Full edit. Recomputes the merchant key when the description changes. */
+    update: operationsProcedure.input(UpdateTransactionSchema).mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.transaction.findUnique({
+        where: { id: input.id },
+        select: { householdId: true, currency: true, amount: true },
+      });
+      if (!existing || existing.householdId !== ctx.householdId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "TRANSACTION_NOT_FOUND" });
+      }
+      if (input.categoryId) {
+        const cat = await ctx.db.cashFlowCategory.findUnique({
+          where: { id: input.categoryId },
+          select: { householdId: true },
+        });
+        if (!cat || cat.householdId !== ctx.householdId) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "CATEGORY_NOT_FOUND" });
+        }
+      }
+
+      const data: Record<string, unknown> = {};
+      if (input.bookedAt !== undefined) data["bookedAt"] = input.bookedAt;
+      if (input.valueDate !== undefined) data["valueDate"] = input.valueDate;
+      if (input.amount !== undefined) data["amount"] = input.amount;
+      if (input.currency !== undefined) data["currency"] = input.currency;
+      if (input.categoryId !== undefined) data["categoryId"] = input.categoryId;
+      if (input.behavioralClass !== undefined) data["behavioralClass"] = input.behavioralClass;
+      if (input.instalmentNumber !== undefined) data["instalmentNumber"] = input.instalmentNumber;
+      if (input.instalmentTotal !== undefined) data["instalmentTotal"] = input.instalmentTotal;
+      if (input.isRecurringCandidate !== undefined) data["isRecurringCandidate"] = input.isRecurringCandidate;
+      if (input.description !== undefined) {
+        data["descriptionRedacted"] = input.description;
+        // The merchant key is DERIVED from the description; leaving a stale key would
+        // silently mis-group the transaction and poison owner memory.
+        data["merchantKey"] = normalizeMerchantKey(input.description) || null;
+      }
+
+      // amountBase is only safe to set directly in the household base currency; any
+      // other currency needs an FxRate, which the engine resolves (and refuses without).
+      const nextCurrency = input.currency ?? existing.currency;
+      if (input.amount !== undefined || input.currency !== undefined) {
+        data["amountBase"] = nextCurrency === ctx.baseCurrency
+          ? (input.amount ?? String(existing.amount))
+          : null;
+      }
+
+      await ctx.db.transaction.update({ where: { id: input.id }, data: data as never });
+      return { id: input.id };
+    }),
+
+    /**
+     * Remove (VOID) or restore. Never a hard delete — classification history is
+     * append-only evidence, and a voided row is excluded from every calculation
+     * anyway, so destroying it would only cost the audit trail.
+     */
+    setStatus: operationsProcedure.input(SetTransactionStatusSchema).mutation(async ({ ctx, input }) => {
+      const existing = await ctx.db.transaction.findUnique({
+        where: { id: input.id },
+        select: { householdId: true },
+      });
+      if (!existing || existing.householdId !== ctx.householdId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "TRANSACTION_NOT_FOUND" });
+      }
+      await ctx.db.transaction.update({ where: { id: input.id }, data: { status: input.status } });
+      return { id: input.id, status: input.status };
+    }),
 
     /**
      * Teach the classifier: apply one decision to EVERY transaction sharing a merchant

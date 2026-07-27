@@ -2,6 +2,52 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-27, session 10)
+
+- **M38a (transaction editing + provenance + guard test) code-complete — `m38a.patch` on M37.
+  NO MIGRATION, NO LOCKFILE CHANGE.** Owner-requested scope, ahead of the M38b ingestion work.
+  - **Transaction edit.** Every row is now fully editable — date, direction, amount, currency,
+    description, category, behaviour, instalments, recurring flag — via `transactions.update`.
+    Changing the description **recomputes `merchantKey`** (it is derived; a stale key would
+    mis-group the transaction and poison owner memory). Changing amount/currency resets
+    `amountBase` to null unless it is the base currency, so the engine re-resolves FX rather
+    than carrying a stale converted figure.
+  - **Remove = VOID, not DELETE**, and reversible. A voided transaction is excluded from every
+    calculation but keeps its append-only classification history. Destroying the row would only
+    cost the audit trail — the maths is identical either way.
+  - **Classification provenance.** Each row now shows HOW it got its category: method
+    (your decision / merchant rule / no rule matched), confidence %, `decidedBy`, and the
+    rules version. Raised because a row showed an unexpected category and nothing in the UI
+    could explain it. (Investigated: the classifier was correct — `ZZQQ WIDGET EMPORIUM`
+    resolves to `other.unclassified`, FALLBACK, confidence 0 — so the row had been changed by
+    a form submission. Unexplainable state in a financial tool is a trust problem regardless.)
+  - **`minPhaseGuard` test matrix added** (`packages/api/test/workflow-guard.test.ts`, mock-DB,
+    no Postgres needed): every probe × every phase, plus the property that distinguishes it from
+    `workflowGuard` — once reached, it STAYS open in later phases. This was a real coverage gap:
+    M36 shipped the guard with no test at all.
+  - Dead single-row `classifyTransactionAction` removed (superseded by the edit form); the
+    `transactions.classify` API procedure is retained.
+  - **Verified:** api guard tests 9 (6 new), engine-operations 66, domain 49, tsc clean, eslint
+    clean, i18n parity 1069/1069, `prisma validate` OK, `npm ci --dry-run` exit 0.
+
+- **CI failure explained, already fixed.** The failing run was on `90a37bd` (M36, before the
+  lockfix) — `npm ci` rejected the lock/package.json mismatch. `d97799b` fixed it; `origin/main`
+  (`af17e2b`) has a correct lockfile, verified by fresh clone. **Re-run the failed workflow.**
+- **GitHub auto-deploy is now connected** (first "via GitHub" deploy: the M36 lockfix).
+  `git push origin main` IS the deploy — do NOT also run `railway up`, that produces two
+  redundant builds. `docs/DEPLOY.md` corrected accordingly; deploy scripts no longer call it.
+
+### Known blind spot
+The sandbox has no Postgres and no root, so **DB-bound suites (`packages/db`, `packages/api`
+integration) only ever run in CI.** Everything else is verified locally before a patch is cut.
+
+## Next up
+
+**M38b — ingestion:** generic tabular adapter (CSV/XLSX, Windows-1255 + UTF-8 sniffing, header
+detection, debit/credit vs signed), saved `ImportMappingProfile`s, statement-range detection,
+`redact()` PII boundary, import preview/commit. Covers the OneZero XLS and Isracard HTML almost
+unchanged. Then the institution adapters (FIBI PDF, Isracard PDF, CAL PDF) + `us-bank-chase-csv`.
+
 ## Current state (2026-07-27, session 9)
 
 - **M37 (Financial Operations — dual-axis engine) code-complete — `m37.patch` on the M36 lockfix.

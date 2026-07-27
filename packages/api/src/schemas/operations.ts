@@ -121,3 +121,43 @@ export const BulkClassifyByMerchantSchema = z.object({
   categoryId: z.uuid(),
   behavioralClass: BehavioralClassSchema,
 });
+
+// ------------------------------------------------------------------ M38a --
+
+/**
+ * Full edit of a manually-entered or imported transaction. Every field optional —
+ * only what is sent is changed. Changing the amount or the description invalidates
+ * the derived merchant key, so the router recomputes it.
+ */
+export const UpdateTransactionSchema = z
+  .object({
+    id: z.uuid(),
+    bookedAt: z.coerce.date().optional(),
+    valueDate: z.coerce.date().nullable().optional(),
+    amount: SignedDecimalString.optional(),
+    currency: CurrencyCodeSchema.optional(),
+    description: z.string().min(1).max(400).optional(),
+    categoryId: z.uuid().nullable().optional(),
+    behavioralClass: BehavioralClassSchema.nullable().optional(),
+    instalmentNumber: z.number().int().min(1).max(999).nullable().optional(),
+    instalmentTotal: z.number().int().min(1).max(999).nullable().optional(),
+    isRecurringCandidate: z.boolean().optional(),
+  })
+  .refine(
+    (v) =>
+      v.instalmentNumber === null || v.instalmentTotal === null ||
+      v.instalmentNumber === undefined || v.instalmentTotal === undefined ||
+      v.instalmentNumber <= v.instalmentTotal,
+    { message: "instalmentNumber must not exceed instalmentTotal", path: ["instalmentNumber"] },
+  );
+
+/**
+ * Removal is a VOID, not a DELETE. A voided transaction is excluded from every
+ * calculation but keeps its classification history, which is append-only evidence —
+ * and it can be restored. Destroying the row would also destroy the audit trail of
+ * how it was ever classified.
+ */
+export const SetTransactionStatusSchema = z.object({
+  id: z.uuid(),
+  status: z.enum(["BOOKED", "PENDING", "VOID"]),
+});

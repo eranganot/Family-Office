@@ -49,21 +49,6 @@ export async function createManualTransactionAction(fd: FormData): Promise<void>
   redirect(`/${locale}/operations?created=1`);
 }
 
-export async function classifyTransactionAction(fd: FormData): Promise<void> {
-  const locale = str(fd, "locale");
-  const trpc = await serverCaller();
-  try {
-    await trpc.operations.transactions.classify({
-      transactionIds: [str(fd, "transactionId")],
-      categoryId: str(fd, "categoryId"),
-      behavioralClass: str(fd, "behavioralClass") as never,
-    });
-  } catch {
-    redirect(`/${locale}/operations?error=classify`);
-  }
-  redirect(`/${locale}/operations?classified=1`);
-}
-
 export async function upsertCategoryAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const parentId = str(fd, "parentId");
@@ -144,4 +129,51 @@ export async function bulkClassifyMerchantAction(fd: FormData): Promise<void> {
     redirect(`/${locale}/operations?error=classify`);
   }
   redirect(`/${locale}/operations?classified=1`);
+}
+
+export async function updateTransactionAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const direction = str(fd, "direction");
+  const rawAmount = str(fd, "amount").trim();
+  const magnitude = Math.abs(Number(rawAmount));
+  if (!Number.isFinite(magnitude) || magnitude === 0) {
+    redirect(`/${locale}/operations?error=amount`);
+  }
+  const amount = direction === "IN" ? String(magnitude) : String(-magnitude);
+  const categoryId = str(fd, "categoryId");
+  const behavioralClass = str(fd, "behavioralClass");
+  const instalmentNumber = str(fd, "instalmentNumber");
+  const instalmentTotal = str(fd, "instalmentTotal");
+
+  const trpc = await serverCaller();
+  try {
+    await trpc.operations.transactions.update({
+      id: str(fd, "id"),
+      bookedAt: new Date(str(fd, "bookedAt")),
+      amount,
+      currency: str(fd, "currency") as never,
+      description: str(fd, "description"),
+      categoryId: categoryId ? categoryId : null,
+      behavioralClass: behavioralClass ? (behavioralClass as never) : null,
+      instalmentNumber: instalmentNumber ? Number(instalmentNumber) : null,
+      instalmentTotal: instalmentTotal ? Number(instalmentTotal) : null,
+      isRecurringCandidate: fd.get("isRecurringCandidate") === "on",
+    });
+  } catch {
+    redirect(`/${locale}/operations?error=update&edit=${str(fd, "id")}`);
+  }
+  redirect(`/${locale}/operations?updated=1`);
+}
+
+/** Remove = VOID (reversible, keeps the classification history). Restore = BOOKED. */
+export async function setTransactionStatusAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const status = str(fd, "status");
+  const trpc = await serverCaller();
+  try {
+    await trpc.operations.transactions.setStatus({ id: str(fd, "id"), status: status as never });
+  } catch {
+    redirect(`/${locale}/operations?error=status`);
+  }
+  redirect(`/${locale}/operations?${status === "VOID" ? "removed" : "restored"}=1`);
 }

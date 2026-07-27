@@ -3,11 +3,12 @@ import { getTranslations } from "next-intl/server";
 import { Card, ErrorBanner, Explainer, Field, Select, SubmitButton, SuccessBanner, TextInput } from "../../../../components/fields";
 import {
   bulkClassifyMerchantAction,
-  classifyTransactionAction,
   closePeriodAction,
   createManualTransactionAction,
   recomputePeriodAction,
   reopenPeriodAction,
+  setTransactionStatusAction,
+  updateTransactionAction,
   upsertCategoryAction,
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
@@ -39,6 +40,7 @@ export default async function OperationsPage({
   searchParams: Promise<{
     error?: string; created?: string; classified?: string; categorySaved?: string;
     recomputed?: string; closed?: string; reopened?: string; tab?: string;
+    updated?: string; removed?: string; restored?: string; edit?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -81,6 +83,9 @@ export default async function OperationsPage({
           : sp.recomputed ? t("recomputed")
           : sp.closed ? t("closedOk")
           : sp.reopened ? t("reopenedOk")
+          : sp.updated ? t("updatedOk")
+          : sp.removed ? t("removedOk")
+          : sp.restored ? t("restoredOk")
           : undefined
         }
       />
@@ -329,68 +334,131 @@ export default async function OperationsPage({
       </Card>
 
       <Card title={t("transactions")}>
+        <p className="mb-4 text-xs text-neutral-500">{t("transactionsHint")}</p>
         {txns.length === 0 ? (
           <p className="text-sm text-neutral-500">{t("noTransactions")}</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200 text-start text-xs text-neutral-500">
-                <th className="py-2 text-start">{t("date")}</th>
-                <th className="py-2 text-start">{t("description")}</th>
-                <th className="py-2 text-start">{t("amount")}</th>
-                <th className="py-2 text-start">{t("category")}</th>
-                <th className="py-2 text-start">{t("behavioral")}</th>
-                <th className="py-2 text-start">{t("reclassify")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {txns.map((tx) => {
-                const cat = tx.categoryId ? byId.get(tx.categoryId) : undefined;
-                const amount = Number(tx.amount);
-                return (
-                  <tr key={tx.id} className="border-b border-neutral-100">
-                    <td className="py-2 whitespace-nowrap">{new Date(tx.bookedAt).toISOString().slice(0, 10)}</td>
-                    <td className="py-2">
-                      {tx.descriptionRedacted}
-                      {tx.instalmentTotal ? (
-                        <span className="ms-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700">
-                          {t("instalmentBadge", { n: tx.instalmentNumber ?? 1, total: tx.instalmentTotal })}
-                        </span>
-                      ) : null}
-                      {tx.isRecurringCandidate ? (
-                        <span className="ms-2 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700">{t("recurringBadge")}</span>
-                      ) : null}
-                    </td>
-                    <td className={`py-2 whitespace-nowrap ${amount < 0 ? "text-neutral-800" : "text-green-700"}`}>
-                      {formatMoney(Math.abs(amount), tx.currency, loc)}
-                    </td>
-                    <td className="py-2">
-                      {cat ? (locale === "he" ? cat.nameHe : cat.nameEn) : (
-                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700">{t("unclassifiedBadge")}</span>
+          <div className="flex flex-col gap-3">
+            {txns.map((tx) => {
+              const cat = tx.categoryId ? byId.get(tx.categoryId) : undefined;
+              const amount = Number(tx.amount);
+              const cls = tx.classifications[0];
+              const isEditing = sp.edit === tx.id;
+              const voided = tx.status === "VOID";
+              return (
+                <div
+                  key={tx.id}
+                  className={`rounded-xl border p-4 ${voided ? "border-neutral-200 bg-neutral-50 opacity-60" : "border-neutral-200"}`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 font-medium">
+                        <span>{tx.descriptionRedacted}</span>
+                        {voided ? (
+                          <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-600">{t("removedBadge")}</span>
+                        ) : null}
+                        {tx.instalmentTotal ? (
+                          <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700">
+                            {t("instalmentBadge", { n: tx.instalmentNumber ?? 1, total: tx.instalmentTotal })}
+                          </span>
+                        ) : null}
+                        {tx.isRecurringCandidate ? (
+                          <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700">{t("recurringBadge")}</span>
+                        ) : null}
+                      </p>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {new Date(tx.bookedAt).toISOString().slice(0, 10)}
+                        {" · "}
+                        {cat ? (locale === "he" ? cat.nameHe : cat.nameEn) : t("unclassifiedBadge")}
+                        {tx.behavioralClass ? ` · ${t(`behavioralClass.${tx.behavioralClass}`)}` : ""}
+                      </p>
+                      {/* Provenance: why does this row have this category? */}
+                      {cls ? (
+                        <p className="mt-1 text-xs text-neutral-400">
+                          {t("provenance", {
+                            method: t(`method.${cls.method}`),
+                            confidence: Math.round(Number(cls.confidence) * 100),
+                          })}
+                          {cls.decidedBy ? ` · ${cls.decidedBy}` : ""}
+                          {cls.ruleVersion ? ` · ${cls.ruleVersion}` : ""}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-neutral-400">{t("provenanceNone")}</p>
                       )}
-                    </td>
-                    <td className="py-2 text-xs text-neutral-500">
-                      {tx.behavioralClass ? t(`behavioralClass.${tx.behavioralClass}`) : "—"}
-                    </td>
-                    <td className="py-2">
-                      <form action={classifyTransactionAction} className="flex items-center gap-1">
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`whitespace-nowrap tabular-nums ${amount < 0 ? "text-neutral-800" : "text-green-700"}`}>
+                        {formatMoney(Math.abs(amount), tx.currency, loc)}
+                      </span>
+                      {isEditing ? (
+                        <a href={`/${locale}/operations`} className="text-xs text-neutral-500 underline">{t("cancel")}</a>
+                      ) : (
+                        <a href={`/${locale}/operations?edit=${tx.id}`} className="text-xs text-blue-600 underline">{t("edit")}</a>
+                      )}
+                      <form action={setTransactionStatusAction}>
                         <input type="hidden" name="locale" value={locale} />
-                        <input type="hidden" name="transactionId" value={tx.id} />
-                        <Select name="categoryId" defaultValue={tx.categoryId ?? ""} required>
-                          <option value="" disabled>{t("choose")}</option>
+                        <input type="hidden" name="id" value={tx.id} />
+                        <input type="hidden" name="status" value={voided ? "BOOKED" : "VOID"} />
+                        <button type="submit" className="text-xs text-neutral-500 underline">
+                          {voided ? t("restore") : t("remove")}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                  {isEditing ? (
+                    <form action={updateTransactionAction} className="mt-4 grid grid-cols-2 items-end gap-3 border-t border-neutral-100 pt-4 md:grid-cols-4">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="id" value={tx.id} />
+                      <Field label={t("date")}>
+                        <TextInput name="bookedAt" type="date" defaultValue={new Date(tx.bookedAt).toISOString().slice(0, 10)} required />
+                      </Field>
+                      <Field label={t("direction")}>
+                        <Select name="direction" defaultValue={amount < 0 ? "OUT" : "IN"}>
+                          <option value="OUT">{t("directionOut")}</option>
+                          <option value="IN">{t("directionIn")}</option>
+                        </Select>
+                      </Field>
+                      <Field label={t("amount")}>
+                        <TextInput name="amount" inputMode="decimal" defaultValue={Math.abs(amount)} required />
+                      </Field>
+                      <Field label={t("currency")}>
+                        <Select name="currency" defaultValue={tx.currency}>
+                          {["ILS", "USD", "EUR"].map((c) => <option key={c} value={c}>{c}</option>)}
+                        </Select>
+                      </Field>
+                      <Field label={t("description")}>
+                        <TextInput name="description" defaultValue={tx.descriptionRedacted} required maxLength={400} />
+                      </Field>
+                      <Field label={t("category")}>
+                        <Select name="categoryId" defaultValue={tx.categoryId ?? ""}>
+                          <option value="">{t("uncategorised")}</option>
                           {flat.map((c) => <option key={c.id} value={c.id}>{optionLabel(c, locale)}</option>)}
                         </Select>
-                        <Select name="behavioralClass" defaultValue={tx.behavioralClass ?? cat?.defaultBehavioralClass ?? "VARIABLE_DISCRETIONARY"}>
+                      </Field>
+                      <Field label={t("behavioral")}>
+                        <Select name="behavioralClass" defaultValue={tx.behavioralClass ?? ""}>
+                          <option value="">{t("behavioralFromCategory")}</option>
                           {BEHAVIORAL.map((b) => <option key={b} value={b}>{t(`behavioralClass.${b}`)}</option>)}
                         </Select>
-                        <button type="submit" className="text-xs text-blue-600 underline">{t("apply")}</button>
-                      </form>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </Field>
+                      <Field label={t("instalmentNumber")}>
+                        <TextInput name="instalmentNumber" inputMode="numeric" defaultValue={tx.instalmentNumber ?? ""} />
+                      </Field>
+                      <Field label={t("instalmentTotal")}>
+                        <TextInput name="instalmentTotal" inputMode="numeric" defaultValue={tx.instalmentTotal ?? ""} />
+                      </Field>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="isRecurringCandidate" defaultChecked={tx.isRecurringCandidate} />
+                        <span className="text-neutral-600">{t("recurring")}</span>
+                      </label>
+                      <SubmitButton label={t("saveChanges")} />
+                    </form>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         )}
       </Card>
 
