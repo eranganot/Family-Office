@@ -2,6 +2,48 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 17)
+
+- **M38e — PDF import rebuilt against the REAL files. `m38e.patch`. NO MIGRATION, NO LOCKFILE CHANGE.**
+  **⚠️ Owner must UNDO all previous PDF imports and re-import.**
+  - **METHOD CHANGE THAT MATTERS: the parser was finally run against the owner's actual PDFs**
+    (`npx tsx` probe over the uploads, output inspected row by row). Three consecutive mis-parses
+    shipped because every earlier test used SYNTHETIC fixtures built from my own *description* of
+    the files rather than the files themselves. Fixtures now carry real cell coordinates.
+  - **THE BIG ONE: pdfjs returns Hebrew in CORRECT LOGICAL ORDER.** All the "RTL repair"
+    machinery (`repairVisualOrder`, per-word repair, orientation scoring, lexicon tie-breaks)
+    was built to fix a reversal that came from **pdfplumber — the Python tool I analysed with —
+    not from pdfjs, which is what actually runs.** It was corrupting text that was already
+    correct. **No character reversal happens in the PDF path any more.**
+  - **The real defect was WORD ORDER, not character order.** Cells were joined in ascending x,
+    but Hebrew reads right-to-left: «בעמ-מ» «העתקות» «גרמושקה» became "בעמ-מ העתקות גרמושקה" —
+    every word right, order reversed. Hebrew now joins DESCENDING x. Numbers stay ASCENDING and
+    are joined with NO separator, because producers split them ("₪130." + "85"); joining those
+    RTL yields "85 ₪130." and parses as 85.
+  - **New `pdf-table.ts` replaces the line heuristic for all PDFs.** Header located by Hebrew
+    labels, columns by x, cells assigned nearest-wins (a tight tolerance silently dropped the
+    date column, which is what produced zero rows). Bank: debit→negative, credit→positive,
+    balance never a movement. Card: charge column, always an outflow unless an explicit minus.
+    Foreign originals captured ($10.00 → ₪29.79). Two-digit years accepted locally.
+  - **Description assembly is layout-specific** (verified against the files): BANK takes the
+    letters line ABOVE plus the numeric line BELOW ("משיכת שיק" + "1750400"); CARD takes the
+    inline merchant only, with the lines beneath ("הוראת קבע", "הנחה") used as CONTEXT for
+    recurring/instalment detection, not glued onto the name.
+  - **Headerless statements (Visa CAL) derive columns from the data.** The description column is
+    derived only from cells CONTAINING LETTERS — averaging all middles pulls it onto the
+    split-amount fragment and drops most rows (41→13 in the real file).
+  - **`allOutflow` added for tabular imports.** Card CSV/HTML lists charges as POSITIVE numbers,
+    so every card expense was importing as income — the owner's "numbers are opposite" report.
+  - **Measured against the real files:** FIBI bank 111 rows / 1 unparsed (salary +36,986.94 now
+    correct); Isracard 1069 12 rows, 7796 18 rows; CAL 74 rows. Hebrew readable throughout.
+  - **Verified:** ingestion 99 tests (14 new, real coordinates), tsc clean, eslint clean,
+    i18n parity 1128/1128.
+
+### Lesson recorded
+**Never validate a parser against fixtures derived from a different tool's output.** The
+pdfplumber-vs-pdfjs mismatch cost three shipped mis-parses. Run the real artefact through the
+real code path and read the output.
+
 ## Current state (2026-07-27, session 16)
 
 - **M38d — bank-PDF column parser + undo import. `m38d.patch`. NO MIGRATION, NO LOCKFILE CHANGE.**

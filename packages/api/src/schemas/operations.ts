@@ -182,6 +182,7 @@ export const ColumnMappingSchema = z.object({
 export const MappingProfileSchema = z
   .object({
     amountMode: AmountModeSchema,
+    allOutflow: z.boolean().default(false),
     columns: ColumnMappingSchema,
     defaultCurrency: CurrencyCodeSchema.default("ILS"),
     dayFirst: z.boolean().default(true),

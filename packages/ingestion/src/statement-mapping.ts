@@ -28,6 +28,12 @@ export type AmountMode = "SIGNED" | "DEBIT_CREDIT";
 
 export interface MappingProfile {
   amountMode: AmountMode;
+  /**
+   * Card statements list every charge as a POSITIVE number — there is no sign, because
+   * the whole document is charges. Without this flag every card expense imports as
+   * income. Only an explicit minus (a refund) flips it back.
+   */
+  allOutflow?: boolean | undefined;
   columns: ColumnMapping;
   defaultCurrency: string;
   /** Israeli statements are day-first; kept explicit so US exports can differ. */
@@ -127,7 +133,13 @@ export function applyMapping(
 
     let signed: string | undefined;
     if (profile.amountMode === "SIGNED") {
-      signed = parseLocalizedDecimal(cell(rec, c.amount));
+      const parsed = parseLocalizedDecimal(cell(rec, c.amount));
+      if (parsed !== undefined && profile.allOutflow) {
+        // Preserve an explicit minus (refund); otherwise force outflow.
+        signed = Number(parsed) < 0 ? String(Math.abs(Number(parsed))) : String(-Math.abs(Number(parsed)));
+      } else {
+        signed = parsed;
+      }
     } else {
       const debit = parseLocalizedDecimal(cell(rec, c.debit));
       const credit = parseLocalizedDecimal(cell(rec, c.credit));

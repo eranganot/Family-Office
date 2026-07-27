@@ -1,6 +1,5 @@
 import { containsHebrew, repairHebrewWords } from "@wealthos/domain";
-import { extractPdfCellLines, extractPdfLines } from "./pdf/extract";
-import { parseBankTable } from "./pdf-bank-table";
+import { extractPdfLines } from "./pdf/extract";
 import { toggleVisualHebrewLine } from "./normalize";
 import { IL_STATEMENT_LEXICON } from "./tabular";
 import { normaliseMinus, parseInstalments, looksRecurring } from "./statement-mapping";
@@ -280,8 +279,6 @@ export async function parsePdfStatement(
   profileOverride?: PdfProfile | undefined,
 ): Promise<PdfStatementResult> {
   const lines = await extractPdfLines(bytes);
-  const issuer = profileOverride?.issuer ?? guessIssuer(lines.map((l) => l.text).join("\n"));
-
   /**
    * BANK statements go through the COLUMN-AWARE parser, never the line heuristic.
    *
@@ -294,33 +291,5 @@ export async function parsePdfStatement(
    * falling back to the heuristic. Silently importing plausible-looking wrong numbers
    * into a financial ledger is far worse than importing nothing.
    */
-  if (issuer === "FIBI_BANK") {
-    const cellLines = await extractPdfCellLines(bytes);
-    const table = parseBankTable(cellLines);
-    if (!table.columnsFound) {
-      return {
-        rows: [],
-        unparsed: ["BANK_COLUMNS_NOT_DETECTED"],
-        issuerGuess: issuer,
-        totalLines: cellLines.length,
-      };
-    }
-    return {
-      rows: table.rows.map((r) => ({
-        bookedAt: r.bookedAt,
-        descriptionRaw: r.descriptionRaw,
-        amount: r.amount,
-        currency: "ILS",
-        reference: r.reference,
-        isRecurringCandidate: false,
-        pending: false,
-        page: r.page,
-      })),
-      unparsed: table.unparsed,
-      issuerGuess: issuer,
-      totalLines: cellLines.length,
-    };
-  }
-
   return parseStatementLines(lines, profileOverride);
 }

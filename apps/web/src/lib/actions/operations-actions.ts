@@ -232,6 +232,7 @@ export async function commitStatementAction(fd: FormData): Promise<void> {
 
   const mapping = {
     amountMode,
+    allOutflow: fd.get("allOutflow") === "on",
     defaultCurrency: (str(fd, "defaultCurrency") || "ILS") as never,
     dayFirst: true,
     columns: {

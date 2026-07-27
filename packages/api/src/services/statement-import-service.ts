@@ -2,7 +2,7 @@ import type { PrismaClient } from "@wealthos/db";
 import { fileStore } from "@wealthos/db";
 import {
   applyMapping, decodeBytes, detectHeaderRow, guessMapping, normaliseGrid, parseCsvGrid,
-  parseHtmlGrid, parsePdfStatement, pdfRowsToDrafts, REDACTION_VERSION, sniffFormat, toRecords,
+  parseHtmlGrid, extractPdfCellLines, parsePdfTable, pdfRowsToDrafts, REDACTION_VERSION, sniffFormat, toRecords,
   type MappingProfile, type TransactionDraft,
 } from "@wealthos/ingestion";
 
@@ -103,11 +103,13 @@ export async function previewStatement(
   if (sniff.format === "PDF") {
     // PDFs have no columns to map — the layout IS the format, so there is no mapping
     // wizard for them. Rows go through pdfRowsToDrafts, which calls the same redact().
-    const parsed = await parsePdfStatement(bytes);
+    const parsed = parsePdfTable(await extractPdfCellLines(bytes));
     drafts = pdfRowsToDrafts(parsed.rows, memberNames);
-    issues = parsed.unparsed.map((raw, i) => ({ rowIndex: i, reason: "UNPARSED_LINE", raw }));
+    issues = parsed.columnsFound
+      ? parsed.unparsed.map((raw: string, i: number) => ({ rowIndex: i, reason: "UNPARSED_LINE", raw }))
+      : [{ rowIndex: 0, reason: "UNPARSED_LINE", raw: "BANK_COLUMNS_NOT_DETECTED" }];
     totalRows = parsed.rows.length + parsed.unparsed.length;
-    guessed = { issuer: parsed.issuerGuess };
+    guessed = { issuer: parsed.kind ?? "UNKNOWN", columns: parsed.detectedColumns.join(",") };
   } else {
     const built = buildTable(bytes, sniff.format, sniff.encoding);
     headerRowIndex = built.headerRowIndex;
@@ -175,9 +177,10 @@ export async function commitStatement(
   let drafts: TransactionDraft[];
   let profile: MappingProfile | { issuer: string };
   if (sniff.format === "PDF") {
-    const parsed = await parsePdfStatement(bytes);
+    const parsed = parsePdfTable(await extractPdfCellLines(bytes));
+    if (!parsed.columnsFound) throw new Error("BANK_COLUMNS_NOT_DETECTED");
     drafts = pdfRowsToDrafts(parsed.rows, memberNames);
-    profile = { issuer: parsed.issuerGuess };
+    profile = { issuer: parsed.kind ?? "UNKNOWN" };
   } else {
     const { table } = buildTable(bytes, sniff.format, sniff.encoding);
     const p = overrideMapping ?? defaultProfile(table.headers);

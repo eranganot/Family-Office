@@ -1358,6 +1358,7 @@
     "batchRows": "{n} transactions",
     "undoImport": "Undo",
     "undoneOk": "Undone — {n} transactions removed. Press “Reclassify & recompute” to refresh the figures.",
-    "bankColumnsFailed": "This looks like a bank statement, but its table columns could not be identified, so nothing was imported. Importing plausible-but-wrong numbers into your ledger would be worse than importing nothing — send me the file's layout and I'll fix the parser."
+    "bankColumnsFailed": "This looks like a bank statement, but its table columns could not be identified, so nothing was imported. Importing plausible-but-wrong numbers into your ledger would be worse than importing nothing — send me the file's layout and I'll fix the parser.",
+    "allOutflow": "All amounts are charges (card statement)"
   }
 }

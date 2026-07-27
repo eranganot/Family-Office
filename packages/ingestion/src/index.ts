@@ -42,7 +42,7 @@ export type {
 } from "./statement-mapping";
 export { parsePdfStatement, parseStatementLines, guessIssuer, PDF_PROFILES } from "./pdf-statement";
 export type { PdfStatementRow, PdfStatementResult, PdfIssuer, PdfProfile } from "./pdf-statement";
-export { parseBankTable, detectColumns } from "./pdf-bank-table";
-export type { BankRow, BankTableResult } from "./pdf-bank-table";
 export { extractPdfCellLines } from "./pdf/extract";
 export type { CellLine, TextCell } from "./pdf/extract";
+export { parsePdfTable } from "./pdf-table";
+export type { PdfTableRow, PdfTableResult, TableKind } from "./pdf-table";

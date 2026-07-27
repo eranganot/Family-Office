@@ -303,6 +303,10 @@ export default async function OperationsPage({
                     {["ILS", "USD", "EUR"].map((c) => <option key={c} value={c}>{c}</option>)}
                   </Select>
                 </Field>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="allOutflow" />
+                  <span className="text-neutral-600">{t("allOutflow")}</span>
+                </label>
                 <Field label={t("saveProfileAs")}>
                   <TextInput name="saveProfileAs" placeholder={t("saveProfilePlaceholder")} />
                 </Field>
