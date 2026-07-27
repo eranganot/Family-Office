@@ -496,20 +496,16 @@ export const operationsRouter = router({
      * once, and without this list the extra files would be invisible after the first
      * preview.
      */
-    pending: operationsProcedure.query(async ({ ctx }) => {
-      const docs = await ctx.db.document.findMany({
-        where: { householdId: ctx.householdId },
+    pending: operationsProcedure.query(async ({ ctx }) =>
+      // Relation filter, NOT take-then-filter: an earlier version paginated first and
+      // then removed imported rows, so `pending` (newest 25) and `commitAllPending`
+      // (oldest 25) silently operated on DIFFERENT sets of files.
+      ctx.db.document.findMany({
+        where: { householdId: ctx.householdId, batches: { none: { status: "COMPLETED" } } },
         orderBy: { uploadedAt: "desc" },
-        take: 25,
         select: { id: true, filename: true, uploadedAt: true, mimeType: true },
-      });
-      const imported = await ctx.db.importBatch.findMany({
-        where: { status: "COMPLETED", documentId: { in: docs.map((d) => d.id) } },
-        select: { documentId: true },
-      });
-      const done = new Set(imported.map((b) => b.documentId));
-      return docs.filter((d) => !done.has(d.id));
-    }),
+      }),
+    ),
 
     /**
      * Import every pending statement that needs no column mapping (PDF, and HTML/CSV
@@ -519,20 +515,12 @@ export const operationsRouter = router({
      * mapping decision are skipped and reported, not guessed at.
      */
     commitAllPending: operationsProcedure.mutation(async ({ ctx }) => {
+      // EXACTLY the same set the `pending` list shows — see the note there.
       const docs = await ctx.db.document.findMany({
-        where: { householdId: ctx.householdId },
+        where: { householdId: ctx.householdId, batches: { none: { status: "COMPLETED" } } },
         orderBy: { uploadedAt: "asc" },
-        take: 25,
         select: { id: true, filename: true },
       });
-      const done = new Set(
-        (
-          await ctx.db.importBatch.findMany({
-            where: { status: "COMPLETED", documentId: { in: docs.map((d) => d.id) } },
-            select: { documentId: true },
-          })
-        ).map((b) => b.documentId),
-      );
 
       let inserted = 0;
       let duplicates = 0;
@@ -540,7 +528,6 @@ export const operationsRouter = router({
       const skipped: Array<{ filename: string; reason: string }> = [];
 
       for (const doc of docs) {
-        if (done.has(doc.id)) continue;
         try {
           const pv = await previewStatement(ctx.db, ctx.householdId, doc.id);
           if (pv.unsupportedReason) {
@@ -568,7 +555,8 @@ export const operationsRouter = router({
       }
 
       const classified = inserted > 0 ? await autoClassify(ctx.db, ctx.householdId) : { classified: 0, suspense: 0 };
-      return { inserted, duplicates, imported, skipped, ...classified };
+      // `considered` makes the on-screen numbers reconcile: considered = imported + skipped.
+      return { considered: docs.length, inserted, duplicates, imported, skipped, ...classified };
     }),
 
     profiles: operationsProcedure.query(async ({ ctx }) =>

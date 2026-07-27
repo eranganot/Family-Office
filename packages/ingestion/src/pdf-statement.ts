@@ -1,6 +1,7 @@
-import { containsHebrew } from "@wealthos/domain";
+import { containsHebrew, repairHebrewWords } from "@wealthos/domain";
 import { extractPdfLines } from "./pdf/extract";
 import { toggleVisualHebrewLine } from "./normalize";
+import { IL_STATEMENT_LEXICON } from "./tabular";
 import { normaliseMinus, parseInstalments, looksRecurring } from "./statement-mapping";
 
 /**
@@ -142,6 +143,32 @@ interface Parsed {
   description: string;
 }
 
+/**
+ * Strip the debris a statement line leaves behind once the date and amounts are removed:
+ * voucher/terminal/reference numbers, stray date fragments, and orphaned punctuation.
+ * Without this the merchant name arrives buried in digits, which both reads badly and
+ * defeats merchant-key grouping.
+ */
+function cleanDescription(raw: string): string {
+  let d = raw
+    .replace(/[₪$€]/g, " ")
+    // Any remaining dd/mm/yy(yy) or dd.mm.yy fragment.
+    .replace(/\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b/g, " ")
+    // ISO fragments that survive redaction/formatting.
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
+    // Reference / terminal / voucher numbers: 4+ digit runs carry no merchant signal.
+    .replace(/\b\d{4,}\b/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    // Leading/trailing orphaned punctuation left by the removals.
+    .replace(/^[\s.,;:/\-|]+|[\s.,;:/\-|]+$/g, "")
+    .trim();
+  // Per-WORD Hebrew repair: a line can be mixed (one word reversed, the next correct),
+  // which a single per-line orientation choice cannot fix.
+  d = repairHebrewWords(d, IL_STATEMENT_LEXICON);
+  return d;
+}
+
 /** Attempt to parse one orientation of a line. */
 function parseOrientation(line: string): Parsed | undefined {
   const cleaned = normaliseMinus(line);
@@ -156,7 +183,7 @@ function parseOrientation(line: string): Parsed | undefined {
   for (const a of amounts) {
     description = description.replace(new RegExp(`[₪$€]?\\s*${a.value.replace(".", "\\.")}`), " ");
   }
-  description = description.replace(/[₪$€]/g, " ").replace(/\s{2,}/g, " ").trim();
+  description = cleanDescription(description);
   return { iso, amounts, description };
 }
 

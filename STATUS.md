@@ -2,6 +2,44 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-27, session 15)
+
+- **M38c-fix3 — `m38c-fix3.patch`. NO MIGRATION, NO LOCKFILE CHANGE.** All owner-reported.
+  - **"Import all" only saw SOME files.** `pending` listed the **newest 25** documents then
+    filtered out imported ones; `commitAllPending` iterated the **oldest 25**. Opposite
+    orderings, so the two operated on **different sets** — with older documents filling the
+    window, the newly uploaded PDFs were never reached, which is why 14 files produced
+    "0 imported, 6 need attention". Both now use one exact relation filter
+    (`batches: { none: { status: "COMPLETED" } }`) with no pagination, so the list and the
+    action are the same set by construction. Result also returns `considered`, so the numbers
+    on screen reconcile (`considered = imported + skipped`).
+  - **PDF descriptions carried debris.** Voucher/terminal numbers, leftover date fragments and
+    orphaned punctuation were left in the merchant name — which read badly AND defeated
+    merchant-key grouping. New `cleanDescription()` strips 4+ digit runs, date fragments and
+    edge punctuation.
+  - **Mixed-direction Hebrew.** Per-LINE orientation choice cannot fix a line where one word is
+    reversed and the next is not. Added `repairHebrewWords()` in domain — per-word judgement
+    using the final-letter invariant plus a lexicon. Merchant vocabulary added to
+    `IL_STATEMENT_LEXICON` (מינימרקט, שוק, מסעדה, דלק…) because words with **no final form are
+    orthographically undecidable** and the lexicon is the only available signal.
+    **Residual limit, tested and documented:** on a mixed line, an unknown word with no final
+    letter can still land reversed. Editing the row fixes it, and the merchant key stays stable
+    either way, so grouping still works.
+  - **Suspense queue rebuilt as cards.** Was a cramped table that clipped its text. Now shows
+    **the amount** (it was missing entirely — the single most useful signal when deciding what
+    a transaction was), date, current category and confidence, with a roomy form beneath.
+  - **Category picker is ONE control again.** Its history: plain `<select>` (a wall of options)
+    → search only (lost browsing) → search + select side by side (duplicated clutter, per owner)
+    → **single `<input list>` + `<datalist>`**: typing filters, the arrow reveals the full list.
+    Browse and search in one field, still no client JS. A hidden field preserves the current
+    category when the box is left untouched.
+  - **Verified:** ingestion 85 tests (7 new), engine-operations 66, domain 49, tsc clean, eslint
+    clean, i18n parity 1121/1121.
+
+### Standing note on patch delivery
+The owner sometimes pushes a phase while the next fix is being prepared. **Always re-check
+`origin/main` and rebase the fix as its own patch** rather than amending an already-pushed commit.
+
 ## Current state (2026-07-27, session 14)
 
 - **M38c-fix2 (PDF preview blank + Import all) — `m38c-fix2.patch` on b1a032d.

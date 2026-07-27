@@ -136,3 +136,55 @@ describe("parseStatementLines — robustness", () => {
     expect(rows[0]?.descriptionRaw).toContain("הספרים");
   });
 });
+
+describe("description cleanup — the debris a statement line leaves behind", () => {
+  it("strips voucher/terminal numbers from the merchant name", () => {
+    const { rows } = parseStatementLines([L(visual("26.07.26 מינימרקט שוק ₪85.00 13795 1622761"))]);
+    expect(rows[0]?.descriptionRaw).not.toMatch(/\d{4,}/);
+    expect(rows[0]?.descriptionRaw).toContain("מינימרקט");
+  });
+
+  it("strips leftover date fragments", () => {
+    const { rows } = parseStatementLines([L(visual("20.07.26 קצבת ילדים ₪853.00 20/07/2026"))]);
+    expect(rows[0]?.descriptionRaw).not.toContain("20/07/2026");
+  });
+
+  it("repairs a reversed word that carries a decisive final letter", () => {
+    // "ילדים" ends in a final mem; reversed, that lands word-initially and is detectable.
+    const mixed = `${[..."ילדים"].reverse().join("")} קצבת`;
+    const { rows } = parseStatementLines([L(`26.07.26 ${mixed} ₪85.00`)]);
+    expect(rows[0]?.descriptionRaw).toContain("ילדים");
+  });
+
+  it("repairs a reversed word with NO final letters via the merchant lexicon", () => {
+    // "מינימרקט" has no final form, so orthography alone cannot decide it. The lexicon
+    // is the ONLY signal available - which is exactly why it exists.
+    const { rows } = parseStatementLines([
+      L(`26.07.26 ${[..."מינימרקט"].reverse().join("")} ₪85.00`),
+    ]);
+    expect(rows[0]?.descriptionRaw).toContain("מינימרקט");
+  });
+
+  it("recovers an unknown merchant with no final letter via the LINE-level orientation choice", () => {
+    // Even with no lexicon entry and no final letter, a single-merchant line is still
+    // recoverable: the whole-line orientation that reads better wins.
+    const odd = [..."בסטרו"].reverse().join("");
+    const { rows } = parseStatementLines([L(`26.07.26 ${odd} ₪85.00`)]);
+    expect(rows[0]?.descriptionRaw).toContain("בסטרו");
+  });
+
+  it("RESIDUAL LIMIT: on a mixed line, an unknown no-final-letter word can still land reversed", () => {
+    // Honest boundary. "ילדים" carries a decisive final mem and pins the line's
+    // orientation; an unknown neighbour with neither signal follows that choice, right
+    // or wrong. The owner can fix such a row by editing it, and the merchant key stays
+    // stable either way, so grouping still works.
+    const line = `26.07.26 בסטרו ילדים ₪85.00`;
+    const { rows } = parseStatementLines([L(line)]);
+    expect(rows[0]?.descriptionRaw).toContain("ילדים");
+  });
+
+  it("does not leave orphaned punctuation at the edges", () => {
+    const { rows } = parseStatementLines([L(visual("26.07.26 . חנות , ₪85.00"))]);
+    expect(rows[0]?.descriptionRaw).toMatch(/^[^\s.,;:/|-]/);
+  });
+});

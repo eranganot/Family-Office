@@ -1,13 +1,16 @@
 /**
- * Category picker: a type-to-search box AND a full dropdown, side by side.
+ * Category picker — ONE control that both searches and browses.
  *
- * The tree is ~117 entries, so a bare <select> means scrolling a wall of options — but
- * search alone removes the ability to BROWSE, which matters when you don't yet know
- * what the tree contains. Both controls are rendered and both are submitted; the
- * server action prefers the search box when it has text, and falls back to the select.
+ * History worth keeping: this was first a plain <select> (a wall of ~117 options), then
+ * a search box (which lost browsing), then search + select side by side (which was
+ * duplicated clutter, especially in a table row). The resolution is a single native
+ * <input list> + <datalist>: typing filters, and the dropdown arrow reveals the whole
+ * list — browse and search in one field, with NO client JavaScript, so this stays a
+ * server component and RTL keeps working.
  *
- * Native <input list> + <datalist> gives real typeahead with NO client JavaScript, so
- * this stays a server component and RTL keeps working.
+ * Options carry their parent path ("דיור › ארנונה") so repeated leaf names ("אחר") are
+ * unambiguous. The server action resolves the label back to an id, falling back to the
+ * hidden current-value field when the box is left untouched.
  */
 export interface PickerCategory {
   id: string;
@@ -35,12 +38,6 @@ export function categoryLabel(
   return parts.join(" › ");
 }
 
-/** Indented so hierarchy is readable inside a flat <select>. */
-function indentedLabel(c: PickerCategory, locale: string): string {
-  const depth = c.key.split(".").length - 1;
-  return `${"  ".repeat(depth)}${locale === "he" ? c.nameHe : c.nameEn}`;
-}
-
 export function CategoryPicker({
   name,
   categories,
@@ -50,7 +47,6 @@ export function CategoryPicker({
   required,
   listId,
   compact,
-  labels,
 }: {
   /** Base field name. Submits `${name}Label` (search) and `${name}Id` (dropdown). */
   name: string;
@@ -62,43 +58,32 @@ export function CategoryPicker({
   /** Datalists are shared by id; pass a stable one so the options render once. */
   listId: string;
   compact?: boolean | undefined;
-  labels: { none: string; income: string; expense: string };
 }) {
   const byId = new Map(categories.map((c) => [c.id, c]));
-  const income = categories.filter((c) => c.axis === "INCOME");
-  const expense = categories.filter((c) => c.axis === "EXPENSE");
   const cls = compact
     ? "min-w-44 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-xs"
     : "w-full min-w-48 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm";
 
+  const current = defaultCategoryId ? byId.get(defaultCategoryId) : undefined;
   return (
-    <span className="flex flex-wrap items-center gap-2">
+    <>
       <input
         type="text"
         name={`${name}Label`}
         list={listId}
+        defaultValue={current ? categoryLabel(current, byId, locale) : ""}
         placeholder={placeholder}
         autoComplete="off"
+        required={required}
         className={cls}
       />
-      <select name={`${name}Id`} defaultValue={defaultCategoryId ?? ""} required={required} className={cls}>
-        <option value="">{labels.none}</option>
-        <optgroup label={labels.expense}>
-          {expense.map((c) => (
-            <option key={c.id} value={c.id}>{indentedLabel(c, locale)}</option>
-          ))}
-        </optgroup>
-        <optgroup label={labels.income}>
-          {income.map((c) => (
-            <option key={c.id} value={c.id}>{indentedLabel(c, locale)}</option>
-          ))}
-        </optgroup>
-      </select>
+      {/* Preserves the existing category when the box is left untouched. */}
+      <input type="hidden" name={`${name}Id`} value={defaultCategoryId ?? ""} />
       <datalist id={listId}>
         {categories.map((c) => (
           <option key={c.id} value={categoryLabel(c, byId, locale)} />
         ))}
       </datalist>
-    </span>
+    </>
   );
 }

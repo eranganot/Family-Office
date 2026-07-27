@@ -124,3 +124,28 @@ export function toggleVisualHebrewLine(line: string): string {
     .map((tok) => (HEBREW_RE.test(tok) ? reverseChars(tok) : tok))
     .join("");
 }
+
+/**
+ * Repair Hebrew WORD BY WORD rather than per line.
+ *
+ * A statement line can come out mixed — one merchant word reversed, the next correct —
+ * because PDF producers emit runs in different directions. Choosing a single
+ * orientation for the whole line therefore cannot fix it; each word must be judged on
+ * its own, using the same orthographic invariant (final letters may appear only at a
+ * word's end), with an optional lexicon for words that have no final form at all.
+ */
+export function repairHebrewWords(text: string, lexicon: readonly string[] = []): string {
+  const lex = new Set(lexicon);
+  return text
+    .split(/(\s+)/)
+    .map((token) => {
+      if (!HEBREW_RE.test(token)) return token;
+      const reversed = reverseChars(token);
+      // A lexicon hit is decisive either way.
+      if (lex.has(token)) return token;
+      if (lex.has(reversed)) return reversed;
+      const score = visualOrderScore(token);
+      return score > 0 ? reversed : token;
+    })
+    .join("");
+}

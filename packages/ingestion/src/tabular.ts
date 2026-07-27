@@ -160,6 +160,13 @@ export const IL_STATEMENT_LEXICON = [
   "משכורת", "העברה", "הפקדה", "משיכה", "שיק", "כרטיס", "אשראי", "ריבית", "עמלה", "מזומן",
   "תשלום", "תשלומים", "מתוך", "הוראת", "קבע", "מטבע", "ערך", "תנועה", "פעולה", "שובר",
   "בית", "עסק", "פירוט", "סניף", "חשבון", "בנק",
+  // High-frequency MERCHANT words. Many Hebrew words (e.g. "מינימרקט") contain no
+  // final letter, so their reversal is orthographically undetectable — the lexicon is
+  // the only thing that can decide them. Kept to common, generic nouns rather than
+  // specific vendors, which would be both endless and household-identifying.
+  "מינימרקט", "מרקט", "סופר", "מכולת", "חנות", "מסעדה", "פיצה", "קפה", "דלק", "תחנת",
+  "ביטוח", "עירייה", "עיריית", "חשמל", "מים", "ארנונה", "משכנתא", "רפואי", "מרקחת",
+  "קצבת", "ילדים", "שוק", "מרכז", "חניון", "חניה", "נסיעות", "תחבורה", "רכב", "טיסה",
 ];
 
 /** Repair visual-order Hebrew in headers and cells (real exports ship reversed text). */
