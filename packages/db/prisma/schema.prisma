@@ -67,6 +67,15 @@ model Household {
   users           User[]
   monitoringRuns   MonitoringRun[]
   monitoringAlerts MonitoringAlert[]
+
+  // M36 — Financial Operations
+  cashFlowCategories CashFlowCategory[]
+  transactions       Transaction[]
+  operatingPeriods   OperatingPeriod[]
+  calendarEvents     CalendarEvent[]
+  recurringDecisions RecurringDecision[]
+  actionEvents       ActionEvent[]
+  mappingProfiles    ImportMappingProfile[]
 }
 
 enum MemberRole {
@@ -172,6 +181,7 @@ model LedgerItem {
   evidenceFor         RecommendationEvidence[]
 
   @@index([householdId, kind, status])
+  transactions Transaction[] // M36 (evidence link; never counted by net-worth)
 }
 
 model OwnershipShare {
@@ -423,6 +433,7 @@ model ImportBatch {
 
   importedFields ImportedField[]
   suspenseItems  SuspenseItem[]
+  transactions   Transaction[] // M36
 }
 
 model ImportedField {
@@ -585,10 +596,30 @@ model Recommendation {
   status                RecommendationStatus @default(PROPOSED)
   generatedAt           DateTime             @default(now())
 
+  // --- M36: operational extension (all additive; every pre-M36 row stays valid) ---
+  origin            RecommendationOrigin @default(STRATEGIC)
+  cadence           ActionCadence        @default(ONE_TIME)
+  dueDate           DateTime?            @db.Date
+  expiresAt         DateTime?            @db.Date
+  difficulty        ActionDifficulty?
+  reversibility     Reversibility?
+  impactMonthlyBase Decimal?             @db.Decimal(18, 4)
+  impactAnnualBase  Decimal?             @db.Decimal(18, 4)
+  impactEoyBase     Decimal?             @db.Decimal(18, 4)
+  operatingPeriodId String?
+  calendarEventId   String?
+
   assumptionPins RecommendationAssumption[]
   goalImpacts    RecommendationGoal[]
   evidence       RecommendationEvidence[]
   journal        DecisionJournalEntry[]
+
+  dependsOn    RecommendationDependency[] @relation("dependent")
+  dependents   RecommendationDependency[] @relation("prerequisite")
+  actionEvents ActionEvent[]
+
+  @@index([householdId, origin, status])
+  @@index([householdId, dueDate])
 }
 
 model RecommendationAssumption {
@@ -793,4 +824,345 @@ model StrategyPlan {
   createdAt     DateTime @default(now())
 
   @@index([householdId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// M36 — Financial Operations & Cash Flow (docs/architecture/07-financial-operations.md)
+//
+// Design rules enforced here:
+//  * Additive only. No existing column/enum value is dropped or renamed.
+//  * `Transaction` is the OBSERVATION layer. It is never read by NetWorthCalculator
+//    or the strategy analyzers — `CashFlowDetail` streams remain canonical (owner
+//    decision D5). Transactions are evidence FOR a stream, not a replacement.
+//  * No raw description column exists. Only `descriptionRedacted` is persisted,
+//    post-`redact()` (owner decision D3 / §7.1).
+// ---------------------------------------------------------------------------
+
+enum RecommendationOrigin {
+  STRATEGIC // default — every pre-M36 row
+  OPERATIONAL
+}
+
+enum ActionCadence {
+  ONE_TIME
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+  EVENT_DRIVEN
+}
+
+enum ActionDifficulty {
+  TRIVIAL
+  EASY
+  MODERATE
+  HARD
+}
+
+enum Reversibility {
+  REVERSIBLE
+  PARTIALLY_REVERSIBLE
+  IRREVERSIBLE
+}
+
+/// Dependency edge between action items. Acyclicity is enforced by the domain
+/// service, not by the DB (existing convention for cross-aggregate rules).
+model RecommendationDependency {
+  dependentId    String
+  prerequisiteId String
+  dependent      Recommendation @relation("dependent", fields: [dependentId], references: [id])
+  prerequisite   Recommendation @relation("prerequisite", fields: [prerequisiteId], references: [id])
+
+  @@id([dependentId, prerequisiteId])
+  @@index([prerequisiteId])
+}
+
+enum BehavioralClass {
+  FIXED_CONTRACTUAL // mortgage, arnona, tuition, insurance premiums
+  VARIABLE_DISCRETIONARY // dining, entertainment, shopping, travel
+  FINANCIAL_DRAG // amlot, FX markup, overdraft interest, dormant subscriptions
+  SAVINGS_FLOW // pension / hishtalmut / gemel / standing-order savings — NOT an expense (D7)
+  TRANSFER // between own accounts, and card settlements — excluded from income AND expense
+}
+
+enum CategoryAxis {
+  INCOME
+  EXPENSE
+}
+
+/// Configurable functional hierarchy (axis 1 of the dual-axis engine). Seeded with
+/// an IL-aware default tree; system rows are archivable but never deletable.
+model CashFlowCategory {
+  id                     String             @id @default(uuid())
+  householdId            String
+  household              Household          @relation(fields: [householdId], references: [id])
+  parentId               String?
+  parent                 CashFlowCategory?  @relation("categoryTree", fields: [parentId], references: [id])
+  children               CashFlowCategory[] @relation("categoryTree")
+  axis                   CategoryAxis
+  key                    String // stable slug, e.g. "housing.arnona"
+  nameEn                 String
+  nameHe                 String
+  defaultBehavioralClass BehavioralClass
+  /// Bridge to the canonical stream model — lets a category roll up into the
+  /// CashFlowType the strategy engine already understands.
+  mapsToFlowType         CashFlowType?
+  isSystem               Boolean            @default(false)
+  isArchived             Boolean            @default(false)
+  sortOrder              Int                @default(0)
+  createdAt              DateTime           @default(now())
+
+  transactions    Transaction[]
+  classifications TransactionClassification[]
+
+  @@unique([householdId, key])
+  @@index([householdId, axis, parentId])
+}
+
+enum TransactionSource {
+  IMPORT
+  MANUAL
+  DERIVED
+}
+
+/// PENDING = seen but not yet settled (e.g. CAL "עסקאות בתהליך קליטה"). Excluded
+/// from period computation until BOOKED.
+enum TransactionStatus {
+  PENDING
+  BOOKED
+  VOID
+}
+
+model Transaction {
+  id                  String            @id @default(uuid())
+  householdId         String
+  household           Household         @relation(fields: [householdId], references: [id])
+  importBatchId       String?
+  importBatch         ImportBatch?      @relation(fields: [importBatchId], references: [id])
+  source              TransactionSource
+  status              TransactionStatus @default(BOOKED)
+  bookedAt            DateTime          @db.Date
+  valueDate           DateTime?         @db.Date
+  amount              Decimal           @db.Decimal(18, 4) // signed: negative = outflow
+  currency            String            @db.Char(3)
+  amountBase          Decimal?          @db.Decimal(18, 4) // null when no FxRate exists — never guessed
+  fxRateId            String?
+  descriptionRedacted String // post-redaction only; no raw column exists by design
+  merchantKey         String? // normalised, Hebrew-aware
+  counterpartyMasked  String? // last-4 style, never full
+
+  /// Evidence link back to the canonical stream this observation supports.
+  ledgerItemId String?
+  ledgerItem   LedgerItem? @relation(fields: [ledgerItemId], references: [id])
+
+  categoryId      String?
+  category        CashFlowCategory? @relation(fields: [categoryId], references: [id])
+  behavioralClass BehavioralClass? // owner override of the category default
+
+  // --- Israeli instalments (תשלומים). Remaining instalments are committed FUTURE
+  // outflows and are emitted as CalendarEvents, not as this month's expense.
+  instalmentNumber Int?
+  instalmentTotal  Int?
+  originalAmount   Decimal? @db.Decimal(18, 4) // סכום עסקה when it differs from סכום חיוב
+
+  /// Links a bank-side aggregate card settlement to the itemised card statement,
+  /// so the two never double-count. See Appendix B.3.
+  settlementLinkId     String?
+  isRecurringCandidate Boolean @default(false) // e.g. "הוראת קבע" marker
+  isDuplicateOf        String?
+  externalRef          String? // idempotent re-import key
+
+  createdAt       DateTime                    @default(now())
+  classifications TransactionClassification[]
+
+  @@unique([householdId, externalRef])
+  @@index([householdId, bookedAt])
+  @@index([householdId, categoryId, bookedAt])
+  @@index([householdId, merchantKey])
+  @@index([householdId, status])
+  @@index([settlementLinkId])
+}
+
+enum ClassificationStatus {
+  AUTO
+  SUSPENSE // confidence below operations_classification_min_confidence
+  CONFIRMED
+  SUPERSEDED
+}
+
+/// Full classification history — how a transaction got its dual-axis tags and which
+/// rule version decided it. Exactly one non-SUPERSEDED row per transaction.
+model TransactionClassification {
+  id              String               @id @default(uuid())
+  transactionId   String
+  transaction     Transaction          @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  categoryId      String
+  category        CashFlowCategory     @relation(fields: [categoryId], references: [id])
+  behavioralClass BehavioralClass
+  confidence      Decimal              @db.Decimal(4, 3) // 0.000–1.000
+  method          String // RULE | ALIAS | OWNER | CARRIED_FORWARD | FALLBACK
+  ruleVersion     String?
+  status          ClassificationStatus @default(AUTO)
+  decidedBy       String?
+  createdAt       DateTime             @default(now())
+
+  @@index([transactionId, status])
+}
+
+enum OperatingPeriodStatus {
+  OPEN
+  CLOSED
+}
+
+/// Source coverage for a period. Never silently COMPLETE — a known-but-unimported
+/// source (e.g. the US Chase account) keeps the period PARTIAL and says so.
+enum PeriodCoverage {
+  COMPLETE
+  PARTIAL
+  AGGREGATE_ONLY
+}
+
+/// A household-month. `computed` freezes the full normalised cash-flow result at
+/// close with engineVersion + assumption pins — the same reproducibility contract
+/// as StrategyPlan.
+model OperatingPeriod {
+  id            String                @id @default(uuid())
+  householdId   String
+  household     Household             @relation(fields: [householdId], references: [id])
+  year          Int
+  month         Int // 1–12
+  status        OperatingPeriodStatus @default(OPEN)
+  engineVersion String?
+  /// { income{net,byCategory[]}, expenses{byCategory[],byBehavioral{}}, savingsFlows[],
+  ///   transfers[], surplusBase, safeToSpend{}, workingCapitalBase, leakageBase, healthScore{} }
+  computed      Json?
+  pins          Json? // [{ key, version }]
+
+  surplusBase          Decimal?       @db.Decimal(18, 4)
+  surplusIsProvisional Boolean        @default(true) // "contains unverified transactions"
+  coverage             PeriodCoverage @default(PARTIAL)
+  unverifiedCount      Int            @default(0)
+  unverifiedAmountBase Decimal?       @db.Decimal(18, 4)
+  reviewNote           String?
+  closedAt             DateTime?
+  createdAt            DateTime       @default(now())
+
+  @@unique([householdId, year, month])
+  @@index([householdId, year, month])
+}
+
+enum CalendarEventKind {
+  TAX_DEADLINE
+  BITUACH_LEUMI
+  PENSION_WINDOW
+  HISHTALMUT_CEILING
+  GEMEL_CONTRIBUTION
+  MORTGAGE_RESET
+  INSURANCE_RENEWAL
+  ARNONA
+  VEHICLE_LICENSE
+  VEHICLE_INSURANCE
+  SCHOOL_PAYMENT
+  CHILDCARE_PAYMENT
+  SALARY_BONUS
+  HOLIDAY_SPENDING
+  ANNUAL_SUBSCRIPTION
+  INSTALMENT // remaining תשלומים on a card purchase
+  REVIEW
+  OTHER
+}
+
+enum CalendarEventStatus {
+  SCHEDULED
+  DUE
+  DONE
+  SKIPPED
+  EXPIRED
+}
+
+model CalendarEvent {
+  id                  String              @id @default(uuid())
+  householdId         String
+  household           Household           @relation(fields: [householdId], references: [id])
+  kind                CalendarEventKind
+  titleEn             String
+  titleHe             String
+  dueDate             DateTime            @db.Date
+  windowDays          Int                 @default(0)
+  amountBase          Decimal?            @db.Decimal(18, 4)
+  isCashImpacting     Boolean             @default(false) // feeds the liquidity forecast
+  status              CalendarEventStatus @default(SCHEDULED)
+  ruleId              String?
+  recurringDecisionId String?
+  recurringDecision   RecurringDecision?  @relation(fields: [recurringDecisionId], references: [id])
+  ledgerItemId        String?
+  transactionId       String? // instalment origin
+  sourceNote          String? // provenance: STATUTORY | HOUSEHOLD | DERIVED
+  completedAt         DateTime?
+  createdAt           DateTime            @default(now())
+
+  @@index([householdId, dueDate, status])
+  @@index([householdId, kind])
+}
+
+/// Recurring operational decision ("review insurance annually"). Emits future
+/// CalendarEvents on its cadence; never emits into the past.
+model RecurringDecision {
+  id            String        @id @default(uuid())
+  householdId   String
+  household     Household     @relation(fields: [householdId], references: [id])
+  key           String // stable slug, e.g. "review.mortgage"
+  titleEn       String
+  titleHe       String
+  cadence       ActionCadence
+  anchorDate    DateTime      @db.Date
+  leadDays      Int           @default(14)
+  isActive      Boolean       @default(true)
+  lastEmittedAt DateTime?
+  createdAt     DateTime      @default(now())
+
+  events CalendarEvent[]
+
+  @@unique([householdId, key])
+}
+
+/// Append-only operational telemetry. The spec's `ActionItemTelemetry` is a COMPUTED
+/// projection over this table + DecisionJournalEntry (owner decision D1) — acceptance
+/// rate, completion rate, average time-to-completion, dismissal reasons. No metric is
+/// stored denormalised.
+model ActionEvent {
+  id               String                @id @default(uuid())
+  householdId      String
+  household        Household             @relation(fields: [householdId], references: [id])
+  recommendationId String
+  recommendation   Recommendation        @relation(fields: [recommendationId], references: [id])
+  fromStatus       RecommendationStatus?
+  toStatus         RecommendationStatus
+  dismissalReason  String? // NOT_RELEVANT | TOO_HARD | DISAGREE | ALREADY_DONE | LATER | OTHER
+  note             String?
+  actor            String
+  at               DateTime              @default(now())
+
+  @@index([householdId, at])
+  @@index([recommendationId, at])
+}
+
+/// Saved column-mapping profile for the generic tabular adapter — what makes "any
+/// bank export" work before an institution-specific adapter exists.
+model ImportMappingProfile {
+  id            String    @id @default(uuid())
+  householdId   String
+  household     Household @relation(fields: [householdId], references: [id])
+  name          String
+  institutionId String?
+  adapterId     String
+  /// { headerRow, encoding, dateFormat, amountMode: SIGNED|DEBIT_CREDIT,
+  ///   columns: { date, description, amount?, debit?, credit?, currency?, ref?, balance? } }
+  mapping       Json
+  version       Int       @default(1)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([householdId, name])
 }

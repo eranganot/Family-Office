@@ -29,7 +29,8 @@
     "journal": "Journal",
     "scenarios": "Scenarios",
     "monitoring": "Monitoring",
-    "allocation": "Allocation"
+    "allocation": "Allocation",
+    "operations": "Operations"
   },
   "phase": {
     "label": "Current phase",
@@ -1174,5 +1175,61 @@
     "blockAllocation": "Approve your deployment plan below to continue",
     "finalPhase": "This is the final phase — monitoring runs continuously.",
     "orGoBack": "Or go back to"
+  },
+  "operations": {
+    "explainer": {
+      "title": "Financial Operations",
+      "p1": "This is the operational workspace: it converts each month's income into long-term wealth according to your approved strategy. It is not a budget — it never limits your spending. It finds where new money should go.",
+      "p2": "Every expense carries two tags at once: what it is (Housing, Food) and how it behaves (contractual, discretionary, or avoidable leakage). The behavioural tag is what makes surplus and Safe-to-Spend computable."
+    },
+    "addTransaction": "Add a transaction",
+    "addTransactionHint": "Manual entry for now. Statement import (bank, credit card) arrives in a later phase.",
+    "transactions": "Transactions",
+    "noTransactions": "No transactions yet. Add one above to see the dual-axis tagging in action.",
+    "categories": "Category tree",
+    "categoriesHint": "{count} categories seeded. System categories can be renamed, re-parented or archived — never deleted, because classification history references them.",
+    "date": "Date",
+    "direction": "Direction",
+    "directionIn": "Money in",
+    "directionOut": "Money out",
+    "amount": "Amount",
+    "currency": "Currency",
+    "description": "Description",
+    "category": "Category",
+    "behavioral": "Behaviour",
+    "behavioralFromCategory": "Use category default",
+    "uncategorised": "Leave uncategorised",
+    "instalmentNumber": "Instalment #",
+    "instalmentTotal": "of",
+    "instalmentBadge": "Instalment {n}/{total}",
+    "recurring": "Recurring (standing order)",
+    "recurringBadge": "Recurring",
+    "unclassifiedBadge": "Unclassified",
+    "reclassify": "Reclassify",
+    "apply": "Apply",
+    "choose": "Choose…",
+    "save": "Save transaction",
+    "created": "Transaction saved.",
+    "classified": "Classification updated.",
+    "categorySaved": "Category saved.",
+    "addCategory": "Add category",
+    "categoryKey": "Key (slug)",
+    "nameEn": "Name (English)",
+    "nameHe": "Name (Hebrew)",
+    "parent": "Parent category",
+    "noParent": "Top level",
+    "axisLabel": "Axis",
+    "axis": {
+      "INCOME": "Income",
+      "EXPENSE": "Expense"
+    },
+    "behavioralClass": {
+      "FIXED_CONTRACTUAL": "Fixed / contractual",
+      "VARIABLE_DISCRETIONARY": "Variable / discretionary",
+      "FINANCIAL_DRAG": "Financial drag",
+      "SAVINGS_FLOW": "Savings flow",
+      "TRANSFER": "Transfer (not counted)"
+    },
+    "engineVersion": "Operations engine {version}"
   }
 }

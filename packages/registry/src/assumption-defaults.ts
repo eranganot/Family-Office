@@ -66,4 +66,23 @@ export const DEFAULT_ASSUMPTIONS: Array<{
     unit: "WEIGHTS",
     description: "Recommendation priority-score weights (sum 100); consumed by the M6 strategy engine",
   },
+  // --- M36: Financial Operations (docs/architecture/07 §4.3) -------------------
+  // Thresholds live here, never in code — a change is a new assumption VERSION,
+  // which invalidates pinned recommendations exactly as it does for strategy.
+  { key: "operations_classification_min_confidence", value: 0.85, unit: "RATIO", description: "Transaction classification below this confidence is routed to the Suspense Queue (non-blocking: the amount is still counted, in Other/Unclassified)" },
+  { key: "operations_normalisation_min_days", value: 20, unit: "DAYS", description: "Minimum active statement days before a multi-month/custom range may be normalised to a monthly baseline; below it the engine refuses rather than extrapolating" },
+  { key: "operations_baseline_months", value: 3, unit: "MONTHS", description: "Trailing window used to derive a category's monthly baseline from observed transactions" },
+  { key: "working_capital_months", value: 1.5, unit: "MONTHS", description: "Working-capital buffer target in months of expenses (distinct from emergency_fund_months, which is the 6-month emergency reserve)" },
+  { key: "leakage_subscription_dormant_days", value: 90, unit: "DAYS", description: "A recurring charge with no offsetting usage signal for this many days becomes a dormant-subscription leakage candidate" },
+  { key: "leakage_fx_markup_notice_pct", value: 1.5, unit: "PCT", description: "Spread between a transaction's implied FX rate and the reference rate above which conversion markup is flagged as financial drag" },
+  { key: "leakage_bank_fee_monthly_notice_base", value: 40, unit: "ILS", description: "Monthly bank fees (amlot) above which fee drag is flagged" },
+  { key: "safe_to_spend_window_days", value: 30, unit: "DAYS", description: "Horizon for the Discretionary Liquidity Floor (Safe-to-Spend) calculation" },
+  { key: "calendar_upcoming_window_days", value: 60, unit: "DAYS", description: "Horizon for 'upcoming financial deadlines' on the dashboard and in the liquidity forecast" },
+  { key: "operations_surplus_drift_pct", value: 20, unit: "PCT", description: "Deviation of realised monthly surplus from the approved plan's assumption that raises a monitoring alert" },
+  {
+    key: "health_score_weights",
+    value: { cashflow: 30, liquidity: 25, leakage: 15, execution: 15, goals: 15 },
+    unit: "WEIGHTS",
+    description: "Household Financial Health Score composition (sum 100); consumed by the M42 dashboard",
+  },
 ];

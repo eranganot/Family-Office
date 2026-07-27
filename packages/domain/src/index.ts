@@ -19,3 +19,22 @@ export { validateGoalDependencies } from "./goals/dependencies";
 export type { GoalEdge, DependencyValidation } from "./goals/dependencies";
 export { SnapshotPayloadSchema, SnapshotItemSchema, SnapshotGoalSchema, SnapshotMemberSchema } from "./strategy/snapshot";
 export type { SnapshotPayload, SnapshotItem, SnapshotGoal, SnapshotMember } from "./strategy/snapshot";
+export {
+  HEBREW_RE,
+  containsHebrew,
+  hasBidiControls,
+  stripBidiControls,
+  cleanHebrew,
+  reverseChars,
+  visualOrderScore,
+  looksVisualOrder,
+  repairVisualOrder,
+  foldHebrewFinals,
+  toggleVisualHebrewLine,
+} from "./text/hebrew";
+export {
+  DEFAULT_CATEGORY_TREE,
+  UNCLASSIFIED_KEY,
+  flattenCategoryTree,
+} from "./operations/categories";
+export type { SeedCategory, BehavioralClassKey, CategoryAxisKey } from "./operations/categories";

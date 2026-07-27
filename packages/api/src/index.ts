@@ -16,6 +16,7 @@ import { householdRouter } from "./routers/household";
 import { ledgerRouter } from "./routers/ledger";
 import { workflowRouter } from "./routers/workflow";
 import { monitoringRouter } from "./routers/monitoring";
+import { operationsRouter } from "./routers/operations";
 import { router } from "./trpc";
 
 export const appRouter = router({
@@ -38,6 +39,7 @@ export const appRouter = router({
   journal: journalRouter,
   scenarios: scenariosRouter,
   monitoring: monitoringRouter,
+  operations: operationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -4,29 +4,16 @@
  * unparseable input returns undefined, never a fabricated value.
  */
 
-const HEBREW_RE = /[֐-׿]/;
-const NIQQUD_RE = /[֑-ׇ]/g;
+// M36: the Hebrew/RTL primitives moved to @wealthos/domain so that engine-operations
+// can share them (boundary rules forbid engine -> ingestion). Re-exported here so the
+// ingestion public API and every existing adapter/test keep working unchanged.
+import { HEBREW_RE, cleanHebrew, containsHebrew, reverseChars } from "@wealthos/domain";
 
-export function containsHebrew(s: string): boolean {
-  return HEBREW_RE.test(s);
-}
+export { containsHebrew, cleanHebrew };
 
-/** Strip niqqud/cantillation and directional control characters; collapse whitespace. */
-export function cleanHebrew(s: string): string {
-  return s
-    .replace(NIQQUD_RE, "")
-    .replace(/[‎‏‪-‮⁦-⁩]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Some PDF extractors return Hebrew in visual (reversed) order. Heuristic:
- * if a token is Hebrew and its reversal matches a known lexicon entry, reverse it.
- * Used only by adapters that detect visual-order output; logical-order text passes through.
- */
+/** @deprecated use `reverseChars` from @wealthos/domain */
 export function reverseVisualHebrew(s: string): string {
-  return [...s].reverse().join("");
+  return reverseChars(s);
 }
 
 /** "1,234.56" | "1.234,56" | "₪ 1,234.56" | "1,234.56-" → "1234.56" (decimal string) or undefined. */

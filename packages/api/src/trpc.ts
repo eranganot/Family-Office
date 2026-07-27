@@ -66,3 +66,45 @@ export function workflowGuard(required: WorkflowState) {
     return next({ ctx: { ...ctx, householdId: household.id } });
   });
 }
+
+/**
+ * M36 — cross-phase guard for Financial Operations (owner decision D2).
+ *
+ * `workflowGuard` locks a procedure to EXACTLY one phase, which is right for the
+ * strategic loop. Operations runs on an independent monthly cadence and must never
+ * block, or be blocked by, that loop — so it uses a MINIMUM phase instead: once the
+ * household has reached VERIFICATION, the operational workspace stays available in
+ * every later phase. WorkflowState itself is unchanged; no new state was added.
+ */
+const PHASE_ORDER: readonly WorkflowState[] = [
+  "MAPPING",
+  "VERIFICATION",
+  "ALLOCATION",
+  "STRATEGY",
+  "MONITORING",
+] as const;
+
+export function minPhaseGuard(min: WorkflowState) {
+  return protectedProcedure.use(async ({ ctx, next }) => {
+    const household = await ctx.db.household.findFirst({
+      select: { id: true, workflowState: true, baseCurrency: true },
+    });
+    if (!household) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No household bootstrapped" });
+    }
+    const currentIdx = PHASE_ORDER.indexOf(household.workflowState);
+    const minIdx = PHASE_ORDER.indexOf(min);
+    if (currentIdx < minIdx) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Requires workflow state ${min} or later, current state is ${household.workflowState}`,
+      });
+    }
+    return next({
+      ctx: { ...ctx, householdId: household.id, baseCurrency: household.baseCurrency },
+    });
+  });
+}
+
+/** Every Financial Operations procedure is built on this. */
+export const operationsProcedure = minPhaseGuard("VERIFICATION");

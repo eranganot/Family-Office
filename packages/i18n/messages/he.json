@@ -29,7 +29,8 @@
     "journal": "יומן",
     "scenarios": "תרחישים",
     "monitoring": "ניטור",
-    "allocation": "הקצאה"
+    "allocation": "הקצאה",
+    "operations": "תפעול"
   },
   "phase": {
     "label": "שלב נוכחי",
@@ -1174,5 +1175,61 @@
     "blockAllocation": "אשרו את תוכנית הפריסה למטה כדי להמשיך",
     "finalPhase": "זהו השלב האחרון — הניטור פועל ברציפות.",
     "orGoBack": "או חזרה ל"
+  },
+  "operations": {
+    "explainer": {
+      "title": "תפעול פיננסי",
+      "p1": "זהו חלל העבודה התפעולי: הוא ממיר את ההכנסה של כל חודש לעושר ארוך טווח בהתאם לאסטרטגיה שאישרתם. זו אינה תוכנית תקציב — היא לעולם אינה מגבילה את ההוצאות שלכם, אלא מאתרת לאן כסף חדש צריך ללכת.",
+      "p2": "כל הוצאה נושאת שני תגים בו-זמנית: מה היא (דיור, מזון) וכיצד היא מתנהגת (חוזית, שיקולית, או דליפה שניתן להימנע ממנה). התג ההתנהגותי הוא שמאפשר לחשב עודף חודשי ו״בטוח להוצאה״."
+    },
+    "addTransaction": "הוספת תנועה",
+    "addTransactionHint": "כרגע הזנה ידנית. ייבוא דפי בנק וכרטיסי אשראי יגיע בשלב מאוחר יותר.",
+    "transactions": "תנועות",
+    "noTransactions": "אין עדיין תנועות. הוסיפו אחת למעלה כדי לראות את הסיווג הדו-צירי בפעולה.",
+    "categories": "עץ הקטגוריות",
+    "categoriesHint": "{count} קטגוריות נטענו. קטגוריות מערכת ניתנות לשינוי שם, להעברה או לארכוב — לעולם לא למחיקה, מכיוון שהיסטוריית הסיווג מפנה אליהן.",
+    "date": "תאריך",
+    "direction": "כיוון",
+    "directionIn": "כסף נכנס",
+    "directionOut": "כסף יוצא",
+    "amount": "סכום",
+    "currency": "מטבע",
+    "description": "תיאור",
+    "category": "קטגוריה",
+    "behavioral": "התנהגות",
+    "behavioralFromCategory": "ברירת המחדל של הקטגוריה",
+    "uncategorised": "להשאיר ללא סיווג",
+    "instalmentNumber": "תשלום מס׳",
+    "instalmentTotal": "מתוך",
+    "instalmentBadge": "תשלום {n} מתוך {total}",
+    "recurring": "הוראת קבע",
+    "recurringBadge": "הוראת קבע",
+    "unclassifiedBadge": "לא מסווג",
+    "reclassify": "סיווג מחדש",
+    "apply": "החל",
+    "choose": "בחרו…",
+    "save": "שמירת תנועה",
+    "created": "התנועה נשמרה.",
+    "classified": "הסיווג עודכן.",
+    "categorySaved": "הקטגוריה נשמרה.",
+    "addCategory": "הוספת קטגוריה",
+    "categoryKey": "מפתח (slug)",
+    "nameEn": "שם (אנגלית)",
+    "nameHe": "שם (עברית)",
+    "parent": "קטגוריית אב",
+    "noParent": "רמה עליונה",
+    "axisLabel": "ציר",
+    "axis": {
+      "INCOME": "הכנסה",
+      "EXPENSE": "הוצאה"
+    },
+    "behavioralClass": {
+      "FIXED_CONTRACTUAL": "קבועה / חוזית",
+      "VARIABLE_DISCRETIONARY": "משתנה / שיקולית",
+      "FINANCIAL_DRAG": "דליפה פיננסית",
+      "SAVINGS_FLOW": "זרם חיסכון",
+      "TRANSFER": "העברה (לא נספר)"
+    },
+    "engineVersion": "מנוע תפעול {version}"
   }
 }

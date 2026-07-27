@@ -22,7 +22,8 @@
     "@wealthos/engine-goals": "*",
     "@wealthos/engine-strategy": "*",
     "@wealthos/engine-scenario": "*",
-    "@wealthos/engine-monitoring": "*"
+    "@wealthos/engine-monitoring": "*",
+    "@wealthos/engine-operations": "*"
   },
   "devDependencies": {
     "@wealthos/config": "*",

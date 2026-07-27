@@ -7,4 +7,6 @@ export { documentsRepo } from "./repositories/documents";
 export type { CreateDocumentInput } from "./repositories/documents";
 export { DiskFileStore, fileStore, sha256Of } from "./file-store";
 export type { FileStore } from "./file-store";
+export { operationsRepo } from "./repositories/operations";
+export type { CategoryNode, CreateTransactionInput } from "./repositories/operations";
 export * from "@prisma/client";

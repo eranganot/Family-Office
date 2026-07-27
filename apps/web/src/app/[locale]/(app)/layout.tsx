@@ -47,6 +47,7 @@ export default async function AppLayout({
           { href: "/documents", label: t("nav.documents") },
           { href: "/verification", label: t("nav.verification") },
           { href: "/allocation", label: t("nav.allocation") },
+          { href: "/operations", label: t("nav.operations") },
           { href: "/goals", label: t("nav.goals") },
           { href: "/strategy", label: t("nav.strategy") },
           { href: "/scenarios", label: t("nav.scenarios") },

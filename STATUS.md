@@ -2,6 +2,67 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-27, session 8)
+
+- **M36 (Financial Operations — core context) code-complete — `m36.patch` on 6961e95. HAS A MIGRATION.**
+  First milestone of the Financial Operations & Cash Flow module (design package:
+  `docs/architecture/07-financial-operations.md`, 955 lines, owner-approved 2026-07-27).
+  **Nothing existing changes behaviour** — a household that never opens the Operations tab is
+  served identically.
+  - **Schema (+13 models/enums, migration `20260727090000_m36_operations_core`, additive only):**
+    `CashFlowCategory` (configurable functional tree), `Transaction` (OBSERVATION layer — never read
+    by NetWorthCalculator or the strategy analyzers; `CashFlowDetail` streams stay canonical),
+    `TransactionClassification` (append-only decision history w/ rule provenance), `OperatingPeriod`
+    (the household-month, freezes `computed` + pins at close), `CalendarEvent`, `RecurringDecision`,
+    `ActionEvent` (append-only telemetry), `ImportMappingProfile`, `RecommendationDependency`.
+    `Recommendation` gains 11 additive columns (`origin`, `cadence`, `dueDate`, `expiresAt`,
+    `difficulty`, `reversibility`, impact×3, period/calendar links) — every pre-M36 row valid on
+    landing, no data-migration script. **No new `WorkflowState`, no new `RecommendationStatus`.**
+  - **Owner decisions locked (doc 07 §1):** D1 extend existing engines (no parallel allocation/action
+    system); D2 operations is cross-phase via new `minPhaseGuard("VERIFICATION")`, NOT a 6th phase;
+    D3 **no LLM anywhere** — deterministic classification only; D5 transactions are evidence, streams
+    canonical; D7 surplus is net-of-payroll, pension/hishtalmut are SAVINGS_FLOW not expense.
+  - **New package `packages/engine-operations`** (boundary-clean: engine→domain/db/registry only).
+    `OPERATIONS_ENGINE_VERSION`, read-model contracts (`MonthlyCashFlow`, `VerifiedSurplus`, `Refusal`),
+    deterministic `normalizeMerchantKey`.
+  - **Hebrew/RTL primitives moved to `packages/domain/src/text/hebrew.ts`** and shared by BOTH
+    `ingestion` and `engine-operations` (boundaries forbid engine→ingestion; duplicating was the
+    alternative). New **lexicon-independent** visual-order detector using Hebrew final-letter
+    position — works on arbitrary merchant names, unlike the pension doc's keyword lexicon.
+    `ingestion/normalize.ts` re-exports from domain, so every existing adapter/test is untouched.
+  - **11 new assumption keys** (classification confidence 0.85, normalisation min days, baseline
+    months, working-capital months, leakage thresholds, safe-to-spend window, health-score weights).
+    ⚠️ These are NEW assumption versions → **pinned pre-M36 recommendations are invalidated on deploy;
+    rerun strategy once after M36** (existing, correct invalidation rule).
+  - **API:** `operations` router (categories tree/upsert/archive, transactions list/createManual/
+    classify) on `operationsProcedure`; Zod schemas in `schemas/operations.ts`. Cycle guard on
+    category re-parent; fallback category cannot be archived.
+  - **UI:** new cross-phase `/operations` tab (nav entry, NOT in the phase strip, no `phase-gate`),
+    manual transaction entry with dual-axis tagging, transaction table with inline reclassify,
+    category tree view + add-category form. Bilingual (i18n parity 1011/1011 keys).
+  - **Verified:** domain 49 tests (15 new), engine-operations 17 (new), ingestion 17, engine-strategy 61,
+    eslint boundaries clean, tsc clean (domain/db/registry/api/ingestion/engine-operations/web),
+    `prisma validate` OK.
+- **Real statement formats catalogued (doc 07 Appendix B)** from six owner-supplied exports.
+  **Two banks (FIBI, OneZero) + two card issuers (Isracard ×3 cards, Visa CAL), five adapters.**
+  Two findings that changed the design: (1) **card settlements double-count** — the bank carries the
+  card bill as one aggregate debit while the card statement itemises it; bank-side settlement lines
+  become `TRANSFER` only when a reconciling card statement exists, else `AGGREGATE_ONLY`;
+  (2) **instalments (תשלומים) are committed FUTURE outflows** → `CalendarEvent(INSTALMENT)` feeding
+  the liquidity forecast, plus 3 `Transaction` columns. Owner facts: **two earners** (per-member
+  ceiling utilisation), a **US Chase account** pending (USD as a first-class account currency),
+  history depth Jan–Jul 2026.
+- **Owner sign-offs 2026-07-27:** B5 transactions may live in Railway Postgres — OK. B6 default
+  category tree — OK. **B2: IL 2025 tax matrices APPROVED** (still to flip `ownerReviewed=true` at
+  `/registry`; **2026 remains unreviewed**, incl. the null bituach-leumi employee rates).
+
+## Next up
+
+**M37 — dual-axis engine:** deterministic classification (merchant rules in the registry), monthly
+normalisation (activeDays divisor), **verified surplus** (net-of-payroll), safe-to-spend, working
+capital, suspense queue (non-blocking), leakage aggregation, settlement-linking + instalment→calendar.
+Then M38a generic tabular adapter + `redact()`, M38b the five institution adapters.
+
 ## Current state (2026-07-20, session 8)
 
 - **M34 (strategy synthesis, Variant A) + M35 (dashboard v2) code-complete — patch `m34-m35.patch`,
