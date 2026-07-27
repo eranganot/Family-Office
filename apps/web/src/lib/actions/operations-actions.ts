@@ -24,7 +24,7 @@ export async function createManualTransactionAction(fd: FormData): Promise<void>
   // positive number, which is far less error-prone than asking for a signed value.
   const amount = direction === "IN" ? String(magnitude) : String(-magnitude);
 
-  const categoryId = str(fd, "categoryId");
+  const categoryId = await resolveCategoryLabel(str(fd, "categoryLabel"), locale);
   const behavioralClass = str(fd, "behavioralClass");
   const instalmentNumber = str(fd, "instalmentNumber");
   const instalmentTotal = str(fd, "instalmentTotal");
@@ -51,7 +51,7 @@ export async function createManualTransactionAction(fd: FormData): Promise<void>
 
 export async function upsertCategoryAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
-  const parentId = str(fd, "parentId");
+  const parentId = await resolveCategoryLabel(str(fd, "parentLabel"), locale);
   const trpc = await serverCaller();
   try {
     await trpc.operations.categories.upsert({
@@ -120,9 +120,11 @@ export async function bulkClassifyMerchantAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const trpc = await serverCaller();
   try {
+    const categoryId = await resolveCategoryLabel(str(fd, "categoryLabel"), locale);
+    if (!categoryId) redirect(`/${locale}/operations?error=badcategory`);
     await trpc.operations.transactions.bulkClassifyByMerchant({
       merchantKey: str(fd, "merchantKey"),
-      categoryId: str(fd, "categoryId"),
+      categoryId,
       behavioralClass: str(fd, "behavioralClass") as never,
     });
   } catch {
@@ -140,7 +142,7 @@ export async function updateTransactionAction(fd: FormData): Promise<void> {
     redirect(`/${locale}/operations?error=amount`);
   }
   const amount = direction === "IN" ? String(magnitude) : String(-magnitude);
-  const categoryId = str(fd, "categoryId");
+  const categoryId = await resolveCategoryLabel(str(fd, "categoryLabel"), locale);
   const behavioralClass = str(fd, "behavioralClass");
   const instalmentNumber = str(fd, "instalmentNumber");
   const instalmentTotal = str(fd, "instalmentTotal");
@@ -185,26 +187,33 @@ export async function setTransactionStatusAction(fd: FormData): Promise<void> {
  */
 export async function uploadStatementAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
-  const file = fd.get("file");
-  if (!(file instanceof File) || file.size === 0) {
-    redirect(`/${locale}/operations?error=nofile`);
-  }
-  const bytes = Buffer.from(await (file as File).arrayBuffer());
+  const files = fd.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) redirect(`/${locale}/operations?error=nofile`);
+
   const trpc = await serverCaller();
-  let documentId: string | undefined;
-  try {
-    const doc = await trpc.documents.upload({
-      filename: (file as File).name,
-      mimeType: (file as File).type || "application/octet-stream",
-      institutionName: str(fd, "institutionName") || undefined,
-      contentBase64: bytes.toString("base64"),
-    });
-    documentId = (doc as { id: string }).id;
-  } catch (e) {
-    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 60)) : "UNKNOWN";
-    redirect(`/${locale}/operations?error=${code}`);
+  const ids: string[] = [];
+  const failed: string[] = [];
+  for (const file of files) {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    try {
+      const doc = await trpc.documents.upload({
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        institutionName: str(fd, "institutionName") || undefined,
+        contentBase64: bytes.toString("base64"),
+      });
+      ids.push((doc as { id: string }).id);
+    } catch {
+      // A duplicate sha256 is rejected by the existing pipeline - that is correct
+      // (the same file twice), and one bad file must not abort the whole batch.
+      failed.push(file.name);
+    }
   }
-  redirect(`/${locale}/operations?preview=${documentId}`);
+  if (ids.length === 0) {
+    redirect(`/${locale}/operations?error=allfailed&n=${encodeURIComponent(String(failed.length))}`);
+  }
+  // Land on the first upload's preview; the rest queue up in the pending list.
+  redirect(`/${locale}/operations?preview=${ids[0]}&uploaded=${ids.length}&failed=${failed.length}`);
 }
 
 export async function commitStatementAction(fd: FormData): Promise<void> {
@@ -231,14 +240,16 @@ export async function commitStatementAction(fd: FormData): Promise<void> {
   };
   const saveAs = str(fd, "saveProfileAs");
 
+  // A PDF has no columns to map; the service detects the format and ignores `mapping`.
+  const isPdf = mapping.columns.date === "-";
   const trpc = await serverCaller();
   let result: { inserted: number; duplicates: number } | undefined;
   try {
     result = await trpc.operations.import.commit({
       documentId,
-      adapterId: "generic-tabular",
-      mapping: mapping as never,
-      ...(saveAs ? { saveProfileAs: saveAs } : {}),
+      adapterId: isPdf ? "pdf-statement" : "generic-tabular",
+      ...(isPdf ? {} : { mapping: mapping as never }),
+      ...(saveAs && !isPdf ? { saveProfileAs: saveAs } : {}),
     });
   } catch (e) {
     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 60)) : "IMPORT_FAILED";
@@ -246,3 +257,37 @@ export async function commitStatementAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/operations?imported=${result?.inserted ?? 0}&dupes=${result?.duplicates ?? 0}`);
 }
+
+/**
+ * Resolve a category picker label ("דיור › ארנונה") back to an id.
+ *
+ * Labels carry the full parent path, so they are unique. Falls back to a leaf-name
+ * match for a label typed by hand, and returns null when nothing matches — an
+ * unrecognised category is left unset rather than silently guessed at.
+ */
+async function resolveCategoryLabel(label: string, locale: string): Promise<string | null> {
+  const clean = label.trim();
+  if (!clean) return null;
+  const trpc = await serverCaller();
+  const { flat } = await trpc.operations.categories.tree();
+  const rows = flat as unknown as Array<{ id: string; nameEn: string; nameHe: string; parentId: string | null }>;
+  const byId = new Map(rows.map((c) => [c.id, c]));
+  const nameOf = (c: { nameEn: string; nameHe: string }) => (locale === "he" ? c.nameHe : c.nameEn);
+  const pathOf = (c: (typeof rows)[number]): string => {
+    const parts = [nameOf(c)];
+    let cur = c.parentId ? byId.get(c.parentId) : undefined;
+    let guard = 0;
+    while (cur && guard < 6) {
+      parts.unshift(nameOf(cur));
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+      guard += 1;
+    }
+    return parts.join(" › ");
+  };
+  const exact = rows.find((c) => pathOf(c) === clean);
+  if (exact) return exact.id;
+  const byLeaf = rows.filter((c) => nameOf(c) === clean);
+  return byLeaf.length === 1 ? byLeaf[0]!.id : null;
+}
+
+export { resolveCategoryLabel };

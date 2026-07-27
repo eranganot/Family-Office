@@ -2,7 +2,7 @@ import type { PrismaClient } from "@wealthos/db";
 import { fileStore } from "@wealthos/db";
 import {
   applyMapping, decodeBytes, detectHeaderRow, guessMapping, normaliseGrid, parseCsvGrid,
-  parseHtmlGrid, REDACTION_VERSION, sniffFormat, toRecords,
+  parseHtmlGrid, parsePdfStatement, pdfRowsToDrafts, REDACTION_VERSION, sniffFormat, toRecords,
   type MappingProfile, type TransactionDraft,
 } from "@wealthos/ingestion";
 
@@ -89,11 +89,37 @@ export async function previewStatement(
     };
   }
 
-  const { table, headerRowIndex } = buildTable(bytes, sniff.format, sniff.encoding);
   const members = await db.familyMember.findMany({ where: { householdId }, select: { name: true } });
   const memberNames = members.map((m) => m.name);
-  const profile = overrideMapping ?? defaultProfile(table.headers);
-  const { drafts, issues } = applyMapping(table, profile, memberNames);
+
+  let drafts: TransactionDraft[];
+  let issues: Array<{ rowIndex: number; reason: string; raw: string }>;
+  let headers: string[] = [];
+  let headerRowIndex = 0;
+  let sampleRows: Array<Record<string, string>> = [];
+  let totalRows = 0;
+  let guessed: Record<string, unknown> = {};
+
+  if (sniff.format === "PDF") {
+    // PDFs have no columns to map — the layout IS the format, so there is no mapping
+    // wizard for them. Rows go through pdfRowsToDrafts, which calls the same redact().
+    const parsed = await parsePdfStatement(bytes);
+    drafts = pdfRowsToDrafts(parsed.rows, memberNames);
+    issues = parsed.unparsed.map((raw, i) => ({ rowIndex: i, reason: "UNPARSED_LINE", raw }));
+    totalRows = parsed.rows.length + parsed.unparsed.length;
+    guessed = { issuer: parsed.issuerGuess };
+  } else {
+    const built = buildTable(bytes, sniff.format, sniff.encoding);
+    headerRowIndex = built.headerRowIndex;
+    headers = built.table.headers;
+    sampleRows = built.table.records.slice(0, 5);
+    totalRows = built.table.records.length;
+    const profile = overrideMapping ?? defaultProfile(built.table.headers);
+    const mapped = applyMapping(built.table, profile, memberNames);
+    drafts = mapped.drafts;
+    issues = mapped.issues;
+    guessed = guessMapping(built.table.headers) as unknown as Record<string, unknown>;
+  }
 
   const refs = drafts.map((d) => d.externalRef).filter((r): r is string => Boolean(r));
   const duplicates = refs.length
@@ -112,11 +138,11 @@ export async function previewStatement(
     format: sniff.format,
     encoding: sniff.encoding,
     unsupportedReason: sniff.reason,
-    headers: table.headers,
+    headers,
     headerRowIndex,
-    guessedMapping: guessMapping(table.headers) as unknown as Record<string, unknown>,
-    sampleRows: table.records.slice(0, 5),
-    totalRows: table.records.length,
+    guessedMapping: guessed,
+    sampleRows,
+    totalRows,
     drafts: drafts.slice(0, 200),
     issues: issues.slice(0, 50),
     duplicates,
@@ -143,10 +169,21 @@ export async function commitStatement(
     throw new Error(`UNSUPPORTED_FORMAT:${sniff.reason ?? "UNKNOWN"}`);
   }
 
-  const { table } = buildTable(bytes, sniff.format, sniff.encoding);
   const members = await db.familyMember.findMany({ where: { householdId }, select: { name: true } });
-  const profile = overrideMapping ?? defaultProfile(table.headers);
-  const { drafts } = applyMapping(table, profile, members.map((m) => m.name));
+  const memberNames = members.map((m) => m.name);
+
+  let drafts: TransactionDraft[];
+  let profile: MappingProfile | { issuer: string };
+  if (sniff.format === "PDF") {
+    const parsed = await parsePdfStatement(bytes);
+    drafts = pdfRowsToDrafts(parsed.rows, memberNames);
+    profile = { issuer: parsed.issuerGuess };
+  } else {
+    const { table } = buildTable(bytes, sniff.format, sniff.encoding);
+    const p = overrideMapping ?? defaultProfile(table.headers);
+    drafts = applyMapping(table, p, memberNames).drafts;
+    profile = p;
+  }
 
   const batch = await db.importBatch.create({
     data: {
@@ -189,6 +226,9 @@ export async function commitStatement(
         // FxRate rather than guessing — so a non-ILS row lands with amountBase null.
         amountBase: d.currency === "ILS" ? d.amount : null,
         descriptionRedacted: d.descriptionRedacted,
+        // Without this, imported rows cannot participate in owner memory or
+        // "apply to this merchant" - the learning loop silently excludes them.
+        merchantKey: d.merchantKey || null,
         counterpartyMasked: d.counterpartyMasked ?? null,
         instalmentNumber: d.instalmentNumber ?? null,
         instalmentTotal: d.instalmentTotal ?? null,

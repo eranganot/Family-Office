@@ -491,6 +491,26 @@ export const operationsRouter = router({
       return { ...result, ...classified };
     }),
 
+    /**
+     * Statements uploaded but not yet imported. Multi-file upload queues several at
+     * once, and without this list the extra files would be invisible after the first
+     * preview.
+     */
+    pending: operationsProcedure.query(async ({ ctx }) => {
+      const docs = await ctx.db.document.findMany({
+        where: { householdId: ctx.householdId },
+        orderBy: { uploadedAt: "desc" },
+        take: 25,
+        select: { id: true, filename: true, uploadedAt: true, mimeType: true },
+      });
+      const imported = await ctx.db.importBatch.findMany({
+        where: { status: "COMPLETED", documentId: { in: docs.map((d) => d.id) } },
+        select: { documentId: true },
+      });
+      const done = new Set(imported.map((b) => b.documentId));
+      return docs.filter((d) => !done.has(d.id));
+    }),
+
     profiles: operationsProcedure.query(async ({ ctx }) =>
       ctx.db.importMappingProfile.findMany({
         where: { householdId: ctx.householdId },

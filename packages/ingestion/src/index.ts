@@ -35,8 +35,10 @@ export {
 export type { TabularFormat, SniffResult, TableGrid, ParsedTable } from "./tabular";
 export {
   applyMapping, guessMapping, parseInstalments, looksRecurring, normaliseMinus,
-  buildExternalRef, HEADER_SYNONYMS,
+  buildExternalRef, HEADER_SYNONYMS, pdfRowsToDrafts,
 } from "./statement-mapping";
 export type {
   ColumnMapping, AmountMode, MappingProfile, MappingGuess, TransactionDraft, MappingIssue, MappedResult,
 } from "./statement-mapping";
+export { parsePdfStatement, parseStatementLines, guessIssuer, PDF_PROFILES } from "./pdf-statement";
+export type { PdfStatementRow, PdfStatementResult, PdfIssuer, PdfProfile } from "./pdf-statement";

@@ -12,7 +12,7 @@ import { cleanHebrew, repairVisualOrder, stripBidiControls } from "@wealthos/dom
  * precise "re-export as CSV" message instead — see `sniffFormat`.
  */
 
-export type TabularFormat = "CSV" | "HTML" | "UNSUPPORTED_XLS" | "UNKNOWN";
+export type TabularFormat = "CSV" | "HTML" | "PDF" | "UNSUPPORTED_XLS" | "UNKNOWN";
 
 export interface SniffResult {
   format: TabularFormat;
@@ -58,6 +58,9 @@ export function sniffFormat(bytes: Uint8Array, filename: string): SniffResult {
   }
   if (startsWith(bytes, ZIP_MAGIC)) {
     return { format: "UNSUPPORTED_XLS", encoding, reason: "XLSX_NOT_YET_SUPPORTED" };
+  }
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+    return { format: "PDF", encoding }; // %PDF
   }
   const head = decodeBytes(bytes.slice(0, 4096), encoding).toLowerCase();
   if (head.includes("<table") || head.includes("<!doctype html") || head.includes("<html")) {

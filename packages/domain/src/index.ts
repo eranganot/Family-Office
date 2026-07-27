@@ -40,3 +40,4 @@ export {
 export type { SeedCategory, BehavioralClassKey, CategoryAxisKey } from "./operations/categories";
 export { MERCHANT_RULES, MERCHANT_RULES_VERSION } from "./operations/merchant-rules";
 export type { MerchantRule } from "./operations/merchant-rules";
+export { normalizeMerchantKey, IL_TXN_LEXICON } from "./operations/merchant-key";

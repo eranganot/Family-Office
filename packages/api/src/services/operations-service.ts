@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@wealthos/db";
 import { assumptionRegistry } from "@wealthos/registry";
+import { normalizeMerchantKey } from "@wealthos/engine-operations";
 import {
   classify,
   committedInstalmentsInWindow,
@@ -108,8 +109,14 @@ export async function autoClassify(
   let classified = 0;
   let suspense = 0;
   for (const t of pending) {
+    // Backfill: rows imported before merchant keys were stamped (or edited to a new
+    // description) would otherwise be permanently excluded from "apply to this merchant".
+    const derivedKey = t.merchantKey ?? normalizeMerchantKey(t.descriptionRedacted) ?? null;
+    if (!t.merchantKey && derivedKey) {
+      await db.transaction.update({ where: { id: t.id }, data: { merchantKey: derivedKey } });
+    }
     const raw = classify(
-      { descriptionRedacted: t.descriptionRedacted, merchantKey: t.merchantKey ?? undefined },
+      { descriptionRedacted: t.descriptionRedacted, merchantKey: derivedKey ?? undefined },
       { minConfidence, ownerMemory },
     );
     const signed = num(t.amountBase ?? t.amount);

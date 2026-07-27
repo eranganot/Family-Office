@@ -2,6 +2,61 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-27, session 12)
+
+- **M38c (PDF statements, multi-upload, searchable categories) code-complete — `m38c.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE, NO NEW DEPENDENCIES.**
+  - **PDF statement parser** (`packages/ingestion/src/pdf-statement.ts`, 17 tests). Reuses the
+    existing `extractPdfLines` (pdfjs). Key empirical finding, verified against the real files:
+    these PDFs reverse **token order + per-word characters**, NOT the whole line — digits and
+    Latin survive intact — so `toggleVisualHebrewLine` is the correct transform, not a full
+    character reversal (which is what the *pension* PDF needs; the two differ).
+    **Each line is parsed in BOTH orientations and the one producing readable Hebrew wins**
+    (scored by final-letter position), so a logical-order PDF parses with no configuration.
+  - **One configurable parser, not three bespoke ones.** `PDF_PROFILES` covers ISRACARD
+    (charge = the SECOND amount, since סכום עסקה precedes סכום חיוב), CAL (amount-first layout
+    + `בתהליך קליטה` pending sections), FIBI_BANK. Issuer auto-detected in either orientation.
+    A bare integer with no symbol and no decimals is **never** treated as money — otherwise
+    voucher numbers like `629076429` become ₪629M.
+  - **PDF rows go through the SAME `redact()` call** as the tabular path (`pdfRowsToDrafts`), so
+    PDFs cannot become a back door that writes un-redacted text.
+  - **Multi-file upload** (owner request): `<input multiple>`, uploads each independently so one
+    rejected file (duplicate sha256 — correct behaviour) cannot abort the batch. New
+    `import.pending` query lists uploaded-but-not-yet-imported statements, since without it the
+    files after the first would be invisible.
+  - **Searchable category picker** (owner request): the tree is ~117 entries and a flat `<select>`
+    was a wall of options. Replaced with native `<input list>` + `<datalist>` — real typeahead,
+    **no client JS**, stays a server component, RTL-correct, degrades to a text field. The
+    submitted value is the display label with its parent path (`דיור › ארנונה`), which the server
+    action resolves back to an id; the path makes labels unambiguous where leaf names repeat.
+    An unrecognised label leaves the category unset rather than guessing. Replaced in all 4 places.
+  - **BUG FIXED (owner-reported): "apply to this merchant" was dead on every imported row.**
+    `commitStatement` never set `merchantKey`, so imported transactions had none — and the
+    button was `disabled={!tx.merchantKey}`. Worse than a dead control: owner memory is keyed on
+    `merchantKey`, so **imported rows were silently excluded from the entire learning loop**.
+    Fixes: (1) `normalizeMerchantKey` moved to `domain` so `ingestion` can use it (boundaries
+    forbid engine→ingestion — same pattern as the category tree and Hebrew primitives);
+    (2) every draft now carries a `merchantKey` derived from the REDACTED text, so no PII can
+    leak into it; (3) `autoClassify` backfills any row still missing one; (4) the UI no longer
+    renders a silently-disabled control — it says why and links to the single-row edit.
+    Also fixed the picker collapsing to the width of its dropdown arrow inside table cells
+    (`w-full` needs a `min-w` there).
+  - **Verified:** ingestion 78 tests (20 new), engine-operations 66, api 9, domain 49, tsc clean,
+    eslint clean, i18n parity 1115/1115, `npm ci --dry-run` exit 0.
+
+### Known blind spots
+- No Postgres / no root in the sandbox: **DB-bound suites only run in CI.**
+- The PDF parser is tested against synthetic lines reproducing the real files' SHAPE, not against
+  the real PDFs (household data must not enter the repo). **Expect the first real import to need
+  a tweak** — the unparsed-lines list in the preview is there to make that diagnosable.
+- Legacy `.xls` still refused by design (unmaintained BIFF reader with open CVEs); re-export CSV.
+
+## Next up
+
+**M39 — financial calendar + recurring decisions.** Statutory figures still depend on owner
+verification of B3/B4 (2026 ceilings + IL tax/bituach-leumi dates); I draft, owner approves at
+`/registry`. Also pending: `us-bank-chase-csv` once the Chase export arrives.
+
 ## Current state (2026-07-27, session 11)
 
 - **M38b (statement import) code-complete — `m38b.patch`. NO MIGRATION, NO LOCKFILE CHANGE,

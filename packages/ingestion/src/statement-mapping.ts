@@ -1,4 +1,4 @@
-import { cleanHebrew } from "@wealthos/domain";
+import { cleanHebrew, normalizeMerchantKey } from "@wealthos/domain";
 import { parseIsraeliDate, parseLocalizedDecimal } from "./normalize";
 import { redact, type RedactionHit } from "./redact";
 import type { ParsedTable } from "./tabular";
@@ -41,6 +41,13 @@ export interface TransactionDraft {
   amount: string;
   currency: string;
   descriptionRedacted: string;
+  /**
+   * Derived from the REDACTED description, so it is stable, contains no PII, and
+   * matches what the classifier and owner-memory lookups use. Stamped here rather
+   * than left null: without it, imported rows cannot participate in "apply to this
+   * merchant", which is the entire learning loop.
+   */
+  merchantKey: string;
   externalRef?: string | undefined;
   status: "BOOKED" | "PENDING";
   counterpartyMasked?: string | undefined;
@@ -158,6 +165,7 @@ export function applyMapping(
       amount: signed,
       currency: (cell(rec, c.currency) || profile.defaultCurrency).toUpperCase().slice(0, 3),
       descriptionRedacted: red.text || "(ללא תיאור)",
+      merchantKey: normalizeMerchantKey(red.text),
       externalRef: buildExternalRef(bookedAt, signed, red.text, cell(rec, c.reference)),
       status: pending ? "PENDING" : "BOOKED",
       counterpartyMasked: red.counterpartyMasked,
@@ -234,4 +242,43 @@ export function guessMapping(headers: string[]): MappingGuess {
     reference: find(HEADER_SYNONYMS.reference),
     balance: find(HEADER_SYNONYMS.balance),
   };
+}
+
+/**
+ * Convert parsed PDF statement rows into the same `TransactionDraft` shape the tabular
+ * path produces — crucially through the SAME `redact()` call, so PDFs cannot become a
+ * back door that writes un-redacted text to the database.
+ */
+export function pdfRowsToDrafts(
+  rows: ReadonlyArray<{
+    bookedAt: string;
+    descriptionRaw: string;
+    amount: string;
+    currency: string;
+    originalAmount?: string | undefined;
+    reference?: string | undefined;
+    instalmentNumber?: number | undefined;
+    instalmentTotal?: number | undefined;
+    isRecurringCandidate: boolean;
+    pending: boolean;
+  }>,
+  memberNames: readonly string[] = [],
+): TransactionDraft[] {
+  return rows.map((r) => {
+    const red = redact(r.descriptionRaw, memberNames);
+    return {
+      bookedAt: r.bookedAt,
+      amount: r.amount,
+      currency: r.currency,
+      descriptionRedacted: red.text || "(ללא תיאור)",
+      merchantKey: normalizeMerchantKey(red.text),
+      externalRef: buildExternalRef(r.bookedAt, r.amount, red.text, r.reference ?? ""),
+      status: r.pending ? "PENDING" : "BOOKED",
+      counterpartyMasked: red.counterpartyMasked,
+      instalmentNumber: r.instalmentNumber,
+      instalmentTotal: r.instalmentTotal,
+      isRecurringCandidate: r.isRecurringCandidate,
+      redactionHits: red.hits,
+    };
+  });
 }

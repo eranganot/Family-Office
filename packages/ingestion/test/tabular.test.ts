@@ -215,3 +215,37 @@ describe("parseInstalments", () => {
     expect(parseInstalments("הוראת קבע")).toBeUndefined();
   });
 });
+
+describe("merchantKey is stamped at import time", () => {
+  it("every mapped draft carries a merchant key derived from the REDACTED text", () => {
+    // Without this, imported rows cannot participate in owner memory or
+    // "apply to this merchant" — the learning loop silently excludes them.
+    const grid = parseCsvGrid("תאריך,תיאור,סכום\n01/01/2026,SPOTIFY P43CD5B1CB,-33.90");
+    const table = toRecords(grid, 0);
+    const { drafts } = applyMapping(table, {
+      amountMode: "SIGNED", defaultCurrency: "ILS", dayFirst: true,
+      columns: { date: "תאריך", description: "תיאור", amount: "סכום" },
+    });
+    expect(drafts[0]?.merchantKey).toBe("SPOTIFY");
+  });
+
+  it("groups the same merchant across differing reference codes", () => {
+    const grid = parseCsvGrid(
+      "תאריך,תיאור,סכום\n01/01/2026,SPOTIFY P43CD5B1CB,-33.90\n01/02/2026,SPOTIFY Q99XX1A2BC,-33.90",
+    );
+    const { drafts } = applyMapping(toRecords(grid, 0), {
+      amountMode: "SIGNED", defaultCurrency: "ILS", dayFirst: true,
+      columns: { date: "תאריך", description: "תיאור", amount: "סכום" },
+    });
+    expect(drafts[0]?.merchantKey).toBe(drafts[1]?.merchantKey);
+  });
+
+  it("derives the key from redacted text, so no PII can leak into it", () => {
+    const grid = parseCsvGrid("תאריך,תיאור,סכום\n01/01/2026,כרטיס 4111111111111111,-50");
+    const { drafts } = applyMapping(toRecords(grid, 0), {
+      amountMode: "SIGNED", defaultCurrency: "ILS", dayFirst: true,
+      columns: { date: "תאריך", description: "תיאור", amount: "סכום" },
+    });
+    expect(drafts[0]?.merchantKey).not.toContain("4111");
+  });
+});

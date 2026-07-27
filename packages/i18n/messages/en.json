@@ -1337,6 +1337,15 @@
       "LEGACY_XLS": "This is a legacy Excel .xls file. Re-export it as CSV from your bank and upload again — the only library that reads this binary format is unmaintained and carries known security advisories, so it is deliberately not used here.",
       "XLSX_NOT_YET_SUPPORTED": "Modern .xlsx is not supported yet. Re-export as CSV for now.",
       "UNRECOGNISED_FORMAT": "This file is not a CSV or an HTML table. PDF statements are supported in a later phase."
-    }
+    },
+    "categorySearchPlaceholder": "Type to search categories…",
+    "uploadedCount": "{n} file(s) uploaded, {failed} rejected (duplicates of files already stored).",
+    "pendingStatements": "Uploaded, not yet imported",
+    "previewThis": "Preview",
+    "previewing": "previewing",
+    "pdfIssuer": "Detected issuer: {issuer}",
+    "pdfNoMapping": "PDFs have no columns to map — the layout is the format. Review the rows below and import.",
+    "noMerchantKey": "No merchant name to group by",
+    "editInstead": "edit this row instead"
   }
 }

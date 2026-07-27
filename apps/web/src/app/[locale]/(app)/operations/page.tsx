@@ -14,6 +14,7 @@ import {
   upsertCategoryAction,
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
+import { CategoryPicker, type PickerCategory } from "../../../../components/operations/category-picker";
 import { serverCaller } from "../../../../lib/trpc-server";
 
 const BEHAVIORAL = ["FIXED_CONTRACTUAL", "VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG", "SAVINGS_FLOW", "TRANSFER"] as const;
@@ -28,12 +29,6 @@ interface FlatCategory {
   defaultBehavioralClass: string;
 }
 
-/** Indented label so the tree is readable inside a flat <select>. */
-function optionLabel(c: FlatCategory, locale: string): string {
-  const depth = c.key.split(".").length - 1;
-  return `${"  ".repeat(depth)}${locale === "he" ? c.nameHe : c.nameEn}`;
-}
-
 export default async function OperationsPage({
   params,
   searchParams,
@@ -43,7 +38,7 @@ export default async function OperationsPage({
     error?: string; created?: string; classified?: string; categorySaved?: string;
     recomputed?: string; closed?: string; reopened?: string; tab?: string;
     updated?: string; removed?: string; restored?: string; edit?: string;
-    preview?: string; imported?: string; dupes?: string;
+    preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -60,6 +55,7 @@ export default async function OperationsPage({
   const preview = sp.preview
     ? await trpc.operations.import.preview({ documentId: sp.preview }).catch(() => null)
     : null;
+  const pending = await trpc.operations.import.pending().catch(() => []);
   const period = await trpc.operations.period.current();
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
   const { year, month, row: periodRow, computed } = period;
@@ -69,9 +65,8 @@ export default async function OperationsPage({
   const baseCurrency = "ILS";
 
   const flat = cats.flat as unknown as FlatCategory[];
-  const income = flat.filter((c) => c.axis === "INCOME");
-  const expense = flat.filter((c) => c.axis === "EXPENSE");
   const byId = new Map(flat.map((c) => [c.id, c]));
+  const pickerCats = flat as unknown as PickerCategory[];
   const today = new Date().toISOString().slice(0, 10);
   const loc = locale as Locale;
 
@@ -89,13 +84,45 @@ export default async function OperationsPage({
         <form action={uploadStatementAction} className="flex flex-wrap items-end gap-4">
           <input type="hidden" name="locale" value={locale} />
           <Field label={t("importFile")}>
-            <input type="file" name="file" required accept=".csv,.txt,.tsv,.html,.htm,text/csv,text/html" className="text-sm" />
+            <input
+              type="file"
+              name="file"
+              multiple
+              required
+              accept=".csv,.txt,.tsv,.html,.htm,.pdf,text/csv,text/html,application/pdf"
+              className="text-sm"
+            />
           </Field>
           <Field label={t("importInstitution")}>
             <TextInput name="institutionName" placeholder={t("importInstitutionPlaceholder")} />
           </Field>
           <SubmitButton label={t("importUpload")} />
         </form>
+
+        {sp.uploaded ? (
+          <p className="mt-3 text-xs text-neutral-600">
+            {t("uploadedCount", { n: sp.uploaded, failed: sp.failed ?? "0" })}
+          </p>
+        ) : null}
+
+        {pending.length > 0 ? (
+          <div className="mt-4 rounded-lg bg-neutral-50 px-3 py-2">
+            <p className="mb-2 text-xs font-medium text-neutral-600">{t("pendingStatements")}</p>
+            <ul className="flex flex-col gap-1 text-xs">
+              {pending.map((d) => (
+                <li key={d.id} className="flex items-center justify-between gap-3">
+                  <span className="truncate">{d.filename}</span>
+                  <a
+                    href={`/${locale}/operations?preview=${d.id}`}
+                    className={`shrink-0 underline ${sp.preview === d.id ? "text-neutral-400" : "text-blue-600"}`}
+                  >
+                    {sp.preview === d.id ? t("previewing") : t("previewThis")}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {preview ? (
           preview.unsupportedReason ? (
@@ -160,6 +187,22 @@ export default async function OperationsPage({
                 <p className="mb-4 text-sm text-amber-700">{t("previewNoRows")}</p>
               )}
 
+              {preview.format === "PDF" ? (
+                <form action={commitStatementAction} className="flex flex-wrap items-end gap-3">
+                  <input type="hidden" name="locale" value={locale} />
+                  <input type="hidden" name="documentId" value={sp.preview ?? ""} />
+                  <input type="hidden" name="amountMode" value="SIGNED" />
+                  <input type="hidden" name="col_date" value="-" />
+                  <input type="hidden" name="col_description" value="-" />
+                  <p className="w-full text-xs text-neutral-500">
+                    {t("pdfNoMapping")}
+                    {preview.guessedMapping["issuer"]
+                      ? ` · ${t("pdfIssuer", { issuer: String(preview.guessedMapping["issuer"]) })}`
+                      : ""}
+                  </p>
+                  <SubmitButton label={t("importCommit")} />
+                </form>
+              ) : (
               <form action={commitStatementAction} className="grid grid-cols-2 items-end gap-3 md:grid-cols-4">
                 <input type="hidden" name="locale" value={locale} />
                 <input type="hidden" name="documentId" value={sp.preview ?? ""} />
@@ -202,6 +245,7 @@ export default async function OperationsPage({
                 </Field>
                 <SubmitButton label={t("importCommit")} />
               </form>
+              )}
 
               {preview.issues.length > 0 ? (
                 <details className="mt-4 text-xs text-neutral-500">
@@ -399,19 +443,35 @@ export default async function OperationsPage({
                     {Math.round(Number(tx.classifications[0]?.confidence ?? 0) * 100)}%
                   </td>
                   <td className="py-2">
-                    <form action={bulkClassifyMerchantAction} className="flex items-center gap-1">
+                    <form action={bulkClassifyMerchantAction} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="locale" value={locale} />
                       <input type="hidden" name="merchantKey" value={tx.merchantKey ?? ""} />
-                      <Select name="categoryId" defaultValue={tx.categoryId ?? ""} required>
-                        <option value="" disabled>{t("choose")}</option>
-                        {flat.map((c) => <option key={c.id} value={c.id}>{optionLabel(c, locale)}</option>)}
-                      </Select>
+                      <CategoryPicker
+                        name="categoryLabel"
+                        categories={pickerCats}
+                        locale={locale}
+                        defaultCategoryId={tx.categoryId}
+                        placeholder={t("categorySearchPlaceholder")}
+                        required
+                        listId="cats-all"
+                        className="min-w-56 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-xs"
+                      />
                       <Select name="behavioralClass" defaultValue={tx.behavioralClass ?? "VARIABLE_DISCRETIONARY"}>
                         {BEHAVIORAL.map((b) => <option key={b} value={b}>{t(`behavioralClass.${b}`)}</option>)}
                       </Select>
-                      <button type="submit" className="whitespace-nowrap text-xs text-blue-600 underline" disabled={!tx.merchantKey}>
-                        {t("applyToMerchant")}
-                      </button>
+                      {tx.merchantKey ? (
+                        <button type="submit" className="whitespace-nowrap rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white">
+                          {t("applyToMerchant")}
+                        </button>
+                      ) : (
+                        // Never a silently dead control: say WHY, and offer the single-row route.
+                        <span className="flex items-center gap-2 whitespace-nowrap text-xs text-neutral-500">
+                          {t("noMerchantKey")}
+                          <a href={`/${locale}/operations?edit=${tx.id}`} className="text-blue-600 underline">
+                            {t("editInstead")}
+                          </a>
+                        </span>
+                      )}
                     </form>
                   </td>
                 </tr>
@@ -446,15 +506,13 @@ export default async function OperationsPage({
             <TextInput name="description" required maxLength={400} />
           </Field>
           <Field label={t("category")}>
-            <Select name="categoryId" defaultValue="">
-              <option value="">{t("uncategorised")}</option>
-              <optgroup label={t("axis.EXPENSE")}>
-                {expense.map((c) => <option key={c.id} value={c.id}>{optionLabel(c, locale)}</option>)}
-              </optgroup>
-              <optgroup label={t("axis.INCOME")}>
-                {income.map((c) => <option key={c.id} value={c.id}>{optionLabel(c, locale)}</option>)}
-              </optgroup>
-            </Select>
+            <CategoryPicker
+              name="categoryLabel"
+              categories={pickerCats}
+              locale={locale}
+              placeholder={t("categorySearchPlaceholder")}
+              listId="cats-create"
+            />
           </Field>
           <Field label={t("behavioral")}>
             <Select name="behavioralClass" defaultValue="">
@@ -574,10 +632,14 @@ export default async function OperationsPage({
                         <TextInput name="description" defaultValue={tx.descriptionRedacted} required maxLength={400} />
                       </Field>
                       <Field label={t("category")}>
-                        <Select name="categoryId" defaultValue={tx.categoryId ?? ""}>
-                          <option value="">{t("uncategorised")}</option>
-                          {flat.map((c) => <option key={c.id} value={c.id}>{optionLabel(c, locale)}</option>)}
-                        </Select>
+                        <CategoryPicker
+                          name="categoryLabel"
+                          categories={pickerCats}
+                          locale={locale}
+                          defaultCategoryId={tx.categoryId}
+                          placeholder={t("categorySearchPlaceholder")}
+                          listId="cats-all"
+                        />
                       </Field>
                       <Field label={t("behavioral")}>
                         <Select name="behavioralClass" defaultValue={tx.behavioralClass ?? ""}>
@@ -633,10 +695,13 @@ export default async function OperationsPage({
             </Select>
           </Field>
           <Field label={t("parent")}>
-            <Select name="parentId" defaultValue="">
-              <option value="">{t("noParent")}</option>
-              {flat.map((c) => <option key={c.id} value={c.id}>{optionLabel(c, locale)}</option>)}
-            </Select>
+            <CategoryPicker
+              name="parentLabel"
+              categories={pickerCats}
+              locale={locale}
+              placeholder={t("noParent")}
+              listId="cats-all"
+            />
           </Field>
           <Field label={t("categoryKey")}>
             <TextInput name="key" required placeholder="food.bakery" />
