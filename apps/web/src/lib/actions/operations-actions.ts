@@ -201,6 +201,7 @@ export async function uploadStatementAction(fd: FormData): Promise<void> {
   const trpc = await serverCaller();
   const ids: string[] = [];
   const failed: string[] = [];
+  let reused = 0;
   let firstError = "";
   for (const file of files) {
     const bytes = Buffer.from(await file.arrayBuffer());
@@ -212,8 +213,12 @@ export async function uploadStatementAction(fd: FormData): Promise<void> {
         docType: (str(fd, "statementType") || "BANK_STATEMENT") as never,
         institutionName: str(fd, "institutionName") || undefined,
         contentBase64: bytes.toString("base64"),
+        // Re-uploading a file you already have should open it, not fail.
+        onDuplicate: "REUSE",
       });
-      ids.push((doc as { id: string }).id);
+      const d = doc as { id: string; duplicate: boolean };
+      if (d.duplicate) reused += 1;
+      ids.push(d.id);
     } catch (e) {
       // A duplicate sha256 is rejected by the existing pipeline - that is correct
       // (the same file twice), and one bad file must not abort the whole batch.
@@ -229,7 +234,9 @@ export async function uploadStatementAction(fd: FormData): Promise<void> {
     );
   }
   // Land on the first upload's preview; the rest queue up in the pending list.
-  redirect(`/${locale}/operations?preview=${ids[0]}&uploaded=${ids.length}&failed=${failed.length}#import`);
+  redirect(
+    `/${locale}/operations?preview=${ids[0]}&uploaded=${ids.length}&failed=${failed.length}&reused=${reused}#import`,
+  );
 }
 
 export async function commitStatementAction(fd: FormData): Promise<void> {

@@ -41,6 +41,15 @@ export const documentsRouter = router({
         docType: DocTypeSchema.optional(),
         institutionName: z.string().max(200).optional(),
         contentBase64: z.string().min(1),
+        /**
+         * What to do when the same bytes are already stored.
+         *
+         * "ERROR" (default) preserves the original behaviour for every existing caller.
+         * "REUSE" returns the stored document instead of throwing — re-uploading a file
+         * you already have should take you to it, not report a failure. The owner hit
+         * exactly this: a perfectly good preview sitting under a red "save failed".
+         */
+        onDuplicate: z.enum(["ERROR", "REUSE"]).default("ERROR"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -50,9 +59,20 @@ export const documentsRouter = router({
       if (bytes.length > 25 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "FILE_TOO_LARGE" });
       const sha256 = sha256Of(bytes);
       const existing = await documentsRepo.findBySha(ctx.db, sha256);
-      if (existing) throw new TRPCError({ code: "CONFLICT", message: "DUPLICATE_DOCUMENT" });
+      if (existing) {
+        if (input.onDuplicate === "ERROR") {
+          throw new TRPCError({ code: "CONFLICT", message: "DUPLICATE_DOCUMENT" });
+        }
+        // Stamp a docType that was missing: files uploaded before the statement-type
+        // selector existed have none, and that is what drives the outflow sign rule.
+        // Re-uploading with the type chosen is the natural way to fix them.
+        if (input.docType && !existing.docType) {
+          await ctx.db.document.update({ where: { id: existing.id }, data: { docType: input.docType } });
+        }
+        return { ...existing, duplicate: true as const };
+      }
       const storageKey = await fileStore().put(sha256, bytes);
-      return documentsRepo.create(ctx.db, householdId, {
+      const created = await documentsRepo.create(ctx.db, householdId, {
         sha256,
         filename: input.filename,
         mimeType: input.mimeType,
@@ -60,6 +80,7 @@ export const documentsRouter = router({
         institutionName: input.institutionName,
         storageKey,
       });
+      return { ...created, duplicate: false as const };
     }),
 
   /** M27: correct the document type after upload (chooses which adapter runs on import). */

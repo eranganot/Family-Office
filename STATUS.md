@@ -2,6 +2,35 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 22)
+
+- **M38j — re-uploading an existing file no longer reports a failure. `m38j.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE.**
+  - **Owner-reported "the upload failed" — but the parse was perfect.** The screenshot showed a
+    red "השמירה נכשלה" banner sitting directly above a fully working preview: 113 rows read,
+    111 usable, 88 expenses / 23 income, correct Hebrew, import button ready. The file was
+    already stored (it was in the pending list), so `documents.upload` threw
+    `CONFLICT: DUPLICATE_DOCUMENT` and the batch reported zero successes.
+  - **Correct for storage, wrong as UX.** Never storing the same bytes twice is right;
+    reporting it as a failure is not. `documents.upload` gains
+    `onDuplicate: "ERROR" | "REUSE"` — **default "ERROR", so every existing caller is
+    unchanged** — and the statement path passes "REUSE", returning the stored document with
+    `duplicate: true`. The UI says "N of them were already stored — showing the existing copy"
+    and opens its preview.
+  - **Bonus fix in the same path:** a REUSE hit now stamps a `docType` that was missing.
+    Files uploaded before the statement-type selector existed have none, and that field drives
+    the card outflow-sign rule — so simply re-uploading them with the type chosen now repairs
+    them, instead of failing.
+  - **Verified:** api 12 tests, tsc clean, eslint clean, i18n parity 1142/1142,
+    `npm ci --dry-run` exit 0.
+
+### Pattern, now three times over
+Three consecutive owner-reported "failures" were **generic error text hiding a benign or
+one-line cause**: an unlisted docType, a validation rejection, and now a duplicate.
+**A failure message that does not name its cause costs a full round-trip every time.**
+Prefer: propagate the real reason, and prefer recovering over reporting when the situation is
+benign.
+
 ## Current state (2026-07-28, session 21)
 
 - **M38i — OneZero CSV + separate-settlement reconciliation. `m38i.patch`.

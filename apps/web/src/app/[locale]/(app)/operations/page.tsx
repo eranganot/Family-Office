@@ -42,7 +42,7 @@ export default async function OperationsPage({
     recomputed?: string; closed?: string; reopened?: string; tab?: string;
     updated?: string; removed?: string; restored?: string; edit?: string;
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
-    mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string;
+    mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string; reused?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -130,6 +130,7 @@ export default async function OperationsPage({
         {sp.uploaded ? (
           <p className="mt-3 text-xs text-neutral-600">
             {t("uploadedCount", { n: sp.uploaded, failed: sp.failed ?? "0" })}
+            {sp.reused && sp.reused !== "0" ? ` ${t("alreadyUploaded", { n: sp.reused })}` : ""}
           </p>
         ) : null}
 
