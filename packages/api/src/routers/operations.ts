@@ -338,15 +338,40 @@ export const operationsRouter = router({
   }),
 
   period: router({
-    current: operationsProcedure.query(async ({ ctx }) => {
-      const now = new Date();
-      const year = now.getUTCFullYear();
-      const month = now.getUTCMonth() + 1;
-      const row = await ctx.db.operatingPeriod.findUnique({
-        where: { householdId_year_month: { householdId: ctx.householdId, year, month } },
+    /** Optional year/month so the owner can navigate to any past month, not just today's. */
+    current: operationsProcedure
+      .input(PeriodRefSchema.partial().optional())
+      .query(async ({ ctx, input }) => {
+        const now = new Date();
+        const year = input?.year ?? now.getUTCFullYear();
+        const month = input?.month ?? now.getUTCMonth() + 1;
+        const row = await ctx.db.operatingPeriod.findUnique({
+          where: { householdId_year_month: { householdId: ctx.householdId, year, month } },
+        });
+        const computed = await computePeriod(ctx.db, ctx.householdId, year, month);
+        return { year, month, row, computed };
+      }),
+
+    /**
+     * Months that actually hold transactions, newest first — so navigation offers real
+     * months rather than an unbounded calendar the owner has to guess their way around.
+     */
+    months: operationsProcedure.query(async ({ ctx }) => {
+      const rows = await ctx.db.transaction.findMany({
+        where: { householdId: ctx.householdId },
+        select: { bookedAt: true },
+        orderBy: { bookedAt: "desc" },
       });
-      const computed = await computePeriod(ctx.db, ctx.householdId, year, month);
-      return { year, month, row, computed };
+      const seen = new Map<string, { year: number; month: number; count: number }>();
+      for (const r of rows) {
+        const y = r.bookedAt.getUTCFullYear();
+        const m = r.bookedAt.getUTCMonth() + 1;
+        const key = `${y}-${m}`;
+        const prev = seen.get(key);
+        if (prev) prev.count += 1;
+        else seen.set(key, { year: y, month: m, count: 1 });
+      }
+      return [...seen.values()];
     }),
 
     /** Runs the deterministic classifier over everything unconfirmed, then recomputes. */

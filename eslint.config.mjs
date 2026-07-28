@@ -28,16 +28,25 @@ export default tseslint.config(
         "error",
         {
           default: "disallow",
+          // eslint-plugin-boundaries v6 object selectors. The v5 string form still works
+          // but prints a deprecation warning on every lint run, and warnings people are
+          // trained to ignore are how real violations get ignored too.
           rules: [
-            { from: "domain", allow: ["domain"] },
-            { from: "db", allow: ["db", "domain"] },
-            { from: "registry", allow: ["registry", "domain", "db"] },
-            { from: "ingestion", allow: ["ingestion", "domain"] },
-            { from: "engine", allow: ["engine", "domain", "db", "registry"] },
-            { from: "api", allow: ["api", "domain", "db", "registry", "engine", "ingestion"] },
-            { from: "i18n", allow: ["i18n"] },
-            { from: "web", allow: ["web", "api", "i18n", "domain"] },
-            { from: "worker", allow: ["worker", "ingestion", "engine", "db", "registry", "domain"] },
+            { from: [{ type: "domain" }], allow: [{ to: [{ type: "domain" }] }] },
+            { from: [{ type: "db" }], allow: [{ to: [{ type: ["db", "domain"] }] }] },
+            { from: [{ type: "registry" }], allow: [{ to: [{ type: ["registry", "domain", "db"] }] }] },
+            { from: [{ type: "ingestion" }], allow: [{ to: [{ type: ["ingestion", "domain"] }] }] },
+            { from: [{ type: "engine" }], allow: [{ to: [{ type: ["engine", "domain", "db", "registry"] }] }] },
+            {
+              from: [{ type: "api" }],
+              allow: [{ to: [{ type: ["api", "domain", "db", "registry", "engine", "ingestion"] }] }],
+            },
+            { from: [{ type: "i18n" }], allow: [{ to: [{ type: "i18n" }] }] },
+            { from: [{ type: "web" }], allow: [{ to: [{ type: ["web", "api", "i18n", "domain"] }] }] },
+            {
+              from: [{ type: "worker" }],
+              allow: [{ to: [{ type: ["worker", "ingestion", "engine", "db", "registry", "domain"] }] }],
+            },
           ],
         },
       ],

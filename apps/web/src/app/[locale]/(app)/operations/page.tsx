@@ -43,6 +43,7 @@ export default async function OperationsPage({
     updated?: string; removed?: string; restored?: string; edit?: string;
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
     mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string; reused?: string;
+    y?: string; m?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -69,7 +70,13 @@ export default async function OperationsPage({
   }
   const pending = await trpc.operations.import.pending().catch(() => []);
   const batches = await trpc.operations.import.batches().catch(() => []);
-  const period = await trpc.operations.period.current();
+  // ?y=&m= drive month navigation; absent means the current month.
+  const navYear = sp.y ? Number(sp.y) : undefined;
+  const navMonth = sp.m ? Number(sp.m) : undefined;
+  const period = await trpc.operations.period.current(
+    navYear && navMonth ? { year: navYear, month: navMonth } : undefined,
+  );
+  const availableMonths = await trpc.operations.period.months().catch(() => []);
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
   const { year, month, row: periodRow, computed } = period;
   const diag = await trpc.operations.diagnostics.month({ year, month }).catch(() => null);
@@ -399,6 +406,44 @@ export default async function OperationsPage({
       {/* ---------------------------------------------------------- M37 --- */}
       <div id="month" />
       <Card title={t("monthTitle", { month: String(month).padStart(2, "0"), year })}>
+        {/* Month navigation: previous / next plus every month that actually has data. */}
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+          {(() => {
+            const prev = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 };
+            const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
+            return (
+              <>
+                <a href={`/${locale}/operations?y=${prev.y}&m=${prev.m}#month`} className="rounded-lg border border-neutral-300 px-3 py-1.5">
+                  ← {String(prev.m).padStart(2, "0")}/{prev.y}
+                </a>
+                <a href={`/${locale}/operations#month`} className="rounded-lg border border-neutral-300 px-3 py-1.5">
+                  {t("thisMonth")}
+                </a>
+                <a href={`/${locale}/operations?y=${next.y}&m=${next.m}#month`} className="rounded-lg border border-neutral-300 px-3 py-1.5">
+                  {String(next.m).padStart(2, "0")}/{next.y} →
+                </a>
+              </>
+            );
+          })()}
+          {availableMonths.length > 0 ? (
+            <span className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
+              <span className="ms-2">{t("monthsWithData")}:</span>
+              {availableMonths.map((mm) => {
+                const active = mm.year === year && mm.month === month;
+                return (
+                  <a
+                    key={`${mm.year}-${mm.month}`}
+                    href={`/${locale}/operations?y=${mm.year}&m=${mm.month}#month`}
+                    className={active ? "rounded bg-blue-600 px-2 py-0.5 text-white" : "rounded bg-neutral-100 px-2 py-0.5 text-blue-700"}
+                  >
+                    {String(mm.month).padStart(2, "0")}/{mm.year} ({mm.count})
+                  </a>
+                );
+              })}
+            </span>
+          ) : null}
+        </div>
+
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <form action={recomputePeriodAction}>
             <input type="hidden" name="locale" value={locale} />

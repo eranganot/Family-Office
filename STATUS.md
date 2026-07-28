@@ -2,6 +2,43 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 27)
+
+- **M38o — month navigation + eslint-boundaries v6 migration. `m38o.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE.**
+  - **Month navigation (owner request).** `period.current` now takes an optional
+    `{year, month}`; new `period.months` lists every month that actually holds
+    transactions, with row counts. UI adds prev / "this month" / next plus one chip per
+    month-with-data, so navigation offers real months rather than an unbounded calendar.
+    Driven by `?y=&m=` so a month is linkable and survives a refresh.
+  - **eslint-plugin-boundaries v6 object selectors (owner request).** The deprecation
+    warning on every lint run is gone. Correct shape is
+    `{ from: [{ type: "x" }], allow: [{ to: [{ type: [...] }] }] }` — note `type`, not
+    `elementType`, and `allow` wraps a policy object around `to`.
+
+### ⚠️ FINDING: the boundary rules are NOT actually enforcing cross-package imports
+While verifying the migration hadn't weakened anything, I tested a deliberate violation
+(`engine-operations` importing `ingestion`) and **neither the old nor the new config flags it** —
+via the package name OR via a relative `../../ingestion/src/...` path. So this is a
+**pre-existing gap, not a regression from the v6 migration**, but it matters:
+`docs/architecture/04-module-decomposition.md` states "Enforcement: `eslint-plugin-boundaries`;
+CI fails on violation", and **that is currently untrue.**
+
+What still DOES work: the `no-restricted-imports` purity rule on `packages/domain` (verified —
+it catches `@wealthos/db` from domain). So domain purity is enforced; the wider dependency
+matrix is not.
+
+Likely cause: the plugin cannot resolve `@wealthos/*` (or relative cross-package paths) to a
+local element without an import resolver, so those imports are treated as external and skipped.
+Probable fix: add `eslint-import-resolver-typescript` and point boundaries at it, or declare the
+workspace packages via `boundaries/alias`. **Deliberately NOT attempted here** — it needs a new
+dependency and a lockfile change, and shipping it untested alongside two other changes is how
+the silent faults in this module happened. Treat as the next piece of work.
+
+Every architectural decision made on the basis of these boundaries (moving the category tree and
+the Hebrew primitives into `domain`, keeping `engine-operations` off `ingestion`) is still
+correct by design — it simply was not machine-checked.
+
 ## Current state (2026-07-28, session 26)
 
 - **M38n — pending card charges are reported, not hidden. `m38n.patch`.
