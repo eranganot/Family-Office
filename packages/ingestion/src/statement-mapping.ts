@@ -20,6 +20,13 @@ export interface ColumnMapping {
   valueDate?: string | undefined;
   reference?: string | undefined;
   balance?: string | undefined;
+  /**
+   * A column stating the DIRECTION in words ("חיוב" / "זכות" / debit / credit) rather
+   * than holding an amount. OneZero exports one signed amount plus this indicator; an
+   * earlier guesser matched it as BOTH the debit and the credit column and then found
+   * no numbers in either, yielding zero usable rows.
+   */
+  direction?: string | undefined;
   /** Cell text that marks a row as not-yet-settled (e.g. "בתהליך קליטה"). */
   pendingMarker?: string | undefined;
 }
@@ -101,6 +108,43 @@ export function normaliseMinus(s: string): string {
   return s.replace(/[−‒–—―]/g, "-");
 }
 
+export type DateOrder = "DMY" | "MDY";
+
+/**
+ * Detect whether a date column is day-first or month-first.
+ *
+ * Israeli statements are day-first, but some exports (the owner's OneZero CSV) emit
+ * US month-first dates like "07/15/2026". Parsing those day-first makes month 15,
+ * every row fails validation, and the import silently yields ZERO usable rows — which
+ * looks like "the tool cannot read the file" rather than a date-format mismatch.
+ *
+ * A component > 12 can only be a day, so one unambiguous sample settles the whole
+ * column. With no evidence either way it stays DMY, the Israeli norm.
+ */
+export function detectDateOrder(samples: readonly string[]): DateOrder {
+  let dmy = 0;
+  let mdy = 0;
+  for (const raw of samples) {
+    const m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/.exec(raw.trim());
+    if (!m) continue;
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a > 12 && b <= 12) dmy += 1;
+    else if (b > 12 && a <= 12) mdy += 1;
+  }
+  return mdy > dmy ? "MDY" : "DMY";
+}
+
+/** Parse a date with an explicit component order. */
+export function parseDateWithOrder(raw: string, order: DateOrder): string | undefined {
+  const t = cleanHebrew(raw);
+  if (order === "DMY") return parseIsraeliDate(t);
+  const m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/.exec(t);
+  if (!m) return parseIsraeliDate(t); // ISO and other shapes fall through
+  const year = m[3]!.length === 2 ? `20${m[3]}` : m[3]!;
+  return parseIsraeliDate(`${m[2]}/${m[1]}/${year}`);
+}
+
 function cell(rec: Record<string, string>, key: string | undefined): string {
   if (!key) return "";
   return normaliseMinus(rec[key] ?? "");
@@ -123,9 +167,13 @@ export function applyMapping(
   const issues: MappingIssue[] = [];
   const c = profile.columns;
 
+  // Decide the date order ONCE from the whole column, not per row: a single
+  // unambiguous sample (a day > 12) settles every other row in the file.
+  const order = detectDateOrder(table.records.map((r) => cleanHebrew(cell(r, c.date))));
+
   table.records.forEach((rec, i) => {
     const rawDate = cell(rec, c.date);
-    const bookedAt = parseIsraeliDate(rawDate);
+    const bookedAt = parseDateWithOrder(rawDate, order);
     if (!bookedAt) {
       issues.push({ rowIndex: i, reason: "NO_DATE", raw: rawDate });
       return;
@@ -134,7 +182,15 @@ export function applyMapping(
     let signed: string | undefined;
     if (profile.amountMode === "SIGNED") {
       const parsed = parseLocalizedDecimal(cell(rec, c.amount));
-      if (parsed !== undefined && profile.allOutflow) {
+      const directionText = cleanHebrew(cell(rec, c.direction)).toLowerCase();
+      if (parsed !== undefined && directionText) {
+        // The statement states the direction explicitly — trust it over the sign, which
+        // some exports omit entirely.
+        const magnitude = Math.abs(Number(parsed));
+        if (CREDIT_WORDS.some((w) => directionText.includes(w))) signed = String(magnitude);
+        else if (DEBIT_WORDS.some((w) => directionText.includes(w))) signed = String(-magnitude);
+        else signed = parsed;
+      } else if (parsed !== undefined && profile.allOutflow) {
         // Preserve an explicit minus (refund); otherwise force outflow.
         signed = Number(parsed) < 0 ? String(Math.abs(Number(parsed))) : String(-Math.abs(Number(parsed)));
       } else {
@@ -158,10 +214,10 @@ export function applyMapping(
       return;
     }
 
-    const descriptionRaw = [cell(rec, c.description), cell(rec, c.reference)]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
+    // The reference is kept for `externalRef` only. Appending it to the description
+    // added noise AND made the redactor mistake it for a bank account number
+    // ("25-21416640" -> [ACCT]), which corrupted the visible merchant text.
+    const descriptionRaw = cell(rec, c.description).trim();
 
     // REDACTION HAPPENS HERE - before the value is ever returned to a caller, and
     // therefore before it can reach the database. There is no path that persists raw text.
@@ -173,7 +229,7 @@ export function applyMapping(
 
     drafts.push({
       bookedAt,
-      valueDate: parseIsraeliDate(cell(rec, c.valueDate)),
+      valueDate: parseDateWithOrder(cell(rec, c.valueDate), order),
       amount: signed,
       currency: (cell(rec, c.currency) || profile.defaultCurrency).toUpperCase().slice(0, 3),
       descriptionRedacted: red.text || "(ללא תיאור)",
@@ -220,8 +276,12 @@ export const HEADER_SYNONYMS: Record<keyof ColumnMapping, string[]> = {
   currency: ["מטבע", "currency"],
   reference: ["אסמכתא", "מס' שובר", "מספר שובר", "reference", "ref"],
   balance: ["יתרה", "balance"],
+  direction: ["חיוב/זיכוי", "חובה/זכות", "סוג תנועה", "debit/credit", "type"],
   pendingMarker: [],
 };
+
+const CREDIT_WORDS = ["זיכוי", "זכות", "credit", "deposit"];
+const DEBIT_WORDS = ["חיוב", "חובה", "debit", "withdrawal"];
 
 /**
  * Recognise a CARD statement from its headers alone.
@@ -259,11 +319,18 @@ export function guessMapping(headers: string[]): MappingGuess {
     }
     return undefined;
   };
-  const debit = find(HEADER_SYNONYMS.debit);
-  const credit = find(HEADER_SYNONYMS.credit);
+  let debit = find(HEADER_SYNONYMS.debit);
+  let credit = find(HEADER_SYNONYMS.credit);
+  // One header matching BOTH is a direction indicator, not two money columns.
+  const direction = find(HEADER_SYNONYMS.direction) ?? (debit && debit === credit ? debit : undefined);
+  if (direction && debit === credit) {
+    debit = undefined;
+    credit = undefined;
+  }
   const amountMode: AmountMode = debit && credit ? "DEBIT_CREDIT" : "SIGNED";
   return {
     amountMode,
+    direction,
     date: find(HEADER_SYNONYMS.date),
     valueDate: find(HEADER_SYNONYMS.valueDate),
     description: find(HEADER_SYNONYMS.description),

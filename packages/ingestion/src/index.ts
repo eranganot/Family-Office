@@ -36,6 +36,7 @@ export type { TabularFormat, SniffResult, TableGrid, ParsedTable } from "./tabul
 export {
   applyMapping, guessMapping, parseInstalments, looksRecurring, normaliseMinus,
   buildExternalRef, HEADER_SYNONYMS, pdfRowsToDrafts, looksLikeCardStatement,
+  detectDateOrder, parseDateWithOrder,
 } from "./statement-mapping";
 export type {
   ColumnMapping, AmountMode, MappingProfile, MappingGuess, TransactionDraft, MappingIssue, MappedResult,

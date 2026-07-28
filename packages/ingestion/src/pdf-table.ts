@@ -59,6 +59,12 @@ export interface PdfTableRow {
   pending: boolean;
   /** True when the bank's own operation code disagrees with the debit/credit columns. */
   directionConflict?: boolean | undefined;
+  /**
+   * Settled directly to the bank account on its own date, OUTSIDE this month's billing
+   * (Isracard prints these under "חיוב בחשבון הבנק ב-<date>"). Still a real transaction
+   * and still imported — it simply must not be counted against the month's total.
+   */
+  separateSettlement?: boolean | undefined;
   page: number;
 }
 
@@ -375,11 +381,20 @@ export function parsePdfTable(lines: CellLine[], declaredKind?: TableKind | unde
   const rows: PdfTableRow[] = [];
   const unparsed: string[] = [];
   let pendingSection = false;
+  /**
+   * Isracard splits a statement into the month's billing and a trailing section of
+   * transactions settled straight to the bank on their own date. Reconciling the whole
+   * file against the printed monthly total therefore FAILS by exactly those rows — the
+   * owner hit this with a ₪247.26 refund on card 1069.
+   */
+  let separateSection = false;
 
   classified.forEach((c, i) => {
     const wholeLine = joinRtl([...c.line.cells]);
     if (wholeLine.includes("בתהליך קליטה")) pendingSection = true;
     if (wholeLine.includes("לחיוב") && wholeLine.includes("עסקאות")) pendingSection = false;
+    // "חיוב בחשבון הבנק ב-<date>" / "שלא במועד החיוב" open the separate-settlement section.
+    if (/חיוב\s+בחשבון\s+הבנק|שלא\s+במועד\s+החיוב/.test(wholeLine)) separateSection = true;
     if (!c.isData) return;
 
     /**
@@ -504,13 +519,18 @@ export function parsePdfTable(lines: CellLine[], declaredKind?: TableKind | unde
       instalmentTotal: inst?.total,
       isRecurringCandidate: looksRecurring(context),
       pending: pendingSection,
+      separateSettlement: separateSection,
       directionConflict,
       page: c.line.page,
     });
   });
 
   const statementTotal = findStatementTotal(lines);
-  const parsedTotal = rows.filter((r) => !r.pending).reduce((sum, r) => sum + Number(r.amount), 0);
+  // Reconcile against ONLY what the issuer billed this month: pending rows have not
+  // settled, and separate-settlement rows were charged to the bank outside this bill.
+  const parsedTotal = rows
+    .filter((r) => !r.pending && !r.separateSettlement)
+    .reduce((sum, r) => sum + Number(r.amount), 0);
   const reconciles =
     statementTotal === undefined
       ? undefined

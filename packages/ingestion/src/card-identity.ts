@@ -26,10 +26,17 @@ export interface SettlementRef {
 export function parseSettlementLine(description: string): SettlementRef | undefined {
   const issuer = ISSUER_PATTERNS.find((p) => description.includes(p));
   if (!issuer) return undefined;
-  // The card number is the trailing 4-digit group (" - 6170", " 1401").
-  const m = /(\d{4})\s*$/.exec(description.trim());
-  if (!m) return undefined;
-  return { last4: m[1]!, issuerText: issuer };
+
+  // FIBI puts the card number last ("ישראכרט בע\"מ - 6170"); OneZero puts it in the
+  // middle ("13795992/1069/ישראכרט בע\"מ). Prefer a trailing group, else take the last
+  // standalone 4-digit token. Requiring an issuer name first is what keeps this safe:
+  // a false positive here would exclude a real expense from the month.
+  const trailing = /(\d{4})\s*$/.exec(description.trim());
+  if (trailing) return { last4: trailing[1]!, issuerText: issuer };
+
+  const groups = [...description.matchAll(/(?<!\d)(\d{4})(?!\d)/g)].map((m) => m[1]!);
+  const last = groups[groups.length - 1];
+  return last ? { last4: last, issuerText: issuer } : undefined;
 }
 
 /**

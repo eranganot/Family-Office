@@ -3,7 +3,8 @@ import {
   detectHeaderRow, normaliseGrid, parseCsvGrid, parseHtmlGrid, sniffEncoding, sniffFormat, toRecords,
 } from "../src/tabular";
 import {
-  applyMapping, buildExternalRef, guessMapping, looksLikeCardStatement, looksRecurring, normaliseMinus, parseInstalments,
+  applyMapping, buildExternalRef, detectDateOrder, guessMapping, looksLikeCardStatement, looksRecurring,
+  normaliseMinus, parseDateWithOrder, parseInstalments,
   type MappingProfile,
 } from "../src/statement-mapping";
 
@@ -271,5 +272,58 @@ describe("card-statement detection — the safety net for a mis-declared file", 
     const asCard = applyMapping(table, { amountMode: "SIGNED", allOutflow: true, defaultCurrency: "ILS", dayFirst: true, columns: cols });
     expect(asCard.drafts[0]?.amount).toBe("-100");   // charge
     expect(asCard.drafts[1]?.amount).toBe("50");     // refund stays an inflow
+  });
+});
+
+describe("real-file regressions: OneZero CSV", () => {
+  it("detects MONTH-FIRST dates so a US-format export is not rejected wholesale", () => {
+    // "07/15/2026" parsed day-first makes month 15; every row fails and the import
+    // yields ZERO rows, which looks like "the tool cannot read this file".
+    expect(detectDateOrder(["07/15/2026", "07/03/2026"])).toBe("MDY");
+    expect(detectDateOrder(["15/07/2026", "03/07/2026"])).toBe("DMY");
+    expect(detectDateOrder(["01/02/2026"])).toBe("DMY"); // ambiguous -> Israeli norm
+  });
+
+  it("parses with the detected order", () => {
+    expect(parseDateWithOrder("07/15/2026", "MDY")).toBe("2026-07-15");
+    expect(parseDateWithOrder("15/07/2026", "DMY")).toBe("2026-07-15");
+  });
+
+  it("treats a single חיוב/זיכוי column as a DIRECTION, not two money columns", () => {
+    // Matching it as both debit AND credit found no numbers in either and produced
+    // zero usable rows.
+    const g = guessMapping(["תאריך תנועה", "תיאור", "סכום פעולה", "חיוב/זיכוי", "יתרה"]);
+    expect(g.amountMode).toBe("SIGNED");
+    expect(g.direction).toBe("חיוב/זיכוי");
+    expect(g.debit).toBeUndefined();
+    expect(g.credit).toBeUndefined();
+  });
+
+  it("uses the stated direction to sign the amount", () => {
+    const csv = [
+      "תאריך תנועה,תיאור,סכום פעולה,חיוב/זיכוי",
+      "07/15/2026,העברה,2006,חיוב",
+      "06/30/2026,משכורת,28279.51,זיכוי",
+    ].join("\n");
+    const table = toRecords(parseCsvGrid(csv), 0);
+    const { drafts } = applyMapping(table, {
+      amountMode: "SIGNED", defaultCurrency: "ILS", dayFirst: true,
+      columns: { date: "תאריך תנועה", description: "תיאור", amount: "סכום פעולה", direction: "חיוב/זיכוי" },
+    });
+    expect(drafts[0]?.amount).toBe("-2006");      // חיוב -> outflow
+    expect(drafts[1]?.amount).toBe("28279.51");   // זיכוי -> inflow
+    expect(drafts[0]?.bookedAt).toBe("2026-07-15");
+  });
+
+  it("keeps the reference OUT of the description", () => {
+    // Appending it made the redactor mistake "25-21416640" for an account number.
+    const csv = "תאריך,תיאור,סכום,אסמכתא\n01/07/2026,חנות,-50,25-21416640";
+    const table = toRecords(parseCsvGrid(csv), 0);
+    const { drafts } = applyMapping(table, {
+      amountMode: "SIGNED", defaultCurrency: "ILS", dayFirst: true,
+      columns: { date: "תאריך", description: "תיאור", amount: "סכום", reference: "אסמכתא" },
+    });
+    expect(drafts[0]?.descriptionRedacted).toBe("חנות");
+    expect(drafts[0]?.externalRef).toContain("25-21416640");
   });
 });

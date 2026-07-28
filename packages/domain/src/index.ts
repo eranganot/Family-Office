@@ -32,6 +32,7 @@ export {
   foldHebrewFinals,
   toggleVisualHebrewLine,
   repairHebrewWords,
+  repairVisualOrderMixed,
 } from "./text/hebrew";
 export {
   DEFAULT_CATEGORY_TREE,

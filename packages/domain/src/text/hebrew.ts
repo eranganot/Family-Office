@@ -149,3 +149,41 @@ export function repairHebrewWords(text: string, lexicon: readonly string[] = [])
     })
     .join("");
 }
+
+/**
+ * Repair a visual-order string that MIXES Hebrew with digits/Latin.
+ *
+ * Neither previous approach is correct for mixed content:
+ *  - full character reversal fixes Hebrew but reverses digits ("12" -> "21");
+ *  - whitespace-token reversal breaks a token containing BOTH, so
+ *    "13795992/1069/מ\"עב" became "בע\"מ/9601/29959731" — Hebrew right, digits mangled.
+ *
+ * The correct transform is run-based, which is what bidi reordering actually is: split
+ * into Hebrew runs and non-Hebrew runs, reverse the ORDER of the runs, and reverse the
+ * characters only INSIDE Hebrew runs. Digit and Latin runs keep their internal order.
+ */
+export function repairVisualOrderMixed(input: string): string {
+  const s = stripBidiControls(input);
+  if (!HEBREW_RE.test(s)) return s;
+
+  const runs: Array<{ hebrew: boolean; text: string }> = [];
+  for (const ch of s) {
+    const isHeb = HEBREW_RE.test(ch) || ch === '"' || ch === "'" || ch === " ";
+    const last = runs[runs.length - 1];
+    // Spaces and Hebrew punctuation attach to the current run so words are not split.
+    if (last && last.hebrew === isHeb) last.text += ch;
+    else runs.push({ hebrew: isHeb, text: ch });
+  }
+
+  // A trailing/leading space run must not decide direction on its own.
+  const meaningful = runs.filter((r) => r.text.trim() !== "");
+  if (meaningful.length <= 1) return reverseChars(s);
+
+  return runs
+    .slice()
+    .reverse()
+    .map((r) => (r.hebrew ? reverseChars(r.text) : r.text))
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}

@@ -10,6 +10,7 @@ import {
   stripBidiControls,
   toggleVisualHebrewLine,
   visualOrderScore,
+  repairVisualOrderMixed,
 } from "../src/text/hebrew";
 
 /**
@@ -110,5 +111,24 @@ describe("containsHebrew", () => {
   it("is true for Hebrew and false for Latin/digits", () => {
     expect(containsHebrew("שלום")).toBe(true);
     expect(containsHebrew("SPOTIFY 33.90")).toBe(false);
+  });
+});
+
+describe("repairVisualOrderMixed — Hebrew and digits in one string", () => {
+  it("reverses Hebrew runs but leaves DIGIT runs intact", () => {
+    // Real OneZero cell. Full character reversal fixes the Hebrew but mangles the
+    // numbers; whitespace-token reversal breaks a token containing both.
+    const visual = '13795992/1069/מ"עב טרכארשי';
+    const out = repairVisualOrderMixed(visual);
+    expect(out).toContain('ישראכרט בע"מ');
+    expect(out).toContain("13795992/1069/"); // digits survive in order
+  });
+
+  it("does not reverse digits inside a mixed token", () => {
+    expect(repairVisualOrderMixed("20אחוז")).toContain("20");
+  });
+
+  it("leaves a pure-Latin string alone", () => {
+    expect(repairVisualOrderMixed("GOOGLE CLOUD 100.00")).toBe("GOOGLE CLOUD 100.00");
   });
 });

@@ -176,6 +176,7 @@ export const ColumnMappingSchema = z.object({
   valueDate: z.string().optional(),
   reference: z.string().optional(),
   balance: z.string().optional(),
+  direction: z.string().optional(),
   pendingMarker: z.string().optional(),
 });
 

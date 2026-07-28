@@ -2,6 +2,56 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 21)
+
+- **M38i — OneZero CSV + separate-settlement reconciliation. `m38i.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE.** Both owner-reported, both diagnosed by running the
+  actual files through the actual code path.
+- **ALL FOUR CARD STATEMENTS NOW RECONCILE EXACTLY** to the totals their issuers print:
+  1069/07 = 5,611.17 · 1069/02 = 2,708.38 · 7796/07 = 3,610.09 · CAL 1401 = 11,709.80.
+  Bank: 111 rows. OneZero CSV: 27 rows, 0 issues, 7 income / 20 expenses.
+
+  ### 1069_02 "does not reconcile" — the CHECK was wrong, not the parse
+  Isracard splits a statement into the month's billing **and a trailing section of
+  transactions settled straight to the bank on their own date**
+  ("חיוב בחשבון הבנק ב-11.01.26 - עסקה אחת:"). A ₪247.26 refund sat there, deliberately
+  OUTSIDE the ₪2,708.38 billed total. Reconciling the whole file therefore failed by exactly
+  that row. Rows under that heading are now marked `separateSettlement` — **still imported**
+  (they are real transactions on their own dates) but excluded from the monthly reconciliation.
+  The 10 billed charges sum to 2,708.38 exactly.
+
+  ### OneZero CSV "cannot read / cannot map" — three stacked faults
+  1. **Month-first dates.** The file uses US `07/15/2026`. Parsed day-first, month 15 is
+     invalid, EVERY row fails, and the import yields zero usable rows — which reads as
+     "the tool cannot read this file". `detectDateOrder()` now settles the column from one
+     unambiguous sample (a component > 12), defaulting to the Israeli DMY when ambiguous.
+  2. **`חיוב/זיכוי` matched BOTH the debit and credit synonyms**, so the guesser chose
+     DEBIT_CREDIT mode and looked for numbers in a column containing WORDS. One header
+     matching both is now recognised as a **direction indicator**: mode stays SIGNED and the
+     stated direction signs the amount (authoritative over the sign, which some exports omit).
+  3. **The reference was folded into the description**, where `redact()` correctly but
+     unhelpfully saw "25-21416640" as an account number and replaced the visible text with
+     `[ACCT]`. The reference is kept for `externalRef` only.
+
+  ### Third bidi lesson: `repairVisualOrderMixed`
+  A cell like `13795992/1069/מ"עב טרכארשי` defeats BOTH earlier repairs — full character
+  reversal fixes the Hebrew but reverses the digits ("1069" → "9601"), and whitespace-token
+  reversal breaks a token containing both. The correct transform is **run-based**, which is
+  what bidi reordering actually is: split into Hebrew and non-Hebrew runs, reverse the ORDER
+  of runs, reverse characters only INSIDE Hebrew runs. Digits keep their internal order.
+  This also restores the card number to a position where settlement dedup can find it —
+  `parseSettlementLine` now accepts a mid-string card number (OneZero) as well as a trailing
+  one (FIBI), still requiring an issuer name first so it can never suppress a real expense.
+
+  - **Verified:** ingestion 121 tests, domain 52, api 12, tsc clean, eslint clean,
+    i18n parity 1141/1141, `npm ci --dry-run` exit 0.
+
+### Standing method
+`/tmp/e2e.mts`, `/tmp/all.mts` and `/tmp/oz.mts` run the owner's real files through the real
+code path and reconcile against the totals the documents state about themselves. **Every fault in
+this module has been found that way and none by inspection.** Re-run them whenever the parser or
+mapping changes.
+
 ## Current state (2026-07-28, session 20)
 
 - **M38h — card-statement uploads were rejected by validation. `m38h.patch`.

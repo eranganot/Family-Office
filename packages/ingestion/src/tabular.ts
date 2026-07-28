@@ -1,6 +1,5 @@
 import Papa from "papaparse";
-import { cleanHebrew, looksVisualOrder, stripBidiControls } from "@wealthos/domain";
-import { toggleVisualHebrewLine } from "./normalize";
+import { cleanHebrew, looksVisualOrder, repairVisualOrderMixed, stripBidiControls } from "@wealthos/domain";
 
 /**
  * Generic tabular statement reader: CSV and HTML-table exports.
@@ -168,6 +167,10 @@ export const IL_STATEMENT_LEXICON = [
   "מינימרקט", "מרקט", "סופר", "מכולת", "חנות", "מסעדה", "פיצה", "קפה", "דלק", "תחנת",
   "ביטוח", "עירייה", "עיריית", "חשמל", "מים", "ארנונה", "משכנתא", "רפואי", "מרקחת",
   "קצבת", "ילדים", "שוק", "מרכז", "חניון", "חניה", "נסיעות", "תחבורה", "רכב", "טיסה",
+  // Card issuers: they appear on bank lines as settlement descriptions, and none of
+  // them contains a Hebrew final letter, so only a lexicon can decide their direction.
+  "ישראכרט", "כאל", "מקס", "דיינרס", "לאומי", "קארד", "אמריקן", "אקספרס", "פועלים",
+  "לאומי", "דיסקונט", "מזרחי", "הבינלאומי", "מסד", "יהב", "וואן", "זירו",
 ];
 
 /**
@@ -184,10 +187,10 @@ export function normaliseGrid(grid: TableGrid): TableGrid {
       r.map((c) => {
         const stripped = stripBidiControls(c);
         if (!/[֐-׿]/.test(stripped)) return stripped;
-        const hit = IL_STATEMENT_LEXICON.some((w) => stripped.includes(w));
-        if (hit) return stripped; // already logical order
-        return looksVisualOrder(stripped) || IL_STATEMENT_LEXICON.some((w) => toggleVisualHebrewLine(stripped).includes(w))
-          ? toggleVisualHebrewLine(stripped)
+        if (IL_STATEMENT_LEXICON.some((w) => stripped.includes(w))) return stripped; // already logical
+        const repaired = repairVisualOrderMixed(stripped);
+        return looksVisualOrder(stripped) || IL_STATEMENT_LEXICON.some((w) => repaired.includes(w))
+          ? repaired
           : stripped;
       }),
     ),
