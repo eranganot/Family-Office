@@ -19,12 +19,13 @@
     "postinstall": "npm run generate --workspace=@wealthos/db --if-present"
   },
   "devDependencies": {
+    "eslint": "^10.6.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-boundaries": "^6.0.0",
     "prettier": "^3.6.0",
     "turbo": "^2.10.3",
     "typescript": "^5.9.0",
-    "eslint": "^10.6.0",
-    "typescript-eslint": "^8.62.0",
-    "eslint-plugin-boundaries": "^6.0.0"
+    "typescript-eslint": "^8.62.0"
   },
   "packageManager": "npm@10.9.8"
 }

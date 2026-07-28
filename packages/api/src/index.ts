@@ -49,3 +49,19 @@ export type { Context, Session } from "./context";
 export { refreshFxFromBoi } from "./services/fx-service";
 export { refreshBoiRate, latestBoiRate } from "./services/boi-rate-service";
 export type { FxRefreshResult } from "./services/fx-service";
+
+/**
+ * The database handle, exposed through `api` so the web app never imports `db` directly.
+ *
+ * `Context` requires a PrismaClient, but `api` previously offered no way to obtain one —
+ * so every caller reached into `@wealthos/db` itself, violating the dependency matrix
+ * (web may import api, i18n and domain only). The seam was missing, not the rule wrong.
+ */
+export { prisma as db } from "@wealthos/db";
+
+/**
+ * Re-exported for the web layer: a pure display calculation that lives in the strategy
+ * engine. `web -> engine` is forbidden, `web -> api -> engine` is not, and duplicating
+ * the formula in the UI would let it drift from the engine that produces the plan.
+ */
+export { deriveTargetGrowthPct } from "@wealthos/engine-strategy";

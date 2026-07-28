@@ -1,6 +1,5 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import { appRouter, type Context } from "@wealthos/api";
-import { prisma } from "@wealthos/db";
+import { appRouter, db, type Context } from "@wealthos/api";
 import { SESSION_COOKIE, verifySessionToken } from "../../../../lib/session";
 
 async function createContext(req: Request): Promise<Context> {
@@ -12,7 +11,7 @@ async function createContext(req: Request): Promise<Context> {
     .find((c) => c.startsWith(`${SESSION_COOKIE}=`))
     ?.slice(SESSION_COOKIE.length + 1);
   const session = secret && token ? await verifySessionToken(token, secret) : null;
-  return { session, db: prisma };
+  return { session, db };
 }
 
 const handler = (req: Request) =>

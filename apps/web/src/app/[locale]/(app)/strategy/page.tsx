@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { PhaseGate } from "../phase-gate";
-import { deriveTargetGrowthPct } from "@wealthos/engine-strategy";
+import { deriveTargetGrowthPct } from "@wealthos/api";
 import { decideAction, dismissRecommendationAction, markImplementedAction, runStrategyAction, saveRiskAction, updateGoalPlanAction } from "../../../../lib/actions/strategy-actions";
 import { Card, Field, Select, SubmitButton, TextInput, Explainer } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";

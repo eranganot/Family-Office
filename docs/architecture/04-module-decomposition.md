@@ -44,8 +44,23 @@ wealthos/
 \* Exception: `engine-strategy` may import `engine-goals` and `engine-verification` read-model types
 (strategy consumes goal gaps and data-quality scores). No other inter-engine imports.
 
-Enforcement: `eslint-plugin-boundaries` in `packages/config`; CI fails on violation. This is what
-keeps "future capabilities added with minimal changes to the core domain" true in practice.
+Enforcement: `eslint-plugin-boundaries` in `eslint.config.mjs`; CI fails on violation.
+
+> **2026-07-28 — this claim was FALSE for a long time and is now true again.** Without an import
+> resolver the plugin could not map `@wealthos/*` to a local element (our packages expose only an
+> `exports` map, which `eslint-import-resolver-node` does not read), so every cross-package import
+> was treated as external and skipped — the matrix below enforced nothing. Fixed by adding
+> `eslint-import-resolver-typescript` and an `import/resolver` setting. Turning it on immediately
+> surfaced four real violations that had accumulated while it was silent:
+>
+> | Violation | Resolution |
+> |---|---|
+> | `web → db` (×2, tRPC context) | `api` now exports the db handle; the seam was missing, not the rule wrong |
+> | `web → engine` (strategy page) | `api` re-exports `deriveTargetGrowthPct`; `web → api → engine` is legal |
+> | `worker → api` | **Rule widened deliberately**: the worker is an application-level caller of the same services the web app uses. This document predates those services living in `api`; moving them into an engine remains the cleaner long-term option. |
+>
+> Verified by asserting a deliberate violation IS reported — a boundary rule that has never been
+> seen to fail is indistinguishable from one that does nothing.
 
 ## 3. Key contracts
 

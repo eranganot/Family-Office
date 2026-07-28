@@ -2,6 +2,42 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 29)
+
+- **M38q — the boundary rules actually enforce now. `m38q.patch`.
+  NO MIGRATION. ⚠️ LOCKFILE CHANGES (one new devDependency).** Apply AFTER `m38p`.
+  - **Root cause of the silent rules:** the plugin could not resolve `@wealthos/*` to a local
+    element, because our workspace packages expose only an `exports` map (`"./src/index.ts"`)
+    with no `main`, and the bundled `eslint-import-resolver-node@0.3.9` does not read `exports`.
+    Unresolved imports are treated as EXTERNAL and skipped — so the entire dependency matrix
+    enforced nothing, in either the v5 or v6 syntax.
+  - **Fix:** added `eslint-import-resolver-typescript` (dev-only) + an `import/resolver` setting.
+    Verified by asserting a deliberate violation IS reported — **a boundary rule that has never
+    been seen to fail is indistinguishable from one that does nothing.**
+  - **Turning it on surfaced four real violations** that had accumulated while it was silent:
+    | Violation | Resolution |
+    |---|---|
+    | `web → db` ×2 (tRPC context) | `api` now exports the db handle. `Context` needed a PrismaClient but `api` offered no way to get one — the SEAM was missing, not the rule wrong. |
+    | `web → engine` (strategy page) | `api` re-exports `deriveTargetGrowthPct`; `web → api → engine` is legal, and duplicating the formula in the UI would let it drift from the engine that produces the plan. |
+    | `worker → api` | **Rule widened deliberately**, with the reason in the config: the worker is an application-level caller of the same services the web app uses. Doc 04 predates those services living in `api`. Moving them into an engine is the cleaner long-term option and is recorded as such. |
+  - `docs/architecture/04` corrected: it claimed CI fails on violation while that was untrue.
+  - **Verified:** full-repo `eslint --max-warnings 0` exit 0 with ZERO violations; deliberate
+    violations in two different packages ARE reported; tsc clean (api / engine-operations / web /
+    worker); `npm ci --dry-run` exit 0.
+
+### ⚠️ Owner blocked on a stale `.git/rebase-apply`
+`git am` left the directory behind after failing on an untracked `docs/SMOKE-M38-final.md`.
+Every later `git am` then exits immediately, no commit is created, and `git push` reports
+"Everything up-to-date" — which reads as "already deployed" but means "nothing to send".
+**Sequence: `git am --abort` → `git am --3way <patch>` → CHECK `git log --oneline -1` → push.**
+Deploy scripts already clear this in pre-flight; hand-run `git am` does not.
+
+## Next up — M39 (financial calendar + recurring decisions)
+Owner inputs needed: **B3** 2026 hishtalmut / gemel / pension ceilings and contribution rates,
+**B4** IL Tax Authority + Bituach Leumi statutory dates. I draft both with sources into a new
+registry seed; owner verifies at `/registry` and flips `ownerReviewed`. **B2 (IL 2025) is already
+approved; IL 2026 remains unreviewed, including the null bituach-leumi employee rates.**
+
 ## Current state (2026-07-28, session 28)
 
 - **M38p — duplicate finder + category/behaviour filters. `m38p.patch`.

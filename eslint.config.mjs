@@ -22,6 +22,20 @@ export default tseslint.config(
         { type: "worker", pattern: "apps/worker/**" },
       ],
       "boundaries/dependency-nodes": ["import"],
+      /**
+       * WITHOUT a resolver, `@wealthos/x` is treated as an EXTERNAL package and the
+       * dependency matrix below never fires — which is what made these rules silently
+       * non-enforcing despite doc 04 claiming CI fails on violation.
+       * The bundled `eslint-import-resolver-node` cannot do it: our workspace packages
+       * expose only an `exports` map ("./src/index.ts") with no `main`, and
+       * resolver-node 0.3.9 does not read `exports`. A TypeScript-aware resolver does.
+       */
+      "import/resolver": {
+        typescript: {
+          project: ["tsconfig.json", "packages/*/tsconfig.json", "apps/*/tsconfig.json"],
+          noWarnOnMultipleProjects: true,
+        },
+      },
     },
     rules: {
       "boundaries/dependencies": [
@@ -44,8 +58,12 @@ export default tseslint.config(
             { from: [{ type: "i18n" }], allow: [{ to: [{ type: "i18n" }] }] },
             { from: [{ type: "web" }], allow: [{ to: [{ type: ["web", "api", "i18n", "domain"] }] }] },
             {
+              // `api` added deliberately: the worker is an application-level caller of the
+              // same services the web app uses (runMonitoringCycle, refreshFxFromBoi). Doc 04
+              // predates those services living in `api`. The alternative — moving them into an
+              // engine — is a real option but a larger refactor; recorded in STATUS.md.
               from: [{ type: "worker" }],
-              allow: [{ to: [{ type: ["worker", "ingestion", "engine", "db", "registry", "domain"] }] }],
+              allow: [{ to: [{ type: ["worker", "api", "ingestion", "engine", "db", "registry", "domain"] }] }],
             },
           ],
         },
