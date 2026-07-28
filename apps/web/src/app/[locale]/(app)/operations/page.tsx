@@ -463,6 +463,14 @@ export default async function OperationsPage({
                     { key: "surplus", label: t("verifiedSurplus"), amount: surplus.ok ? surplus.monthlyBase : 0, kind: "result" },
                   ]}
                 />
+                {flow.pendingCount > 0 ? (
+                  <p className="mt-3 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+                    {t("pendingLine", {
+                      n: flow.pendingCount,
+                      amount: formatMoney(flow.pendingAmountBase, baseCurrency, loc),
+                    })}
+                  </p>
+                ) : null}
                 {!surplus.ok ? (
                   <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{t(`refusal.${surplus.reason}`)}</p>
                 ) : null}
@@ -485,6 +493,11 @@ export default async function OperationsPage({
                   <>
                     <p className="text-2xl font-semibold tabular-nums">{formatMoney(sts.safeToSpendBase, baseCurrency, loc)}</p>
                     <p className="mt-1 text-xs text-neutral-500">{t("safeToSpendHint", { days: sts.windowDays })}</p>
+                    {sts.pendingCommittedBase > 0 ? (
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {t("safeToSpendPending", { amount: formatMoney(sts.pendingCommittedBase, baseCurrency, loc) })}
+                      </p>
+                    ) : null}
                     {computed.committedInstalmentsBase > 0 ? (
                       <p className="mt-1 text-xs text-neutral-500">
                         {t("instalmentsCommitted", { amount: formatMoney(computed.committedInstalmentsBase, baseCurrency, loc) })}

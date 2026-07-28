@@ -65,6 +65,12 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
  */
 export function computeMonthlyCashFlow(input: PeriodInput): MonthlyCashFlowResult {
   const counted = input.transactions.filter((t) => t.status === "BOOKED");
+  // Reported, never counted: a pending charge has not settled, so including it would
+  // break reconciliation against the bank — but hiding it entirely is what made the
+  // owner ask why three transactions had vanished.
+  const pendingRows = input.transactions.filter((t) => t.status === "PENDING");
+  const pendingAmountBase =
+    Math.round(pendingRows.reduce((n, t) => n + Math.abs(t.amountBase ?? 0), 0) * 100) / 100;
 
   const missingFx = counted.filter((t) => t.amountBase === null);
   if (missingFx.length > 0) {
@@ -168,6 +174,8 @@ export function computeMonthlyCashFlow(input: PeriodInput): MonthlyCashFlowResul
     transfersExcludedBase: round2(transfersExcludedBase),
     unverifiedCount,
     unverifiedAmountBase: round2(unverifiedAmountBase),
+    pendingCount: pendingRows.length,
+    pendingAmountBase,
     coverage,
   };
 }
@@ -225,6 +233,7 @@ export interface DiscretionaryLiquidityFloor {
   debtServiceBase: number;
   committedInWindowBase: number;
   bufferContributionBase: number;
+  pendingCommittedBase: number;
   windowDays: number;
   provisional: boolean;
 }
@@ -251,12 +260,16 @@ export function computeSafeToSpend(
   if (flow.byBehavioral.FIXED_CONTRACTUAL === 0 && flow.expensesBase === 0) {
     return { ok: false, reason: "NO_EXPENSES_MAPPED" };
   }
+  // Pending card charges are already committed: the issuer will bill them. They are not
+  // in `expensesBase` (they have not settled), so they must be subtracted here or
+  // Safe-to-Spend overstates what is genuinely free.
   const safe = round2(
     flow.incomeBase -
       flow.byBehavioral.FIXED_CONTRACTUAL -
       input.debtServiceBase -
       input.committedInWindowBase -
-      input.requiredBufferTopUpBase,
+      input.requiredBufferTopUpBase -
+      flow.pendingAmountBase,
   );
   return {
     ok: true,
@@ -266,6 +279,7 @@ export function computeSafeToSpend(
     debtServiceBase: input.debtServiceBase,
     committedInWindowBase: input.committedInWindowBase,
     bufferContributionBase: input.requiredBufferTopUpBase,
+    pendingCommittedBase: flow.pendingAmountBase,
     windowDays: input.windowDays,
     provisional: flow.unverifiedCount > 0 || flow.coverage !== "COMPLETE",
   };

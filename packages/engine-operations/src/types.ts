@@ -57,6 +57,13 @@ export interface MonthlyCashFlow {
   transfersExcludedBase: number;
   unverifiedCount: number;
   unverifiedAmountBase: number;
+  /**
+   * Card charges the issuer has not billed yet (עסקאות בתהליך קליטה). Excluded from the
+   * settled totals — the money has not left the account — but reported so they are never
+   * invisible, and subtracted from Safe-to-Spend because they ARE committed.
+   */
+  pendingCount: number;
+  pendingAmountBase: number;
   coverage: "COMPLETE" | "PARTIAL" | "AGGREGATE_ONLY";
 }
 

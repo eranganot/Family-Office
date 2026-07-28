@@ -193,3 +193,36 @@ describe("computeWorkingCapital", () => {
     expect(computeWorkingCapital(10000, 3000, 12000, 1.5).gapBase).toBe(11000);
   });
 });
+
+describe("pending card charges — reported, never counted", () => {
+  const flow = () => computeMonthlyCashFlow(period([
+    txn({ amountBase: 20000, behavioral: "FIXED_CONTRACTUAL" }),
+    txn({ amountBase: -1000, behavioral: "VARIABLE_DISCRETIONARY" }),
+    txn({ amountBase: -130.85, status: "PENDING" }),
+    txn({ amountBase: -96.7, status: "PENDING" }),
+  ]));
+
+  it("keeps pending OUT of expenses so the month reconciles against settled cash", () => {
+    const f = ok(flow());
+    expect(f.expensesBase).toBe(1000);
+  });
+
+  it("REPORTS them instead of hiding them — invisibility is what prompted the question", () => {
+    const f = ok(flow());
+    expect(f.pendingCount).toBe(2);
+    expect(f.pendingAmountBase).toBe(227.55);
+  });
+
+  it("subtracts them from Safe-to-Spend: not settled, but already committed", () => {
+    const f = ok(flow());
+    const r = computeSafeToSpend({
+      flow: f, debtServiceBase: 0, committedInWindowBase: 0,
+      requiredBufferTopUpBase: 0, windowDays: 30,
+    });
+    expect(isRefusal(r)).toBe(false);
+    if (!isRefusal(r)) {
+      expect(r.pendingCommittedBase).toBe(227.55);
+      expect(r.safeToSpendBase).toBe(20000 - 227.55);
+    }
+  });
+});

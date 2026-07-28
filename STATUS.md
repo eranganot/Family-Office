@@ -2,6 +2,36 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 26)
+
+- **M38n — pending card charges are reported, not hidden. `m38n.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE.** Owner decision 2026-07-28.
+  - **Owner asked why 3 pending transactions "are not calculated".** They were excluded by
+    design (an in-process card charge has not settled, so counting it breaks reconciliation
+    against the bank) — but they were also **invisible**, which is why it read as a bug.
+  - **Resolution (owner chose): keep them out of the settled totals, but SHOW them.**
+    `MonthlyCashFlow` gains `pendingCount` / `pendingAmountBase`; the surplus card renders
+    "בתהליך קליטה, טרם חויב: ₪X (N תנועות)" explaining they will count when the issuer bills.
+  - **Safe-to-Spend now SUBTRACTS them.** They are not in `expensesBase` (unsettled), but they
+    are committed — the issuer will bill them — so leaving them out overstated genuinely free
+    cash. This is the one place a pending charge must reduce a figure.
+  - **Verified:** engine-operations 73 tests (3 new), tsc clean, eslint clean,
+    i18n parity 1153/1153, `npm ci --dry-run` exit 0.
+
+### ⚠️ STALE DATA IN THE OWNER'S DB — diagnosed from the new diagnostics panel
+The panel showed July rows that the CURRENT code cannot produce:
+`פיין מרקט 96.70` and `מינימרקט 130.85` stored **positive** (income) while `536.31-` from the
+same CAL statement is correctly negative; and dates of **2026-07-01** where the CAL statement
+bills 26–27/07. Parsed fresh, all three are negative and correctly dated. Two settlements of
+card 6170 also carry opposite signs. **These are rows imported before the sign fixes; the reset
+either predated the fix or that file was not re-imported.** Owner must run
+`DELETE ALL` → re-upload everything on the current build before any figure can be trusted.
+
+### The diagnostics panel worked
+It ended a multi-round loop in one screenshot: the question stopped being "is the parser right"
+(it is — every statement reconciles) and became "what is actually stored", which is answerable.
+**Ask for that panel before changing code when a displayed figure is disputed.**
+
 ## Current state (2026-07-28, session 25)
 
 - **M38m — read-only diagnostics panel. `m38m.patch`. NO MIGRATION, NO LOCKFILE CHANGE.**
