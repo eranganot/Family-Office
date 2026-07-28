@@ -11,6 +11,7 @@ import {
   commitStatementAction,
   setTransactionStatusAction,
   updateTransactionAction,
+  resetAllImportsAction,
   undoImportAction,
   uploadStatementAction,
   upsertCategoryAction,
@@ -41,7 +42,7 @@ export default async function OperationsPage({
     recomputed?: string; closed?: string; reopened?: string; tab?: string;
     updated?: string; removed?: string; restored?: string; edit?: string;
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
-    mb?: string; skipped?: string; undone?: string;
+    mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -156,6 +157,18 @@ export default async function OperationsPage({
           </div>
         ) : null}
 
+        <details className="mt-4 text-xs">
+          <summary className="cursor-pointer text-red-600">{t("dangerZone")}</summary>
+          <p className="mt-2 text-neutral-600">{t("resetHint")}</p>
+          <form action={resetAllImportsAction} className="mt-2 flex flex-wrap items-center gap-2">
+            <input type="hidden" name="locale" value={locale} />
+            <TextInput name="confirm" placeholder="DELETE ALL" />
+            <button type="submit" className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white">
+              {t("resetAll")}
+            </button>
+          </form>
+        </details>
+
         {batches.length > 0 ? (
           <details className="mt-4 text-xs">
             <summary className="cursor-pointer text-neutral-600">{t("importHistory")}</summary>
@@ -222,6 +235,16 @@ export default async function OperationsPage({
                       })}
                 </p>
               ) : null}
+
+              <p className={`mb-4 rounded-lg px-3 py-2 text-sm ${preview.inflowCount > 0 && preview.outflowCount === 0 ? "bg-amber-50 text-amber-800" : "bg-neutral-50 text-neutral-700"}`}>
+                {t("previewDirection", {
+                  out: preview.outflowCount,
+                  outTotal: Math.abs(preview.outflowTotal).toFixed(2),
+                  in: preview.inflowCount,
+                  inTotal: preview.inflowTotal.toFixed(2),
+                })}
+                {preview.inflowCount > 0 && preview.outflowCount === 0 ? ` ${t("previewAllIncomeWarning")}` : ""}
+              </p>
 
               <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-800">
                 {t("previewRedaction", { n: preview.redactedFields, version: preview.redactionVersion })}
@@ -358,6 +381,7 @@ export default async function OperationsPage({
           : sp.removed ? t("removedOk")
           : sp.restored ? t("restoredOk")
           : sp.undone ? t("undoneOk", { n: sp.undone })
+          : sp.reset ? t("resetOk", { n: sp.reset, docs: sp.docs ?? "0" })
           : sp.imported
             ? sp.skipped && sp.skipped !== "0"
               ? t("importedSome", { n: sp.imported, dupes: sp.dupes ?? "0", skipped: sp.skipped })

@@ -2,6 +2,41 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 19)
+
+- **M38g — card-sign safety net + full import reset. `m38g.patch`. NO MIGRATION, NO LOCKFILE CHANGE.**
+  - **ROOT CAUSE of "expenses still look like income".** `allOutflow` was applied ONLY when the
+    owner *declared* the file a card statement — but the type selector shipped in M38f, AFTER
+    those files were uploaded, so their `docType` was null and every charge imported positive.
+    Two fixes: (a) **`looksLikeCardStatement()` detects a card file from its HEADERS** (a charge
+    column + a merchant column, and crucially NO זכות/חובה pair) and forces outflow regardless of
+    what was declared; (b) the same rule now runs in **preview as well as commit** — previously
+    preview and commit could disagree, so the preview showed signs the import would not produce.
+    **Proved on the real HTML: mis-declared as BANK → 70 income (wrong); with the net → 70
+    expenses + 1 refund (right).**
+  - **Direction summary in the preview**: "N expenses (₪X) · M income (₪Y)", with an explicit
+    warning when EVERY row is income — which for a card statement always means an inverted sign.
+    A sign error is now visible *before* importing rather than discovered in the ledger.
+  - **Danger zone: `import.resetAll`** — deletes every imported transaction, import batch and
+    uploaded statement document so importing can start clean. Requires typing `DELETE ALL`.
+    **Manually-entered transactions are deliberately KEPT** (`source: "IMPORT"` filter): they were
+    never part of an import and re-typing them would be real lost work. Operating periods are
+    cleared too, since their frozen figures were computed from the deleted rows.
+  - **Verified:** ingestion 116 tests (3 new), tsc clean, eslint clean, i18n parity 1140/1140,
+    `npm ci --dry-run` exit 0.
+
+### Owner workflow after deploying this
+1. Import card → **אזור מסוכן** → type `DELETE ALL` → wipe.
+2. Re-upload, choosing the statement type. Bank statements first, then cards.
+3. Check the preview's **reconciliation line** (green = matches the issuer's printed total) and
+   the **direction summary** before pressing import.
+4. Recompute. Card settlements dedup automatically against the bank's aggregate lines.
+
+### Why this kept recurring
+The sign rule depended on owner-declared metadata that did not exist when the files were
+uploaded, and preview did not share the commit path's logic. **Detection now derives from the
+file's own content, and preview and commit run the same code.**
+
 ## Current state (2026-07-28, session 18)
 
 - **M38f — statement import verified E2E against the REAL files. `m38f.patch`.

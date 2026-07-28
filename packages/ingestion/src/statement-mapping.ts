@@ -223,6 +223,26 @@ export const HEADER_SYNONYMS: Record<keyof ColumnMapping, string[]> = {
   pendingMarker: [],
 };
 
+/**
+ * Recognise a CARD statement from its headers alone.
+ *
+ * A card statement has a charge column ("סכום חיוב") and a merchant column, and
+ * crucially NO זכות/חובה pair — every row is a charge. A bank statement always has the
+ * debit/credit pair. This is a SAFETY NET on top of the owner's declared type: a card
+ * file mis-declared as a bank statement would otherwise import every expense as income,
+ * which is exactly the failure the owner hit.
+ */
+export function looksLikeCardStatement(headers: string[]): boolean {
+  const h = headers.map((x) => cleanHebrew(x));
+  const hasDebitCredit =
+    h.some((x) => x.includes("חובה") || x.includes("debit")) &&
+    h.some((x) => x.includes("זכות") || x.includes("credit"));
+  if (hasDebitCredit) return false;
+  const hasCharge = h.some((x) => x.includes("סכום חיוב") || x.includes("סכום עסקה"));
+  const hasMerchant = h.some((x) => x.includes("בית עסק") || x.includes("שם העסק") || x.includes("בית  עסק"));
+  return hasCharge || hasMerchant;
+}
+
 /** Best-effort mapping guess from the headers, for the wizard's initial state. */
 export type MappingGuess = { [K in keyof ColumnMapping]?: string | undefined } & { amountMode: AmountMode };
 

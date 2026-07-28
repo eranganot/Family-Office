@@ -610,6 +610,32 @@ export const operationsRouter = router({
         return { removed: removed.count };
       }),
 
+    /**
+     * DESTRUCTIVE: delete every imported transaction, every import batch and every
+     * uploaded statement document for the household, so importing can start from clean.
+     *
+     * Requires the caller to type the confirmation phrase — this cannot be reached by a
+     * stray click. Manually-entered transactions are KEPT: they were never part of an
+     * import and re-creating them by hand would be real lost work.
+     */
+    resetAll: operationsProcedure
+      .input(z.object({ confirm: z.literal("DELETE ALL") }))
+      .mutation(async ({ ctx }) => {
+        const txns = await ctx.db.transaction.deleteMany({
+          where: { householdId: ctx.householdId, source: "IMPORT" },
+        });
+        const batches = await ctx.db.importBatch.deleteMany({
+          where: { document: { householdId: ctx.householdId } },
+        });
+        // Documents last: batches reference them.
+        const docs = await ctx.db.document.deleteMany({
+          where: { householdId: ctx.householdId, batches: { none: {} }, valuations: { none: {} } },
+        });
+        // Periods hold frozen figures computed from the deleted rows.
+        await ctx.db.operatingPeriod.deleteMany({ where: { householdId: ctx.householdId } });
+        return { transactions: txns.count, batches: batches.count, documents: docs.count };
+      }),
+
     profiles: operationsProcedure.query(async ({ ctx }) =>
       ctx.db.importMappingProfile.findMany({
         where: { householdId: ctx.householdId },

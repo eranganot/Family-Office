@@ -341,3 +341,19 @@ export async function undoImportAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/operations?undone=${removed}#import`);
 }
+
+/** DESTRUCTIVE: wipe every imported transaction, batch and statement document. */
+export async function resetAllImportsAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  if (str(fd, "confirm").trim() !== "DELETE ALL") {
+    redirect(`/${locale}/operations?error=confirm#import`);
+  }
+  const trpc = await serverCaller();
+  let r: { transactions: number; batches: number; documents: number } | undefined;
+  try {
+    r = await trpc.operations.import.resetAll({ confirm: "DELETE ALL" });
+  } catch {
+    redirect(`/${locale}/operations?error=reset#import`);
+  }
+  redirect(`/${locale}/operations?reset=${r?.transactions ?? 0}&docs=${r?.documents ?? 0}#import`);
+}

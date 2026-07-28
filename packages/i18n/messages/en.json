@@ -1365,6 +1365,12 @@
     "typeCard": "Credit card",
     "statementTypeHint": "Card statements are charges (a refund shows a minus). Bank statements carry both income and expenses. Telling us which avoids guessing the sign.",
     "reconcilesOk": "Reconciled: the parsed rows total ₪{total}, matching the statement's own printed total.",
-    "reconcilesFail": "DOES NOT RECONCILE — the statement says ₪{statement} but the parsed rows total ₪{parsed}. Something was dropped, duplicated or read with the wrong sign. Do not import; send me this file."
+    "reconcilesFail": "DOES NOT RECONCILE — the statement says ₪{statement} but the parsed rows total ₪{parsed}. Something was dropped, duplicated or read with the wrong sign. Do not import; send me this file.",
+    "dangerZone": "Danger zone — delete everything imported",
+    "resetHint": "Deletes every imported transaction, import batch and uploaded statement, so you can start from clean. Manually-entered transactions are kept. Type DELETE ALL to confirm — this cannot be undone.",
+    "resetAll": "Delete all imports",
+    "resetOk": "Deleted {n} imported transactions and {docs} statement files. You can now upload from scratch.",
+    "previewDirection": "{out} expenses (₪{outTotal}) · {in} income (₪{inTotal})",
+    "previewAllIncomeWarning": "⚠ Every row is income — for a card statement that means the sign is inverted. Do not import; tell me."
   }
 }

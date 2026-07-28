@@ -3,7 +3,7 @@ import {
   detectHeaderRow, normaliseGrid, parseCsvGrid, parseHtmlGrid, sniffEncoding, sniffFormat, toRecords,
 } from "../src/tabular";
 import {
-  applyMapping, buildExternalRef, guessMapping, looksRecurring, normaliseMinus, parseInstalments,
+  applyMapping, buildExternalRef, guessMapping, looksLikeCardStatement, looksRecurring, normaliseMinus, parseInstalments,
   type MappingProfile,
 } from "../src/statement-mapping";
 
@@ -247,5 +247,29 @@ describe("merchantKey is stamped at import time", () => {
       columns: { date: "תאריך", description: "תיאור", amount: "סכום" },
     });
     expect(drafts[0]?.merchantKey).not.toContain("4111");
+  });
+});
+
+describe("card-statement detection — the safety net for a mis-declared file", () => {
+  it("recognises a card statement from its headers alone", () => {
+    // Real Isracard-via-FIBI HTML headers.
+    expect(looksLikeCardStatement(["תאריך עסקה", "שם העסק", "סכום עסקה", "סכום חיוב", "פירוט"])).toBe(true);
+  });
+
+  it("does NOT flag a bank statement — it has the debit/credit pair", () => {
+    expect(looksLikeCardStatement(["תאריך", "תיאור", "חובה", "זכות", "יתרה", "אסמכתא"])).toBe(false);
+  });
+
+  it("forces every card row to an outflow, keeping an explicit refund positive", () => {
+    // Card statements print charges UNSIGNED. Without allOutflow every expense
+    // imports as income - which is exactly what the owner saw.
+    const csv = "תאריך עסקה,שם העסק,סכום חיוב\n01/07/2026,חנות,100.00\n02/07/2026,החזר,-50.00";
+    const table = toRecords(parseCsvGrid(csv), 0);
+    const cols = { date: "תאריך עסקה", description: "שם העסק", amount: "סכום חיוב" };
+    const asBank = applyMapping(table, { amountMode: "SIGNED", defaultCurrency: "ILS", dayFirst: true, columns: cols });
+    expect(asBank.drafts[0]?.amount).toBe("100.00"); // wrong direction without the flag
+    const asCard = applyMapping(table, { amountMode: "SIGNED", allOutflow: true, defaultCurrency: "ILS", dayFirst: true, columns: cols });
+    expect(asCard.drafts[0]?.amount).toBe("-100");   // charge
+    expect(asCard.drafts[1]?.amount).toBe("50");     // refund stays an inflow
   });
 });

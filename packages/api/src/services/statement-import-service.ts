@@ -2,7 +2,7 @@ import type { PrismaClient } from "@wealthos/db";
 import { fileStore } from "@wealthos/db";
 import {
   applyMapping, decodeBytes, detectHeaderRow, guessMapping, normaliseGrid, parseCsvGrid,
-  parseHtmlGrid, extractPdfCellLines, parsePdfTable, pdfRowsToDrafts, detectCardLast4, REDACTION_VERSION, sniffFormat, toRecords,
+  parseHtmlGrid, extractPdfCellLines, parsePdfTable, pdfRowsToDrafts, detectCardLast4, looksLikeCardStatement, REDACTION_VERSION, sniffFormat, toRecords,
   type MappingProfile, type TransactionDraft,
 } from "@wealthos/ingestion";
 
@@ -37,6 +37,11 @@ export interface ImportPreview {
   statementTotal?: number | undefined;
   parsedTotal?: number | undefined;
   reconciles?: boolean | undefined;
+  /** Direction summary, so a sign error is visible BEFORE anything is imported. */
+  inflowCount: number;
+  outflowCount: number;
+  inflowTotal: number;
+  outflowTotal: number;
 }
 
 async function loadFile(db: PrismaClient, documentId: string) {
@@ -102,6 +107,7 @@ export async function previewStatement(
       format: sniff.format, encoding: sniff.encoding, unsupportedReason: sniff.reason,
       headers: [], headerRowIndex: 0, guessedMapping: {}, sampleRows: [], totalRows: 0,
       drafts: [], issues: [], duplicates: 0, redactedFields: 0, redactionVersion: REDACTION_VERSION,
+      inflowCount: 0, outflowCount: 0, inflowTotal: 0, outflowTotal: 0,
     };
   }
 
@@ -138,7 +144,11 @@ export async function previewStatement(
     headers = built.table.headers;
     sampleRows = built.table.records.slice(0, 5);
     totalRows = built.table.records.length;
-    const profile = overrideMapping ?? defaultProfile(built.table.headers);
+    const base = overrideMapping ?? defaultProfile(built.table.headers);
+    // Declared type OR header shape - either is enough to force outflow. A card file
+    // mis-declared as a bank statement would otherwise import every expense as income.
+    const isCard = declaredKind(doc.docType) === "CARD" || looksLikeCardStatement(built.table.headers);
+    const profile: MappingProfile = isCard ? { ...base, allOutflow: true } : base;
     const mapped = applyMapping(built.table, profile, memberNames);
     drafts = mapped.drafts;
     issues = mapped.issues;
@@ -176,6 +186,10 @@ export async function previewStatement(
     statementTotal,
     parsedTotal,
     reconciles,
+    inflowCount: drafts.filter((d) => Number(d.amount) > 0).length,
+    outflowCount: drafts.filter((d) => Number(d.amount) < 0).length,
+    inflowTotal: Math.round(drafts.filter((d) => Number(d.amount) > 0).reduce((n, d) => n + Number(d.amount), 0) * 100) / 100,
+    outflowTotal: Math.round(drafts.filter((d) => Number(d.amount) < 0).reduce((n, d) => n + Number(d.amount), 0) * 100) / 100,
   };
 }
 
@@ -211,8 +225,8 @@ export async function commitStatement(
     const base = overrideMapping ?? defaultProfile(table.headers);
     // A CARD statement lists every charge as a POSITIVE number. Without this, each
     // card expense imports as income - the owner's "numbers are opposite" report.
-    const p: MappingProfile =
-      declaredKind(doc.docType) === "CARD" ? { ...base, allOutflow: true } : base;
+    const isCard = declaredKind(doc.docType) === "CARD" || looksLikeCardStatement(table.headers);
+    const p: MappingProfile = isCard ? { ...base, allOutflow: true } : base;
     drafts = applyMapping(table, p, memberNames).drafts;
     profile = p;
   }
