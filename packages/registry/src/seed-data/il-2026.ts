@@ -78,9 +78,21 @@ export const IL_2026 = {
   BITUACH_LEUMI: {
     reducedRateMonthlyThresholdILS: 7_703,
     monthlyIncomeCeilingILS: 51_910,
+    /**
+     * COMBINED employee deduction: bituach leumi + health tax (מס בריאות), which is what
+     * a payslip actually withholds and therefore what a net-of-payroll model needs.
+     *
+     * The "conflict" that kept these null was not a conflict at all — the two figure
+     * pairs measure different things:
+     *   3.50% / 12.00%  = bituach leumi ONLY (excludes health tax)
+     *   4.27% / 12.17%  = bituach leumi + health tax  <- what is deducted from pay
+     * Both were correct; the earlier note assumed one had to be wrong.
+     */
     employeeRates: {
-      reducedPct: null, // NEEDS_VERIFICATION: conflicting figures (3.5% classic vs 4.27% in one source); thresholds are solid
-      fullPct: null, // NEEDS_VERIFICATION: 12% classic vs 12.17% in one source
+      reducedPct: 4.27,
+      fullPct: 12.17,
+      bituachLeumiOnly: { reducedPct: 1.04, fullPct: 7.0 },
+      healthTax: { reducedPct: 3.23, fullPct: 5.17 },
     },
     meta: {
       sources: [
@@ -89,10 +101,13 @@ export const IL_2026 = {
       ],
       notes: [
         "Thresholds verified: reduced-rate portion up to ₪7,703/mo; ceiling ₪51,910/mo (2026)",
-        "Employee rate figures conflict across sources — left null until owner review; strategy engine v1 does not compute BL",
+        "Employee rates RESOLVED 2026-07-28, CORRECTED 2026-07-29. 4.27% / 12.17% is the COMBINED deduction and decomposes exactly: bituach leumi 1.04% / 7.00% + health tax 3.23% / 5.17%. The 3.5% / 12.0% pair seen in older sources is the PRE-2025 combined rate (BL reduced was 0.40% before Jan 2025), NOT bituach leumi alone — seeding it as BL-only overstated the reduced band 3.4x.",
+        "RECONCILED against a real 2025 form 106 (figures not stored here): on a BL-liable base of 608,338 with a 7,522/mo reduced threshold, these rates predict BL 37,204 (actual 37,200) and health tax 29,699 (actual 29,696) — both within 4 ILS. This is the arithmetic proof the decomposition is right.",
+        "BTL confirms no change in rates from 2025 to 2026",
+        "Owner cross-check available from his 2025 form 106 (not stored here — public-repo rule)",
       ],
       ownerReviewed: false,
-      capturedAt: "2026-07-05",
+      capturedAt: "2026-07-28",
     },
   },
   PURCHASE_TAX: {

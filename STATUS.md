@@ -1515,3 +1515,39 @@ per-person auth, connectors (new ValuationSource), estate module deep-dive.
 - Mortgage form supports up to 4 static track rows (no client-side dynamic rows yet).
 - Auth still env-var based (swap to DB User row planned).
 - next build skips its own TS pass; tsc --noEmit gates types via turbo/CI instead.
+
+## M39 — Financial calendar + recurring decisions
+
+**Shipped.** Forward-looking calendar over three sources: Israeli statutory deadlines,
+household recurring reviews the owner has dated, and instalments already committed on
+card statements.
+
+- `packages/domain/src/operations/calendar-rules.ts` — 6 IL statutory rules + 11 household
+  templates. `nextOccurrence` is UTC and **clamps to month length**, so a "31st" rule lands
+  on 28 Feb instead of rolling into March. 13 tests.
+- `packages/api/src/services/calendar-service.ts` — `regenerateCalendar` deletes only
+  **future, SCHEDULED, rule-generated** events before rebuilding. History and owner
+  decisions (DONE/SKIPPED) survive, and pressing rebuild twice does not double the list.
+- Templates that need the owner's own date ship `defaultEnabled: false`. WealthOS does not
+  know when his insurance renews; a guessed date makes a confident, wrong calendar.
+- Safe-to-Spend now adds cash-impacting calendar events — filtered on `transactionId: null`.
+  That filter is load-bearing: instalment events are *derived from* the transactions
+  already projected into `committedInstalmentsBase`, so without it every instalment would
+  be charged twice.
+- `il-2026` bituach leumi employee rates resolved **and then corrected**. First pass seeded
+  `3.5 / 12.0` as "bituach leumi alone" — wrong. That pair is the **pre-2025 combined**
+  BL + health rate (BL reduced was 0.40% before Jan 2025). The real decomposition is
+  BL **1.04 / 7.00** + health **3.23 / 5.17** = combined **4.27 / 12.17**. Seeding the
+  wrong pair overstated the reduced band 3.4x and would have propagated silently into
+  every net-income projection.
+  Caught by reconciling against a real form 106: the corrected rates predict the two
+  withheld totals to within 4 ILS on a 608,338 base. `packages/registry/test/
+  bituach-leumi-rates.test.ts` pins the identity so it cannot regress.
+
+**Also included:** the M38q boundaries fix (delivered but never pushed) — the ESLint
+boundary rules were matching nothing because the TS import resolver was missing, so they
+silently enforced zero architecture. Now real, plus the violations that surfaced.
+
+Owner action outstanding: verify the IL 2025/2026 tax matrices at `/registry` and flip
+`ownerReviewed`.
+

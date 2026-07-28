@@ -6,6 +6,9 @@ import {
   closePeriodAction,
   createManualTransactionAction,
   recomputePeriodAction,
+  regenerateCalendarAction,
+  setCalendarStatusAction,
+  upsertRecurringAction,
   reopenPeriodAction,
   commitAllPendingAction,
   commitStatementAction,
@@ -45,6 +48,7 @@ export default async function OperationsPage({
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
     mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string; reused?: string;
     y?: string; m?: string; cat?: string; beh?: string; dupesRemoved?: string;
+    calendarBuilt?: string; calendarUpdated?: string; recurringSaved?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -84,6 +88,10 @@ export default async function OperationsPage({
   );
   const availableMonths = await trpc.operations.period.months().catch(() => []);
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
+  // M39 — forward calendar. Empty until the owner presses "build calendar"; nothing is
+  // auto-generated on read, because generating writes rows and a read must not.
+  const calendar = await trpc.operations.calendar.upcoming({ windowDays: 120 }).catch(() => null);
+  const recurring = await trpc.operations.recurring.list().catch(() => []);
   const { year, month, row: periodRow, computed } = period;
   const diag = await trpc.operations.diagnostics.month({ year, month }).catch(() => null);
   const flow = computed.flow;
@@ -659,6 +667,101 @@ export default async function OperationsPage({
       </Card>
 
       <div id="suspense" />
+      {/* ---------------------------------------------------------- M39 --- */}
+      <div id="calendar" />
+      <Card title={t("calendarTitle")}>
+        <p className="mb-4 text-xs text-neutral-500">{t("calendarHint")}</p>
+
+        <SuccessBanner message={sp.calendarBuilt ? t("calendarBuilt", { n: sp.calendarBuilt }) : undefined} />
+        <SuccessBanner message={sp.calendarUpdated || sp.recurringSaved ? tf("saved") : undefined} />
+
+        <form action={regenerateCalendarAction} className="mb-4">
+          <input type="hidden" name="locale" value={locale} />
+          <SubmitButton label={t("calendarRebuild")} />
+        </form>
+
+        {calendar && calendar.events.length > 0 ? (
+          <>
+            <p className="mb-2 text-xs text-neutral-500">
+              {t("calendarCashImpact", { amount: formatMoney(calendar.cashImpactBase, baseCurrency, loc) })}
+            </p>
+            <table className="w-full text-start text-sm">
+              <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
+                <tr>
+                  <th className="py-2 text-start">{t("colDue")}</th>
+                  <th className="py-2 text-start">{t("colEvent")}</th>
+                  <th className="py-2 text-start">{t("colKind")}</th>
+                  <th className="py-2 text-end">{t("colAmount")}</th>
+                  <th className="py-2 text-end">{t("colActions")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calendar.events.map((e) => (
+                  <tr key={e.id} className="border-b border-neutral-100">
+                    <td className="py-2 tabular-nums">
+                      {e.dueDate}
+                      <span className={`ms-2 text-xs ${e.daysAway < 0 ? "text-red-600" : e.daysAway <= 14 ? "text-amber-600" : "text-neutral-400"}`}>
+                        {t("daysAway", { n: e.daysAway })}
+                      </span>
+                    </td>
+                    <td className="py-2">{loc === "he" ? e.titleHe : e.titleEn}</td>
+                    <td className="py-2 text-xs text-neutral-500">{t(`calendarKind.${e.kind}`)}</td>
+                    <td className="py-2 text-end tabular-nums">
+                      {e.amountBase === null ? "\u2014" : formatMoney(e.amountBase, baseCurrency, loc)}
+                    </td>
+                    <td className="py-2 text-end">
+                      <form action={setCalendarStatusAction} className="inline">
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="id" value={e.id} />
+                        <input type="hidden" name="status" value="DONE" />
+                        <button type="submit" className="text-xs text-emerald-700 underline">{t("markDone")}</button>
+                      </form>
+                      <form action={setCalendarStatusAction} className="ms-3 inline">
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="id" value={e.id} />
+                        <input type="hidden" name="status" value="SKIPPED" />
+                        <button type="submit" className="text-xs text-neutral-500 underline">{t("markSkipped")}</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        ) : (
+          <p className="text-sm text-neutral-500">{t("calendarEmpty")}</p>
+        )}
+
+        <h3 className="mt-8 mb-2 text-sm font-semibold">{t("recurringTitle")}</h3>
+        <p className="mb-3 text-xs text-neutral-500">{t("recurringHint")}</p>
+        <table className="w-full text-start text-sm">
+          <tbody>
+            {recurring.map((r) => (
+              <tr key={r.id} className="border-b border-neutral-100">
+                <td className="py-2">{loc === "he" ? r.titleHe : r.titleEn}</td>
+                <td className="py-2">
+                  <form action={upsertRecurringAction} className="flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="key" value={r.key} />
+                    <input
+                      type="date"
+                      name="anchorDate"
+                      defaultValue={r.anchorDate.toISOString().slice(0, 10)}
+                      className="rounded border border-neutral-300 px-2 py-1 text-sm"
+                    />
+                    <label className="flex items-center gap-1 text-xs text-neutral-600">
+                      <input type="checkbox" name="isActive" defaultChecked={r.isActive} />
+                      {t("recurringActive")}
+                    </label>
+                    <button type="submit" className="text-xs text-blue-700 underline">{tf("save")}</button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
       <Card title={t("suspenseTitle")}>
         <p className="mb-4 text-xs text-neutral-500">{t("suspenseHint", { threshold: Math.round(suspense.minConfidence * 100) })}</p>
         {suspense.rows.length === 0 ? (

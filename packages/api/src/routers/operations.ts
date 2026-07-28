@@ -7,6 +7,7 @@ import { operationsProcedure, router } from "../trpc";
 import { autoClassify, computePeriod, operationsAssumptions } from "../services/operations-service";
 import { commitStatement, previewStatement } from "../services/statement-import-service";
 import { linkCardSettlements } from "../services/settlement-service";
+import { regenerateCalendar, upcomingEvents } from "../services/calendar-service";
 import {
   ArchiveCategorySchema,
   BulkClassifyByMerchantSchema,
@@ -576,6 +577,79 @@ export const operationsRouter = router({
         })),
       };
     }),
+  }),
+
+  /**
+   * Financial calendar: statutory deadlines, household recurring reviews, and the
+   * committed instalments already parsed from card statements.
+   */
+  calendar: router({
+    upcoming: operationsProcedure
+      .input(z.object({ windowDays: z.number().int().min(7).max(400).default(60) }).optional())
+      .query(async ({ ctx, input }) =>
+        upcomingEvents(ctx.db, ctx.householdId, input?.windowDays ?? 60),
+      ),
+
+    /** Seeds recurring decisions on first run, then rebuilds the forward window. */
+    regenerate: operationsProcedure.mutation(async ({ ctx }) =>
+      regenerateCalendar(ctx.db, ctx.householdId),
+    ),
+
+    setStatus: operationsProcedure
+      .input(z.object({ id: z.uuid(), status: z.enum(["SCHEDULED", "DUE", "DONE", "SKIPPED", "EXPIRED"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const ev = await ctx.db.calendarEvent.findUnique({
+          where: { id: input.id },
+          select: { householdId: true },
+        });
+        if (!ev || ev.householdId !== ctx.householdId) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "EVENT_NOT_FOUND" });
+        }
+        await ctx.db.calendarEvent.update({
+          where: { id: input.id },
+          data: { status: input.status, completedAt: input.status === "DONE" ? new Date() : null },
+        });
+        return { id: input.id, status: input.status };
+      }),
+  }),
+
+  recurring: router({
+    list: operationsProcedure.query(async ({ ctx }) =>
+      ctx.db.recurringDecision.findMany({
+        where: { householdId: ctx.householdId },
+        orderBy: [{ isActive: "desc" }, { key: "asc" }],
+      }),
+    ),
+
+    /**
+     * Set a recurring decision's own anchor date / cadence / active flag.
+     * The owner's date always wins over the seeded template — WealthOS does not know
+     * when his insurance renews, and guessing would produce a confident, wrong calendar.
+     */
+    upsert: operationsProcedure
+      .input(z.object({
+        key: z.string().min(1).max(80),
+        anchorDate: z.coerce.date().optional(),
+        leadDays: z.number().int().min(0).max(180).optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const existing = await ctx.db.recurringDecision.findUnique({
+          where: { householdId_key: { householdId: ctx.householdId, key: input.key } },
+        });
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "RULE_NOT_FOUND" });
+        await ctx.db.recurringDecision.update({
+          where: { id: existing.id },
+          data: {
+            ...(input.anchorDate ? { anchorDate: input.anchorDate } : {}),
+            ...(input.leadDays !== undefined ? { leadDays: input.leadDays } : {}),
+            ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+          },
+        });
+        // A date or cadence change must be reflected forward immediately.
+        await regenerateCalendar(ctx.db, ctx.householdId);
+        return { key: input.key };
+      }),
   }),
 
   suspense: router({

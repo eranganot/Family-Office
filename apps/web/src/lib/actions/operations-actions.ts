@@ -384,3 +384,55 @@ export async function removeDuplicatesAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/operations?dupesRemoved=${removed}#transactions`);
 }
+
+/* ------------------------------------------------------------------ M39 --- */
+
+/** Seed the recurring decisions (first run) and rebuild the forward calendar. */
+export async function regenerateCalendarAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  let n = 0;
+  try {
+    const r = await trpc.operations.calendar.regenerate();
+    n = r.eventsCreated + r.instalmentEvents;
+  } catch {
+    redirect(`/${locale}/operations?error=calendar#calendar`);
+  }
+  redirect(`/${locale}/operations?calendarBuilt=${n}#calendar`);
+}
+
+/** Mark a calendar event done or skipped. Both are owner decisions, and both are kept. */
+export async function setCalendarStatusAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    await trpc.operations.calendar.setStatus({
+      id: str(fd, "id"),
+      status: str(fd, "status") as "DONE" | "SKIPPED" | "SCHEDULED",
+    });
+  } catch {
+    redirect(`/${locale}/operations?error=calendar#calendar`);
+  }
+  redirect(`/${locale}/operations?calendarUpdated=1#calendar`);
+}
+
+/**
+ * Record the owner's own date for a recurring review (insurance renewal, mortgage
+ * review, …). WealthOS cannot know these, so the templates ship disabled and only
+ * become live once he supplies the date — a guessed date makes a confident, wrong calendar.
+ */
+export async function upsertRecurringAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  const anchor = str(fd, "anchorDate");
+  try {
+    await trpc.operations.recurring.upsert({
+      key: str(fd, "key"),
+      ...(anchor ? { anchorDate: new Date(anchor) } : {}),
+      isActive: str(fd, "isActive") === "on",
+    });
+  } catch {
+    redirect(`/${locale}/operations?error=recurring#calendar`);
+  }
+  redirect(`/${locale}/operations?recurringSaved=1#calendar`);
+}

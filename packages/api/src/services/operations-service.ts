@@ -240,6 +240,24 @@ export async function computePeriod(
   );
   const committedInstalmentsBase = committedInstalmentsInWindow(future, new Date(), a.safeToSpendWindowDays);
 
+  // M39 — cash-impacting calendar events inside the same window are also already
+  // committed money. `transactionId: null` is load-bearing: instalment CalendarEvents are
+  // DERIVED from the very transactions projected above, so counting them here would
+  // double-charge every instalment against Safe-to-Spend.
+  const now39 = new Date();
+  const calendarCommitted = await db.calendarEvent.aggregate({
+    _sum: { amountBase: true },
+    where: {
+      householdId,
+      status: { in: ["SCHEDULED", "DUE"] },
+      isCashImpacting: true,
+      transactionId: null,
+      dueDate: { gte: now39, lte: new Date(now39.getTime() + a.safeToSpendWindowDays * 86_400_000) },
+    },
+  });
+  const committedInWindowBase =
+    Math.round((committedInstalmentsBase + num(calendarCommitted._sum.amountBase ?? 0)) * 100) / 100;
+
   // A bank-side card settlement with no linked card statement means the month's real
   // spend is only known in aggregate — the period says AGGREGATE_ONLY rather than
   // silently dropping the itemisation it never received.
@@ -269,7 +287,7 @@ export async function computePeriod(
     ? computeSafeToSpend({
         flow,
         debtServiceBase,
-        committedInWindowBase: committedInstalmentsBase,
+        committedInWindowBase,
         requiredBufferTopUpBase: 0, // buffer sizing arrives with the M41 hand-off
         windowDays: a.safeToSpendWindowDays,
       })

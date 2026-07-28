@@ -1394,6 +1394,30 @@
     "filterBehavioral": "התנהגות",
     "filterAll": "הכול",
     "filterApply": "סינון",
-    "filterClear": "ניקוי סינון"
+    "filterClear": "ניקוי סינון",
+    "calendarTitle": "לוח שנה פיננסי",
+    "calendarHint": "מועדים חוקיים, בדיקות תקופתיות שקבעת להן תאריך, ותשלומי עסקאות שכבר התחייבת אליהם בכרטיס. שום פריט כאן אינו ניחוש: תבניות נשארות לא פעילות עד שתזין תאריך.",
+    "calendarRebuild": "בנה מחדש את הלוח",
+    "calendarBuilt": "הלוח נבנה מחדש — {n} אירועים קרובים.",
+    "calendarEmpty": "אין אירועים קרובים. לחץ על “בנה מחדש את הלוח”.",
+    "calendarCashImpact": "סך התזרים הצפוי בחלון: {amount}",
+    "colDue": "מועד",
+    "colEvent": "אירוע",
+    "colKind": "סוג",
+    "daysAway": "{n} ימים",
+    "markDone": "בוצע",
+    "markSkipped": "דלג",
+    "recurringTitle": "החלטות חוזרות",
+    "recurringHint": "קבע תאריך משלך לכל בדיקה. פריטים ללא תאריך נשארים לא פעילים ולא מוצגים בתאריך שהמצאנו.",
+    "recurringActive": "פעיל",
+    "calendarKind": {
+      "TAX_DEADLINE": "מועד מס",
+      "CONTRIBUTION_WINDOW": "חלון הפקדה",
+      "POLICY_REVIEW": "בדיקת פוליסה",
+      "INSTALMENT": "תשלום עסקאות",
+      "RATE_RESET": "עדכון ריבית",
+      "REBALANCE": "איזון מחדש",
+      "OTHER": "אחר"
+    }
   }
 }

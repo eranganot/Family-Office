@@ -43,3 +43,10 @@ export type { SeedCategory, BehavioralClassKey, CategoryAxisKey } from "./operat
 export { MERCHANT_RULES, MERCHANT_RULES_VERSION } from "./operations/merchant-rules";
 export type { MerchantRule } from "./operations/merchant-rules";
 export { normalizeMerchantKey, IL_TXN_LEXICON } from "./operations/merchant-key";
+export {
+  IL_STATUTORY_RULES,
+  HOUSEHOLD_TEMPLATE_RULES,
+  nextOccurrence,
+  occurrencesInWindow,
+} from "./operations/calendar-rules";
+export type { CalendarRule, CalendarRuleKind, Cadence } from "./operations/calendar-rules";

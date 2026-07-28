@@ -1394,6 +1394,30 @@
     "filterBehavioral": "Behaviour",
     "filterAll": "All",
     "filterApply": "Filter",
-    "filterClear": "clear filter"
+    "filterClear": "clear filter",
+    "calendarTitle": "Financial calendar",
+    "calendarHint": "Statutory deadlines, recurring reviews you have dated, and instalments already committed on your cards. Nothing here is a guess: template reviews stay inactive until you supply the date.",
+    "calendarRebuild": "Rebuild calendar",
+    "calendarBuilt": "Calendar rebuilt — {n} upcoming events.",
+    "calendarEmpty": "No upcoming events. Press “Rebuild calendar” to generate them.",
+    "calendarCashImpact": "Cash-impacting total in this window: {amount}",
+    "colDue": "Due",
+    "colEvent": "Event",
+    "colKind": "Type",
+    "daysAway": "{n}d",
+    "markDone": "Done",
+    "markSkipped": "Skip",
+    "recurringTitle": "Recurring decisions",
+    "recurringHint": "Set your own date for each review. Items without a date stay inactive rather than appearing on a date we invented.",
+    "recurringActive": "Active",
+    "calendarKind": {
+      "TAX_DEADLINE": "Tax deadline",
+      "CONTRIBUTION_WINDOW": "Contribution window",
+      "POLICY_REVIEW": "Policy review",
+      "INSTALMENT": "Instalment",
+      "RATE_RESET": "Rate reset",
+      "REBALANCE": "Rebalance",
+      "OTHER": "Other"
+    }
   }
 }
