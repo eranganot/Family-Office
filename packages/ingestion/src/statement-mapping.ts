@@ -244,25 +244,55 @@ export function applyMapping(
     });
   });
 
+  // Genuinely identical rows (same day, amount and description) are distinct
+  // transactions, so give them distinct keys rather than letting one overwrite the other.
+  const withIdx = withOccurrences(drafts.map((d) => d.externalRef ?? ""));
+  drafts.forEach((d, i) => {
+    d.externalRef = withIdx[i] ?? d.externalRef;
+  });
+
   return { drafts, issues };
 }
 
 /**
- * Idempotency key. Prefers the statement's own reference; otherwise a stable digest of
- * (date, amount, description) so re-importing an overlapping date range does not
- * duplicate rows — which WILL happen, because bank exports are range-based.
+ * Idempotency key for re-import.
+ *
+ * CRITICAL HISTORY — do NOT key on the statement's reference alone. The FIBI bank
+ * statement's אסמכתא is an OPERATION-TYPE code, not a transaction id: "13795" appears
+ * on 41 different rows. Keying on it collapsed 111 real transactions to 38 unique keys
+ * and the unique constraint silently discarded the other 73 — including a July salary
+ * that collided with January's. Nothing errored; the money simply never arrived.
+ *
+ * The key is therefore a digest of date + amount + description + reference. That is
+ * stable across re-imports of the same file (so overlapping ranges still deduplicate)
+ * while being distinct per transaction.
+ *
+ * `occurrence` disambiguates genuinely identical rows — two identical coffees on the
+ * same day are two real transactions, not a duplicate — and is assigned by position
+ * within the file, so the same file always yields the same keys.
  */
 export function buildExternalRef(
   bookedAt: string,
   amount: string,
   description: string,
   reference: string,
+  occurrence = 1,
 ): string {
-  if (reference && reference.trim().length >= 4) return `ref:${reference.trim()}`;
-  const basis = `${bookedAt}|${amount}|${description}`;
+  const basis = `${bookedAt}|${amount}|${description}|${reference}`;
   let h = 5381;
   for (let i = 0; i < basis.length; i += 1) h = ((h * 33) ^ basis.charCodeAt(i)) >>> 0;
-  return `syn:${bookedAt}:${h.toString(36)}`;
+  const suffix = occurrence > 1 ? `#${occurrence}` : "";
+  return `txn:${bookedAt}:${h.toString(36)}${suffix}`;
+}
+
+/** Assign per-file occurrence numbers so identical rows get distinct keys. */
+export function withOccurrences(keys: string[]): string[] {
+  const seen = new Map<string, number>();
+  return keys.map((k) => {
+    const n = (seen.get(k) ?? 0) + 1;
+    seen.set(k, n);
+    return n > 1 ? `${k}#${n}` : k;
+  });
 }
 
 /** Header synonyms so the wizard can pre-fill the mapping instead of asking blind. */
@@ -363,7 +393,7 @@ export function pdfRowsToDrafts(
   }>,
   memberNames: readonly string[] = [],
 ): TransactionDraft[] {
-  return rows.map((r) => {
+  const built: TransactionDraft[] = rows.map((r) => {
     const red = redact(r.descriptionRaw, memberNames);
     return {
       bookedAt: r.bookedAt,
@@ -372,7 +402,7 @@ export function pdfRowsToDrafts(
       descriptionRedacted: red.text || "(ללא תיאור)",
       merchantKey: normalizeMerchantKey(red.text),
       externalRef: buildExternalRef(r.bookedAt, r.amount, red.text, r.reference ?? ""),
-      status: r.pending ? "PENDING" : "BOOKED",
+      status: (r.pending ? "PENDING" : "BOOKED") as TransactionDraft["status"],
       counterpartyMasked: red.counterpartyMasked,
       instalmentNumber: r.instalmentNumber,
       instalmentTotal: r.instalmentTotal,
@@ -380,4 +410,9 @@ export function pdfRowsToDrafts(
       redactionHits: red.hits,
     };
   });
+  const withIdx = withOccurrences(built.map((d) => d.externalRef ?? ""));
+  built.forEach((d, i) => {
+    d.externalRef = withIdx[i] ?? d.externalRef;
+  });
+  return built;
 }

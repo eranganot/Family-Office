@@ -193,15 +193,48 @@ describe("applyMapping — signed mode, and the details that bite", () => {
 });
 
 describe("externalRef — idempotent re-import", () => {
-  it("prefers the statement's own reference", () => {
-    expect(buildExternalRef("2026-01-01", "-5", "x", "99411")).toBe("ref:99411");
+  it("NEVER keys on the statement reference alone", () => {
+    // The FIBI bank statement's אסמכתא is an OPERATION-TYPE code, not a transaction id:
+    // "13795" appears on 41 different rows. Keying on it collapsed 111 real transactions
+    // to 38 unique keys, and the unique constraint silently discarded the other 73 -
+    // including a July salary that collided with January's.
+    const jan = buildExternalRef("2026-01-01", "36986.94", "משכורת", "99411");
+    const jul = buildExternalRef("2026-07-06", "70711.40", "משכורת", "99411");
+    expect(jan).not.toBe(jul);
   });
+
   it("is stable for identical rows and different for different ones", () => {
     const a = buildExternalRef("2026-01-01", "-5", "SHOP", "");
     const b = buildExternalRef("2026-01-01", "-5", "SHOP", "");
     const c = buildExternalRef("2026-01-01", "-6", "SHOP", "");
     expect(a).toBe(b);
     expect(a).not.toBe(c);
+  });
+
+  it("still distinguishes rows that differ only by reference", () => {
+    expect(buildExternalRef("2026-01-01", "-5", "SHOP", "A1"))
+      .not.toBe(buildExternalRef("2026-01-01", "-5", "SHOP", "B2"));
+  });
+
+  it("gives genuinely identical same-day rows DISTINCT keys", () => {
+    // Two identical coffees on one day are two transactions, not a duplicate.
+    const csv = "תאריך,תיאור,סכום\n01/07/2026,קפה,-12\n01/07/2026,קפה,-12";
+    const table = toRecords(parseCsvGrid(csv), 0);
+    const { drafts } = applyMapping(table, {
+      amountMode: "SIGNED", defaultCurrency: "ILS", dayFirst: true,
+      columns: { date: "תאריך", description: "תיאור", amount: "סכום" },
+    });
+    expect(drafts).toHaveLength(2);
+    expect(drafts[0]?.externalRef).not.toBe(drafts[1]?.externalRef);
+  });
+
+  it("assigns the SAME keys on a re-import, so overlapping ranges still deduplicate", () => {
+    const csv = "תאריך,תיאור,סכום\n01/07/2026,קפה,-12\n01/07/2026,קפה,-12";
+    const run = () => applyMapping(toRecords(parseCsvGrid(csv), 0), {
+      amountMode: "SIGNED", defaultCurrency: "ILS", dayFirst: true,
+      columns: { date: "תאריך", description: "תיאור", amount: "סכום" },
+    }).drafts.map((d) => d.externalRef);
+    expect(run()).toEqual(run());
   });
 });
 
@@ -324,6 +357,12 @@ describe("real-file regressions: OneZero CSV", () => {
       columns: { date: "תאריך", description: "תיאור", amount: "סכום", reference: "אסמכתא" },
     });
     expect(drafts[0]?.descriptionRedacted).toBe("חנות");
-    expect(drafts[0]?.externalRef).toContain("25-21416640");
+    // The reference still contributes to the key, but is no longer the key itself.
+    const withRef = drafts[0]?.externalRef;
+    const withoutRef = applyMapping(toRecords(parseCsvGrid("תאריך,תיאור,סכום,אסמכתא\n01/07/2026,חנות,-50,"), 0), {
+      amountMode: "SIGNED", defaultCurrency: "ILS", dayFirst: true,
+      columns: { date: "תאריך", description: "תיאור", amount: "סכום", reference: "אסמכתא" },
+    }).drafts[0]?.externalRef;
+    expect(withRef).not.toBe(withoutRef);
   });
 });

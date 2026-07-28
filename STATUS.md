@@ -2,6 +2,39 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 24)
+
+- **M38l — the import key silently discarded 73 of 111 bank rows. `m38l.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE.**
+  ⚠️ **Owner must UNDO the bank import and re-import** — the missing rows were never stored.
+  - **THE BUG BEHIND "where is July's income".** `buildExternalRef` returned
+    `ref:<אסמכתא>` whenever a reference existed. But **FIBI's אסמכתא is an OPERATION-TYPE
+    code, not a transaction id**: `13795` appears on **41 different rows**, `99411` on 7.
+    111 real transactions collapsed to **38 unique keys**, and the
+    `@@unique([householdId, externalRef])` constraint discarded the other **73 as duplicates**.
+    The app reported "38 כבר יובאו" — which matched exactly and was the clue.
+    **July's salary (₪70,711.40, ref 99411) collided with January's (₪36,986.94, same ref);
+    January won, July's salary was never stored.** No error, no suspense entry, nothing logged.
+  - **Fix:** the key is a digest of **date + amount + description + reference**, never the
+    reference alone. Stable across re-imports (overlapping ranges still deduplicate) and
+    distinct per transaction. **111 rows now yield 111 distinct keys, 0 dropped.**
+  - **`withOccurrences`** disambiguates genuinely identical rows — two identical coffees on
+    one day are two transactions, not a duplicate — by position within the file, so a
+    re-import of the same file produces identical keys.
+  - **Two old tests asserted the broken behaviour** ("prefers the statement's own reference")
+    and were rewritten to encode the correct rule, including the January-vs-July salary case.
+  - **Verified:** ingestion 124 tests, engine-operations 70, tsc clean, eslint clean,
+    `npm ci --dry-run` exit 0. Card statements still reconcile exactly
+    (5,611.17 / 2,708.38 / 3,610.09); OZ CSV 27 rows; bank 111 rows.
+
+### The recurring shape of every fault in this module
+Five now: RTL repair fixing a non-existent problem; balances imported as expenses; card
+charges imported as income; a transfer rule swallowing a salary; and now an import key that
+discarded two thirds of a file. **Every one was silent** — no exception, no log, a plausible
+number on screen. The only things that have ever caught them are (a) reconciling against a
+total the document states about itself, and (b) counting rows in vs rows out. Both are cheap.
+**Prefer a check the data can fail over a check the code can pass.**
+
 ## Current state (2026-07-28, session 23)
 
 - **M38k — classifier picks the HIGHEST-CONFIDENCE rule, not the first. `m38k.patch`.
