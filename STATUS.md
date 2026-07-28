@@ -2,6 +2,34 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 23)
+
+- **M38k — classifier picks the HIGHEST-CONFIDENCE rule, not the first. `m38k.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE.** ⚠️ **Run "סיווג וחישוב מחדש" after deploying** — it
+  re-classifies existing rows.
+  - **Owner-reported "where is the income?" — July showed ₪3.91.** Found a real fault while
+    checking it: rule selection returned the FIRST matching rule, so a broad low-confidence
+    rule could beat a specific high-confidence one purely by sitting earlier in the array.
+    **`"העברה משכורת"` matched the generic transfer rule (0.6) before the salary rule (0.95)
+    and was booked as a TRANSFER — and transfers are excluded from BOTH income and expenses,
+    so an entire salary vanished from the month's totals with no error, no suspense entry and
+    nothing in the logs.** That phrasing is common on Israeli bank statements.
+  - **Fix:** highest confidence wins; ties keep array order so deliberate ordering still works.
+    Confidence already encodes specificity, so this makes rule ORDER irrelevant and removes the
+    whole class of silent mis-classification rather than reshuffling one rule.
+  - **Why it is dangerous in this codebase specifically:** TRANSFER is the one class that is
+    excluded from both sides of the ledger (it exists to stop card settlements double-counting).
+    A wrong TRANSFER is therefore invisible — it does not overstate or understate a category, it
+    removes the money entirely. Any future rule touching TRANSFER deserves the same scrutiny.
+  - **Verified:** engine-operations 70 tests (4 new), tsc clean, eslint clean,
+    `npm ci --dry-run` exit 0.
+
+### Owner's remaining July gap is data, not code
+The bank file's 111 rows were previewed but NOT imported ("38 כבר יובאו" of 111). Parsed
+directly, that file shows **July income ₪90,920.86**. After deploying: import the previewed
+bank file, then "סיווג וחישוב מחדש". The "מצרפי בלבד" banner means a card settlement had no
+matching detailed statement yet — expected until the card statements for that period are in.
+
 ## Current state (2026-07-28, session 22)
 
 - **M38j — re-uploading an existing file no longer reports a failure. `m38j.patch`.

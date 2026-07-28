@@ -112,3 +112,32 @@ describe("reconcileWithSign — direction sanity", () => {
     expect(reconcileWithSign(r, -5000, isIncome, MIN).method).toBe("OWNER");
   });
 });
+
+describe("rule selection — highest confidence, not first in the list", () => {
+  it("a specific salary rule beats a generic transfer rule regardless of order", () => {
+    // Real fault: "העברה משכורת" matched the generic transfer rule (0.6) before the
+    // salary rule (0.95) purely by array position, and was booked as a TRANSFER.
+    // Transfers are excluded from BOTH income and expenses, so an entire salary
+    // disappeared from the month with no error anywhere.
+    const r = c("העברה משכורת");
+    expect(r.categoryKey).toBe("income.salary.base");
+    expect(r.behavioral).not.toBe("TRANSFER");
+    expect(r.confidence).toBe(0.95);
+  });
+
+  it("still classifies a genuine transfer as a transfer", () => {
+    const r = c("העברה ל/דנה/תשלום");
+    expect(r.behavioral).toBe("TRANSFER");
+  });
+
+  it("prefers the more specific insurance rule over the generic one", () => {
+    expect(c("ביטוח דירה").categoryKey).toBe("housing.home_insurance");
+    expect(c("ביטוח חובה").categoryKey).toBe("transport.vehicle_insurance");
+  });
+
+  it("a low-confidence match still wins when it is the ONLY match", () => {
+    const r = c("ביטוח כלשהו");
+    expect(r.categoryKey).toBe("insurance.life");
+    expect(r.suspense).toBe(true);
+  });
+});

@@ -89,22 +89,38 @@ export function classify(input: ClassifyInput, opts: ClassifyOptions): Classific
   }
 
   if (merchantKey) {
+    /**
+     * Highest CONFIDENCE wins, not first-in-the-array.
+     *
+     * Rule order used to decide, which meant a broad low-confidence rule could beat a
+     * specific high-confidence one purely by sitting earlier. Real case: "העברה משכורת"
+     * matched the generic transfer rule (0.6) before the salary rule (0.95) and was
+     * booked as a TRANSFER — and transfers are excluded from BOTH income and expenses,
+     * so an entire salary vanished from the month's totals with no error anywhere.
+     *
+     * Confidence already encodes specificity, so using it as the tiebreak makes rule
+     * ordering irrelevant and removes a whole class of silent mis-classification.
+     * Ties keep array order, so deliberate ordering still works where it matters.
+     */
+    let best: CompiledRule | undefined;
     for (const rule of compiledRules()) {
       const hit = rule.re
         ? new RegExp(rule.compiled).test(merchantKey)
         : merchantKey.includes(rule.compiled);
-      if (hit) {
-        return {
-          categoryKey: rule.categoryKey,
-          behavioral: rule.behavioral,
-          confidence: rule.confidence,
-          method: "RULE",
-          ruleVersion: MERCHANT_RULES_VERSION,
-          suspense: rule.confidence < opts.minConfidence,
-          ruleId: rule.id,
-          merchantKey,
-        };
-      }
+      if (!hit) continue;
+      if (!best || rule.confidence > best.confidence) best = rule;
+    }
+    if (best) {
+      return {
+        categoryKey: best.categoryKey,
+        behavioral: best.behavioral,
+        confidence: best.confidence,
+        method: "RULE",
+        ruleVersion: MERCHANT_RULES_VERSION,
+        suspense: best.confidence < opts.minConfidence,
+        ruleId: best.id,
+        merchantKey,
+      };
     }
   }
 
