@@ -2,6 +2,35 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 20)
+
+- **M38h — card-statement uploads were rejected by validation. `m38h.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE.**
+  - **ROOT CAUSE (owner-reported: "השמירה נכשלה" on every card file, bank files fine).**
+    `DocTypeSchema` in `routers/documents.ts` lists `BANK_STATEMENT` but had **no
+    `CARD_STATEMENT`**. The M38f statement-type selector sends `CARD_STATEMENT`, Zod rejected
+    it, every file in the batch failed, and `uploadStatementAction` reported the generic
+    "all failed" banner. Bank uploads worked because their value happened to be in the enum —
+    which made it look like a problem with the card FILES rather than a one-word omission.
+  - **The generic error banner was the second bug.** `uploadStatementAction` swallowed each
+    per-file exception into a name list and surfaced only "save failed", so a plain validation
+    rejection was indistinguishable from a parse failure or a size limit. It now carries the
+    first real error message through to the UI ("None of the N files could be uploaded.
+    Reason: …"). **A failure whose message hides its own cause costs a full round-trip.**
+  - **Drift guard added** (`packages/api/test/doc-types.test.ts`, mock-free): asserts every
+    statement kind offered by the Operations upload form parses under `DocTypeSchema`. This
+    exact class of mismatch — UI offering a value the schema does not accept — is now caught
+    by CI instead of by the owner.
+  - **Verified:** api 12 tests (3 new), ingestion 116, tsc clean, eslint clean,
+    i18n parity 1141/1141, `npm ci --dry-run` exit 0.
+
+### Pattern worth remembering
+Two consecutive faults now have had the same shape: **a value the UI sends that the backend
+never accepted** (docType), and **a rule that depended on owner-declared metadata that did not
+exist yet** (allOutflow). Both were invisible because the failure surfaced as a generic message.
+Prefer deriving behaviour from the artefact's own content, and always propagate the underlying
+error text.
+
 ## Current state (2026-07-28, session 19)
 
 - **M38g — card-sign safety net + full import reset. `m38g.patch`. NO MIGRATION, NO LOCKFILE CHANGE.**

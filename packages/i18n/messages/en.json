@@ -1371,6 +1371,7 @@
     "resetAll": "Delete all imports",
     "resetOk": "Deleted {n} imported transactions and {docs} statement files. You can now upload from scratch.",
     "previewDirection": "{out} expenses (₪{outTotal}) · {in} income (₪{inTotal})",
-    "previewAllIncomeWarning": "⚠ Every row is income — for a card statement that means the sign is inverted. Do not import; tell me."
+    "previewAllIncomeWarning": "⚠ Every row is income — for a card statement that means the sign is inverted. Do not import; tell me.",
+    "errorAllFailed": "None of the {n} file(s) could be uploaded. Reason: {why}"
   }
 }

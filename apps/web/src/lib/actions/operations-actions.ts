@@ -201,6 +201,7 @@ export async function uploadStatementAction(fd: FormData): Promise<void> {
   const trpc = await serverCaller();
   const ids: string[] = [];
   const failed: string[] = [];
+  let firstError = "";
   for (const file of files) {
     const bytes = Buffer.from(await file.arrayBuffer());
     try {
@@ -213,14 +214,19 @@ export async function uploadStatementAction(fd: FormData): Promise<void> {
         contentBase64: bytes.toString("base64"),
       });
       ids.push((doc as { id: string }).id);
-    } catch {
+    } catch (e) {
       // A duplicate sha256 is rejected by the existing pipeline - that is correct
       // (the same file twice), and one bad file must not abort the whole batch.
       failed.push(file.name);
+      // Keep the FIRST real message: a generic "save failed" banner hid a plain
+      // validation rejection (an unlisted docType) for an entire debugging round.
+      if (!firstError && e instanceof Error) firstError = e.message.slice(0, 160);
     }
   }
   if (ids.length === 0) {
-    redirect(`/${locale}/operations?error=allfailed&n=${encodeURIComponent(String(failed.length))}`);
+    redirect(
+      `/${locale}/operations?error=allfailed&n=${failed.length}&why=${encodeURIComponent(firstError || "UNKNOWN")}#import`,
+    );
   }
   // Land on the first upload's preview; the rest queue up in the pending list.
   redirect(`/${locale}/operations?preview=${ids[0]}&uploaded=${ids.length}&failed=${failed.length}#import`);

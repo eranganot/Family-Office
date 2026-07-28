@@ -42,7 +42,7 @@ export default async function OperationsPage({
     recomputed?: string; closed?: string; reopened?: string; tab?: string;
     updated?: string; removed?: string; restored?: string; edit?: string;
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
-    mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string;
+    mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -85,8 +85,12 @@ export default async function OperationsPage({
 
   const errorMsg = sp.error
     ? sp.error === "toolarge"
-      ? t("errorTooLarge", { mb: (sp as { mb?: string }).mb ?? "?" })
-      : tf("error")
+      ? t("errorTooLarge", { mb: sp.mb ?? "?" })
+      : sp.error === "allfailed"
+        // Show the underlying reason: a bare "save failed" told the owner nothing and
+        // cost a whole round-trip to diagnose a simple validation rejection.
+        ? t("errorAllFailed", { n: sp.n ?? "?", why: sp.why ?? "UNKNOWN" })
+        : tf("error")
     : undefined;
 
   return (

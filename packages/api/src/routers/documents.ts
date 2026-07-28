@@ -9,6 +9,10 @@ export const DocTypeSchema = z.enum([
   "HISHTALMUT_STATEMENT",
   "GEMEL_STATEMENT",
   "BANK_STATEMENT",
+  // Card statements are a first-class kind: they drive the outflow sign rule and the
+  // settlement dedup. Their absence here silently rejected every card upload while
+  // bank uploads succeeded, which made it look like a file problem.
+  "CARD_STATEMENT",
   "BROKERAGE_STATEMENT",
   "MISLAKA",
   "MORTGAGE_SCHEDULE",
