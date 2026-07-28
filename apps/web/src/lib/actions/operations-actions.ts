@@ -370,3 +370,17 @@ export async function resetAllImportsAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/operations?reset=${r?.transactions ?? 0}&docs=${r?.documents ?? 0}#import`);
 }
+
+/** Void every duplicate copy of a transaction, keeping the earliest of each group. */
+export async function removeDuplicatesAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  let removed = 0;
+  try {
+    const r = await trpc.operations.transactions.removeDuplicates();
+    removed = r.removed;
+  } catch {
+    redirect(`/${locale}/operations?error=dupes#transactions`);
+  }
+  redirect(`/${locale}/operations?dupesRemoved=${removed}#transactions`);
+}

@@ -2,6 +2,40 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 28)
+
+- **M38p — duplicate finder + category/behaviour filters. `m38p.patch`.
+  NO MIGRATION, NO LOCKFILE CHANGE.** Apply after `m38n` and `m38o`.
+  - **Owner found the same mortgage row stored twice (₪15,081.23 on 2026-07-10).**
+    **Cause is mine and structural:** M38l changed the import key format (from the statement's
+    אסמכתא to a content digest). Rows imported BEFORE and AFTER that change carry different
+    key shapes, so they cannot deduplicate against each other and the same transaction
+    persists twice.
+  - **`transactions.duplicates` matches on (date, amount, description), NOT on `externalRef`.**
+    That is the point: a key-based check cannot find duplicates created BY a key change, and a
+    content match survives any future key change too.
+  - **`removeDuplicates` VOIDs the later copies, keeping the earliest.** Void rather than delete
+    so a false positive is recoverable — a voided row is already excluded from every calculation,
+    so deleting would buy nothing and cost the audit trail.
+  - **Category + behaviour filters on the transaction list**, as GET params (`?cat=&beh=`) so a
+    filtered view is linkable and composes with the month navigation (`?y=&m=`).
+  - **Verified:** tsc clean, eslint clean (no warnings), i18n parity 1163/1163,
+    `npm ci --dry-run` exit 0.
+  - Smoke test for all three: `docs/SMOKE-M38-final.md`.
+
+### Lesson: changing an idempotency key is a data migration
+Swapping the `externalRef` format silently created duplicates for anyone who had already
+imported. **A key change needs either a backfill of existing rows to the new format, or a
+content-based duplicate sweep shipped alongside it.** The sweep now exists; remember the rule.
+
+## Next up — M39 (financial calendar + recurring decisions)
+Statutory figures still depend on owner verification of B3/B4 (2026 ceilings, IL tax and
+bituach-leumi dates) at `/registry`. Also outstanding, in priority order:
+1. **Boundary rules are not enforcing cross-package imports** (see session 27) — needs an import
+   resolver; `docs/architecture/04` currently overstates what CI checks.
+2. `us-bank-chase-csv` adapter when the Chase export arrives.
+3. OZ re-export after the 30th will add the second July salary.
+
 ## Current state (2026-07-28, session 27)
 
 - **M38o — month navigation + eslint-boundaries v6 migration. `m38o.patch`.

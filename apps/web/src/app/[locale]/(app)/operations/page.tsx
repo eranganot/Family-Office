@@ -11,6 +11,7 @@ import {
   commitStatementAction,
   setTransactionStatusAction,
   updateTransactionAction,
+  removeDuplicatesAction,
   resetAllImportsAction,
   undoImportAction,
   uploadStatementAction,
@@ -43,7 +44,7 @@ export default async function OperationsPage({
     updated?: string; removed?: string; restored?: string; edit?: string;
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
     mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string; reused?: string;
-    y?: string; m?: string;
+    y?: string; m?: string; cat?: string; beh?: string; dupesRemoved?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -55,7 +56,12 @@ export default async function OperationsPage({
   // Seeds the default tree on first read — idempotent.
   const cats = await trpc.operations.categories.tree();
   const meta = await trpc.operations.meta();
-  const { rows: txns } = await trpc.operations.transactions.list({ limit: 50 });
+  const { rows: txns } = await trpc.operations.transactions.list({
+    limit: 50,
+    ...(sp.cat ? { categoryId: sp.cat } : {}),
+    ...(sp.beh ? { behavioralClass: sp.beh as never } : {}),
+  });
+  const dupes = await trpc.operations.transactions.duplicates().catch(() => null);
   // Preview is a mutation (it does real parsing work) but persists nothing.
   // NEVER swallow this: a silent catch here renders an empty card and looks like the
   // feature simply does not exist. Surface the reason instead.
@@ -394,6 +400,7 @@ export default async function OperationsPage({
           : sp.removed ? t("removedOk")
           : sp.restored ? t("restoredOk")
           : sp.undone ? t("undoneOk", { n: sp.undone })
+          : sp.dupesRemoved ? t("dupesRemovedOk", { n: sp.dupesRemoved })
           : sp.reset ? t("resetOk", { n: sp.reset, docs: sp.docs ?? "0" })
           : sp.imported
             ? sp.skipped && sp.skipped !== "0"
@@ -775,8 +782,57 @@ export default async function OperationsPage({
         </form>
       </Card>
 
+      <div id="transactions" />
       <Card title={t("transactions")}>
-        <p className="mb-4 text-xs text-neutral-500">{t("transactionsHint")}</p>
+        <p className="mb-3 text-xs text-neutral-500">{t("transactionsHint")}</p>
+
+        {dupes && dupes.extraRows > 0 ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <span>
+              {t("dupesFound", {
+                n: dupes.extraRows,
+                groups: dupes.groups.length,
+                amount: formatMoney(dupes.extraAmount, baseCurrency, loc),
+              })}
+            </span>
+            <form action={removeDuplicatesAction}>
+              <input type="hidden" name="locale" value={locale} />
+              <button type="submit" className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">
+                {t("dupesRemove")}
+              </button>
+            </form>
+          </div>
+        ) : null}
+
+        {/* Filter by category / behaviour — GET links so a filtered view is linkable. */}
+        <form method="get" action={`/${locale}/operations`} className="mb-4 flex flex-wrap items-end gap-3">
+          {sp.y ? <input type="hidden" name="y" value={sp.y} /> : null}
+          {sp.m ? <input type="hidden" name="m" value={sp.m} /> : null}
+          <Field label={t("filterCategory")}>
+            <Select name="cat" defaultValue={sp.cat ?? ""}>
+              <option value="">{t("filterAll")}</option>
+              {flat.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {locale === "he" ? c.nameHe : c.nameEn}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label={t("filterBehavioral")}>
+            <Select name="beh" defaultValue={sp.beh ?? ""}>
+              <option value="">{t("filterAll")}</option>
+              {BEHAVIORAL.map((b) => (
+                <option key={b} value={b}>{t(`behavioralClass.${b}`)}</option>
+              ))}
+            </Select>
+          </Field>
+          <SubmitButton label={t("filterApply")} />
+          {sp.cat || sp.beh ? (
+            <a href={`/${locale}/operations#transactions`} className="text-xs text-blue-600 underline">
+              {t("filterClear")}
+            </a>
+          ) : null}
+        </form>
         {txns.length === 0 ? (
           <p className="text-sm text-neutral-500">{t("noTransactions")}</p>
         ) : (

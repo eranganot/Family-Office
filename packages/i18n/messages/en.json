@@ -1386,6 +1386,14 @@
     "pendingLine": "Pending, not yet billed: {amount} ({n} card transactions). Excluded from the totals above because the money has not left your account — they will count when the issuer bills them.",
     "safeToSpendPending": "Already reduced by {amount} of pending card charges — they are committed even though they have not settled.",
     "thisMonth": "This month",
-    "monthsWithData": "Months with data"
+    "monthsWithData": "Months with data",
+    "dupesFound": "{n} duplicate rows found across {groups} transactions ({amount}). Same date, amount and description stored more than once — usually from importing a file both before and after an import-key change.",
+    "dupesRemove": "Remove duplicates",
+    "dupesRemovedOk": "Removed {n} duplicate rows. They are voided, not deleted — restore any from the list if a match was wrong.",
+    "filterCategory": "Category",
+    "filterBehavioral": "Behaviour",
+    "filterAll": "All",
+    "filterApply": "Filter",
+    "filterClear": "clear filter"
   }
 }

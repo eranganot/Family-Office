@@ -90,6 +90,7 @@ export const ListTransactionsSchema = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   categoryId: z.uuid().optional(),
+  behavioralClass: BehavioralClassSchema.optional(),
   limit: z.number().int().min(1).max(200).default(50),
   cursor: z.uuid().optional(),
 });

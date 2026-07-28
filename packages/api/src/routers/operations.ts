@@ -133,6 +133,7 @@ export const operationsRouter = router({
             ? { bookedAt: { ...(input.from ? { gte: input.from } : {}), ...(input.to ? { lte: input.to } : {}) } }
             : {}),
           ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+          ...(input.behavioralClass ? { behavioralClass: input.behavioralClass } : {}),
         },
         orderBy: [{ bookedAt: "desc" }, { id: "desc" }],
         take: input.limit,
@@ -206,6 +207,74 @@ export const operationsRouter = router({
         });
         return { updated };
       }),
+
+    /**
+     * Find rows that are the same transaction stored more than once.
+     *
+     * Matches on (date, amount, description) rather than on `externalRef`, deliberately:
+     * the import key FORMAT changed (M38l replaced `ref:<asmachta>` with a digest), so
+     * rows imported before and after that change cannot deduplicate against each other
+     * and the same transaction can sit in the ledger twice. A content match survives any
+     * future key change too.
+     */
+    duplicates: operationsProcedure.query(async ({ ctx }) => {
+      const rows = await ctx.db.transaction.findMany({
+        where: { householdId: ctx.householdId, status: { not: "VOID" } },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true, bookedAt: true, amount: true, descriptionRedacted: true,
+          createdAt: true, importBatchId: true, source: true,
+        },
+      });
+      const groups = new Map<string, typeof rows>();
+      for (const r of rows) {
+        const key = `${r.bookedAt.toISOString().slice(0, 10)}|${String(r.amount)}|${r.descriptionRedacted}`;
+        const g = groups.get(key) ?? [];
+        g.push(r);
+        groups.set(key, g);
+      }
+      const dupes = [...groups.entries()]
+        .filter(([, g]) => g.length > 1)
+        .map(([key, g]) => ({
+          key,
+          date: g[0]!.bookedAt.toISOString().slice(0, 10),
+          amount: Number(g[0]!.amount),
+          description: g[0]!.descriptionRedacted,
+          count: g.length,
+          // Keep the OLDEST; the later ones are the accidental re-imports.
+          keepId: g[0]!.id,
+          removeIds: g.slice(1).map((x) => x.id),
+        }));
+      return {
+        groups: dupes,
+        extraRows: dupes.reduce((n, d) => n + d.removeIds.length, 0),
+        extraAmount: Math.round(dupes.reduce((n, d) => n + Math.abs(d.amount) * d.removeIds.length, 0) * 100) / 100,
+      };
+    }),
+
+    /** Void every duplicate copy, keeping the earliest of each group. Reversible. */
+    removeDuplicates: operationsProcedure.mutation(async ({ ctx }) => {
+      const rows = await ctx.db.transaction.findMany({
+        where: { householdId: ctx.householdId, status: { not: "VOID" } },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, bookedAt: true, amount: true, descriptionRedacted: true },
+      });
+      const seen = new Set<string>();
+      const toVoid: string[] = [];
+      for (const r of rows) {
+        const key = `${r.bookedAt.toISOString().slice(0, 10)}|${String(r.amount)}|${r.descriptionRedacted}`;
+        if (seen.has(key)) toVoid.push(r.id);
+        else seen.add(key);
+      }
+      if (toVoid.length === 0) return { removed: 0 };
+      // VOID rather than DELETE: a false positive must be recoverable, and a voided row
+      // is already excluded from every calculation.
+      const res = await ctx.db.transaction.updateMany({
+        where: { id: { in: toVoid }, householdId: ctx.householdId },
+        data: { status: "VOID" },
+      });
+      return { removed: res.count };
+    }),
 
     /** Full edit. Recomputes the merchant key when the description changes. */
     update: operationsProcedure.input(UpdateTransactionSchema).mutation(async ({ ctx, input }) => {
