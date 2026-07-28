@@ -422,6 +422,68 @@ export const operationsRouter = router({
     }),
   }),
 
+  /**
+   * Read-only inspector: exactly what is IN the database for a month, and how each row
+   * is being counted.
+   *
+   * Added after several rounds of "the parser is right but the screen still shows the
+   * old number". Every fault in this module has been silent, and the loop that kept
+   * repeating was: fix parser -> owner re-imports -> figures unchanged -> no way to tell
+   * whether the row is missing, mis-signed, mis-classified or excluded as a TRANSFER.
+   * This answers that in one look, without a database client.
+   */
+  diagnostics: router({
+    month: operationsProcedure.input(PeriodRefSchema).query(async ({ ctx, input }) => {
+      const start = new Date(Date.UTC(input.year, input.month - 1, 1));
+      const end = new Date(Date.UTC(input.year, input.month, 0, 23, 59, 59));
+      const rows = await ctx.db.transaction.findMany({
+        where: { householdId: ctx.householdId, bookedAt: { gte: start, lte: end } },
+        orderBy: [{ amount: "desc" }],
+        select: {
+          id: true, bookedAt: true, amount: true, amountBase: true, currency: true,
+          status: true, source: true, descriptionRedacted: true, behavioralClass: true,
+          category: { select: { key: true, nameHe: true, nameEn: true } },
+          classifications: {
+            where: { status: { not: "SUPERSEDED" } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { method: true, confidence: true, status: true },
+          },
+        },
+      });
+
+      const num = (v: unknown) => Number(v ?? 0);
+      const counted = rows.filter((r) => r.status === "BOOKED");
+      return {
+        total: rows.length,
+        booked: counted.length,
+        pending: rows.filter((r) => r.status === "PENDING").length,
+        voided: rows.filter((r) => r.status === "VOID").length,
+        missingBase: counted.filter((r) => r.amountBase === null).length,
+        // The four buckets that decide whether a row reaches the totals at all.
+        inflow: counted.filter((r) => num(r.amount) > 0 && r.behavioralClass !== "TRANSFER").length,
+        inflowTotal: counted.filter((r) => num(r.amount) > 0 && r.behavioralClass !== "TRANSFER").reduce((n, r) => n + num(r.amount), 0),
+        transfers: counted.filter((r) => r.behavioralClass === "TRANSFER").length,
+        transferTotal: counted.filter((r) => r.behavioralClass === "TRANSFER").reduce((n, r) => n + Math.abs(num(r.amount)), 0),
+        savings: counted.filter((r) => r.behavioralClass === "SAVINGS_FLOW").length,
+        rows: rows.map((r) => ({
+          id: r.id,
+          date: r.bookedAt.toISOString().slice(0, 10),
+          amount: num(r.amount),
+          hasBase: r.amountBase !== null,
+          currency: r.currency,
+          status: r.status,
+          source: r.source,
+          description: r.descriptionRedacted,
+          behavioral: r.behavioralClass,
+          category: r.category?.nameHe ?? null,
+          method: r.classifications[0]?.method ?? null,
+          confidence: Number(r.classifications[0]?.confidence ?? 0),
+        })),
+      };
+    }),
+  }),
+
   suspense: router({
     /**
      * Everything the classifier was not confident enough to apply. These amounts ARE

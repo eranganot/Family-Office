@@ -72,6 +72,7 @@ export default async function OperationsPage({
   const period = await trpc.operations.period.current();
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
   const { year, month, row: periodRow, computed } = period;
+  const diag = await trpc.operations.diagnostics.month({ year, month }).catch(() => null);
   const flow = computed.flow;
   const surplus = computed.surplus;
   const sts = computed.safeToSpend;
@@ -495,6 +496,61 @@ export default async function OperationsPage({
                 )}
               </div>
             </div>
+
+            {diag ? (
+              <details className="mt-6 rounded-lg bg-neutral-50 px-3 py-2 text-xs">
+                <summary className="cursor-pointer font-medium text-neutral-700">
+                  {t("diagTitle", { n: diag.total })}
+                </summary>
+                <p className="mt-2 text-neutral-600">{t("diagHint")}</p>
+                <p className="mt-2 font-mono">
+                  {t("diagSummary", {
+                    booked: diag.booked, pending: diag.pending, voided: diag.voided,
+                    inflow: diag.inflow, inflowTotal: diag.inflowTotal.toFixed(2),
+                    transfers: diag.transfers, transferTotal: diag.transferTotal.toFixed(2),
+                    savings: diag.savings, missingBase: diag.missingBase,
+                  })}
+                </p>
+                <table className="mt-3 w-full">
+                  <thead>
+                    <tr className="text-neutral-500">
+                      <th className="text-start">{t("date")}</th>
+                      <th className="text-start">{t("amount")}</th>
+                      <th className="text-start">{t("description")}</th>
+                      <th className="text-start">{t("behavioral")}</th>
+                      <th className="text-start">{t("category")}</th>
+                      <th className="text-start">{t("diagCounted")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diag.rows.map((r) => {
+                      const excluded =
+                        r.status !== "BOOKED" || r.behavioral === "TRANSFER" || !r.hasBase;
+                      return (
+                        <tr key={r.id} className={excluded ? "text-neutral-400" : ""}>
+                          <td className="whitespace-nowrap">{r.date}</td>
+                          <td className={`tabular-nums ${r.amount > 0 ? "text-green-700" : ""}`}>{r.amount.toFixed(2)}</td>
+                          <td className="max-w-56 truncate">{r.description}</td>
+                          <td>{r.behavioral ? t(`behavioralClass.${r.behavioral}`) : "—"}</td>
+                          <td>{r.category ?? "—"}</td>
+                          <td>
+                            {r.status !== "BOOKED"
+                              ? t("diagNotBooked", { status: r.status })
+                              : !r.hasBase
+                                ? t("diagNoRate")
+                                : r.behavioral === "TRANSFER"
+                                  ? t("diagTransfer")
+                                  : r.behavioral === "SAVINGS_FLOW"
+                                    ? t("diagSavings")
+                                    : t("diagYes")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </details>
+            ) : null}
 
             <div className="mt-8 grid gap-8 md:grid-cols-2">
               <div>

@@ -1373,6 +1373,15 @@
     "previewDirection": "{out} expenses (₪{outTotal}) · {in} income (₪{inTotal})",
     "previewAllIncomeWarning": "⚠ Every row is income — for a card statement that means the sign is inverted. Do not import; tell me.",
     "errorAllFailed": "None of the {n} file(s) could be uploaded. Reason: {why}",
-    "alreadyUploaded": "{n} of them were already stored — showing the existing copy rather than uploading again."
+    "alreadyUploaded": "{n} of them were already stored — showing the existing copy rather than uploading again.",
+    "diagTitle": "Diagnostics — every row in the database for this month ({n})",
+    "diagHint": "Read-only. Shows what is actually stored and whether each row reaches the totals. Greyed rows are excluded — the last column says why.",
+    "diagSummary": "booked {booked} · pending {pending} · removed {voided} · income rows {inflow} (₪{inflowTotal}) · transfers {transfers} (₪{transferTotal}, excluded) · savings {savings} · missing FX rate {missingBase}",
+    "diagCounted": "Counted?",
+    "diagYes": "yes",
+    "diagTransfer": "no — transfer",
+    "diagSavings": "savings, not expense",
+    "diagNotBooked": "no — {status}",
+    "diagNoRate": "no — missing FX rate"
   }
 }

@@ -1373,6 +1373,15 @@
     "previewDirection": "{out} הוצאות (₪{outTotal}) · {in} הכנסות (₪{inTotal})",
     "previewAllIncomeWarning": "⚠ כל השורות הן הכנסה — בדף כרטיס אשראי זה אומר שהסימן הפוך. אל תייבאו; עדכנו אותי.",
     "errorAllFailed": "אף אחד מ-{n} הקבצים לא הועלה. הסיבה: {why}",
-    "alreadyUploaded": "{n} מהם כבר היו שמורים — מוצג העותק הקיים במקום העלאה חוזרת."
+    "alreadyUploaded": "{n} מהם כבר היו שמורים — מוצג העותק הקיים במקום העלאה חוזרת.",
+    "diagTitle": "אבחון — כל השורות שבמסד הנתונים לחודש הזה ({n})",
+    "diagHint": "לקריאה בלבד. מציג מה שמור בפועל והאם כל שורה מגיעה לסיכומים. שורות אפורות מוחרגות — העמודה האחרונה מסבירה למה.",
+    "diagSummary": "נרשמו {booked} · בתהליך {pending} · הוסרו {voided} · שורות הכנסה {inflow} (₪{inflowTotal}) · העברות {transfers} (₪{transferTotal}, מוחרג) · חיסכון {savings} · חסר שער מט״ח {missingBase}",
+    "diagCounted": "נספר?",
+    "diagYes": "כן",
+    "diagTransfer": "לא — העברה",
+    "diagSavings": "חיסכון, לא הוצאה",
+    "diagNotBooked": "לא — {status}",
+    "diagNoRate": "לא — חסר שער מט״ח"
   }
 }

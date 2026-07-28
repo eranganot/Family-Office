@@ -2,6 +2,31 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-28, session 25)
+
+- **M38m — read-only diagnostics panel. `m38m.patch`. NO MIGRATION, NO LOCKFILE CHANGE.**
+  - **Why this exists.** The loop that kept repeating: fix the parser → owner re-imports →
+    figures unchanged → and **no way to tell whether a row is missing, mis-signed,
+    mis-classified, excluded as a TRANSFER, or excluded for a missing FX rate.** I was
+    diagnosing from parser output while the owner was looking at database state, and those
+    two had drifted apart repeatedly. Verifying the parser proves nothing about what is
+    actually stored.
+  - **`operations.diagnostics.month`** returns every transaction in the DB for a month with
+    amount, status, source, behavioural class, category, classification method and confidence,
+    plus counts for the four buckets that decide whether a row reaches the totals at all:
+    booked / pending / voided, income rows, TRANSFER rows (excluded from BOTH sides),
+    SAVINGS_FLOW rows, and rows with no `amountBase` (which make the whole period refuse).
+  - **UI:** collapsible "אבחון" inside the month card. Excluded rows are greyed and the last
+    column states WHY ("no — transfer", "no — missing FX rate", "no — PENDING"). One look
+    answers "is the salary there, and if so why isn't it counted".
+  - **Verified:** tsc clean, eslint clean, i18n parity 1151/1151, `npm ci --dry-run` exit 0.
+
+### Standing instruction for this module
+**Do not diagnose an Operations figure from parser output alone.** The parser is verified
+against the real files (`/tmp/all.mts`, `/tmp/oz.mts`, `/tmp/e2e.mts` — all reconcile). When a
+displayed figure disagrees, the question is what is IN the database, and the diagnostics panel
+is the only thing that answers it. Ask the owner for that panel before changing any code.
+
 ## Current state (2026-07-28, session 24)
 
 - **M38l — the import key silently discarded 73 of 111 bank rows. `m38l.patch`.
