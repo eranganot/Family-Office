@@ -16,7 +16,7 @@
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
     "start": "npm run start --workspace=apps/web",
-    "postinstall": "node scripts/ensure-platform-binaries.mjs"
+    "postinstall": "npm run generate --workspace=@wealthos/db --if-present && node scripts/ensure-platform-binaries.mjs"
   },
   "devDependencies": {
     "eslint": "^10.6.0",
