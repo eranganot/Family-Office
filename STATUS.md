@@ -2,6 +2,86 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-29, session 31) — M40c ⚠️ BUILT, NOT YET VERIFIED
+
+- **M40c — un-accept control + FX conversion-spread analyzer. `deploy-m40c.ps1`.
+  ⚠️ CONTAINS A MIGRATION (`20260729090000_m40c_transaction_original_currency`).
+  NO LOCKFILE CHANGE.** Apply after `m40b`.
+- **⚠️ The sandbox VM never started this session.** Nothing here has been typechecked,
+  tested or linted — `deploy-m40c.ps1` is the only thing that will run it, and it
+  refuses to commit if any gate fails. Same posture as M40a; do not bypass it.
+- **Item 1 — un-accept.** `setStatus` always accepted `PROPOSED`; only the UI gated it,
+  and because a run never re-proposes an ACCEPTED type, a mis-click could not correct
+  itself either. ACCEPTED/IMPLEMENTED cards now render a revert. **The router now
+  journals the revert as `DEFERRED` instead of writing nothing** — previously the
+  journal's last word on a reverted item stayed "ACCEPTED", so the audit trail
+  contradicted the card.
+- **Item 2 — FX spread. The milestone plan's formula was wrong, and silently so.**
+  M40 specified `implied rate = amountBase / amount`. The PDF adapter deliberately
+  stores the CHARGE in `amount` ("the charge is what hits the account"), so on a
+  foreign purchase `amount` and `amountBase` are both the ILS figure and their ratio
+  is **always exactly 1.00**. The analyzer would have reported "no markup" forever, on
+  every household, while looking like a working feature. The foreign side lives in
+  `originalAmount` + `originalCurrency`.
+- **Why M40c gained a migration.** `originalCurrency` was always PARSED by the adapter
+  and dropped at persistence because nothing consumed it. It is load-bearing:
+  `originalAmount` also carries an Israeli **instalment plan's** סכום עסקה, in ILS. A
+  ₪1,200-over-12 purchase divides out to a **92% "conversion markup"** — the M40a
+  defect shape exactly (correct arithmetic over the wrong input set). Pinned by a
+  regression test. Nullable, no backfill: pre-existing rows genuinely do not record
+  the fact, and asserting "ILS" for them would invent one.
+- **Expect NO FX card after deploying.** Rows imported before the migration have no
+  `originalCurrency` and are not conversion candidates. The card appears only after a
+  statement with foreign purchases is re-imported AND BOI rates exist for those dates.
+  **That silence is the coverage rule working.**
+- **Refusals in `fx-markup.ts`** (each with its reason in the file): outflows only;
+  no hindsight rates (only a rate published on or before `bookedAt`, max 7 days stale);
+  refuse-and-report below `opportunity_min_coverage_pct`; `FINANCIAL_DRAG` excluded so
+  a conversion fee is not counted on both this card and the leakage card; a row with no
+  reference rate is unpriced, **never** zero markup.
+- **`other.unclassified` trap does not bite here** — eligibility is currency and
+  arithmetic, never `behavioral`. `behavioral` is read only to push `FINANCIAL_DRAG`
+  rows OUT, a conservative exclusion that stays safe when the class is wrong.
+- **NEW ASSUMPTION KEY `opportunity_min_coverage_pct` (70)** — generic on purpose, so
+  the employer-benefit analyzer reuses the same floor. A new assumption version
+  **INVALIDATES pinned recommendations**; rerun the Opportunity Center once.
+  `leakage_fx_markup_notice_pct` (1.5) already existed and is unchanged.
+- **Gate round 1 caught a wrong TEST, not wrong code** (`fx-markup` coverage-refusal
+  case). It spaced four rows one day apart with a single day-1 rate and expected 25%
+  coverage — but `RATE_STALENESS_DAYS = 7` deliberately carries a rate forward for a
+  week, because BOI does not publish on weekends or holidays. All four priced, coverage
+  was 100%, and the analyzer correctly emitted. Rows respaced past the window, and the
+  carry-forward is now pinned by its own positive test.
+- **Tests:** new `engine-operations/test/fx-markup.test.ts` (18 cases — instalment trap,
+  coverage refusal, hindsight-rate refusal, BOI source preference, unclassified row
+  still counted, value-weighting, materiality floor); FX generator cases including a
+  **second deliberate product-reference violation that MUST throw**, proven per-card
+  rather than assumed covered by another card's test; an ingestion test pinning that
+  `originalCurrency` survives `pdfRowsToDrafts` — the seam that was dropping it.
+
+### Next up — M40c items 3 & 4 (not started)
+
+3. **Employer-benefit analyzer — BLOCKED ON A DATA DECISION, not on code.**
+   Doc 07 §B.4 requires contribution vs statutory ceiling **per employed member**.
+   `FamilyMember` has `employmentStatus` but **no per-member salary or contribution
+   figure exists anywhere in the schema** — pension/gemel/hishtalmut are household-level
+   `LedgerItem`s with `OwnershipShare`, and transactions are not attributed to a member.
+   Decide the data path before writing the analyzer. Under refuse-and-report-coverage
+   thin coverage means it correctly emits nothing, so the plumbing must come first.
+   Owner confirmed 2026-07-29: **no additional income beyond the two salaries.**
+4. Cash-flow timing analyzer, dependency graph, Action Center.
+
+**Owner decision, applies to 3 (2026-07-29): REFUSE-AND-REPORT-COVERAGE**, now
+implemented generically as `opportunity_min_coverage_pct` — reuse it rather than
+adding another key.
+
+### ⚠️ Lesson worth keeping from this session
+A milestone plan written before the data was inspected specified a formula that would
+have produced a permanently silent feature. **It failed the same way M40a did — the
+arithmetic was fine, the input set was wrong** — but this time it would have failed
+*quietly*, with no card to read and nothing to QA. Check the actual column semantics
+before implementing a one-line spec.
+
 ## Current state (2026-07-29, session 30) — M40b part 1
 
 - **M40b part 1 — commitment policy, renegotiation, materiality floor. `deploy-m40b.ps1`.
@@ -39,7 +119,12 @@
   `FIXED_CONTRACTUAL`; plus renegotiation analyzer tests, a materiality test, and a generator
   test asserting the word "cancel"/"לבטל" never appears on a renegotiation card.
 
-## Next up — M40c (start of next session)
+## Next up — M40c (SUPERSEDED — see session 31 above)
+
+> Items 1 and 2 are built (session 31, awaiting the deploy gate). **Item 2's formula
+> below is WRONG** — `amountBase / amount` is always 1.00 for a foreign purchase; the
+> real pair is `amountBase / originalAmount` guarded by `originalCurrency`. Kept for
+> the record only.
 
 M40b part 1 is verified live. **M40c is the remainder of M40**, in this order:
 

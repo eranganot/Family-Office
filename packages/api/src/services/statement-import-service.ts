@@ -291,6 +291,11 @@ export async function commitStatement(
         counterpartyMasked: d.counterpartyMasked ?? null,
         instalmentNumber: d.instalmentNumber ?? null,
         instalmentTotal: d.instalmentTotal ?? null,
+        // M40c: the FX-spread analyzer divides the ILS charge by the foreign original,
+        // so both halves of that pair have to survive import. The currency is the half
+        // that makes it safe — the same column also holds an instalment's ILS סכום עסקה.
+        originalAmount: d.originalAmount ?? null,
+        originalCurrency: d.originalCurrency ?? null,
         isRecurringCandidate: d.isRecurringCandidate,
         externalRef: d.externalRef ?? null,
       },

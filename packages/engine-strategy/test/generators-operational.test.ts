@@ -96,13 +96,58 @@ const renegotiate: Finding = {
   evidenceItemIds: [],
 };
 
-const ALL = [leakage, subs, renegotiate, statutory, review];
+const fxMarkup: Finding = {
+  code: "OPERATIONAL_FX_MARKUP_ABOVE_NOTICE",
+  severity: "WARNING",
+  metrics: {
+    markupPct: 4,
+    thresholdPct: 1.5,
+    excessBase: 444,
+    monthlyExcessBase: 148,
+    annualExcessBase: 1776,
+    convertedVolumeBase: 11100,
+    rowsPriced: 3,
+    rowsCandidate: 3,
+    coveragePct: 100,
+    minCoveragePct: 70,
+    unpricedNoRate: 0,
+    spanDays: 90,
+    currencies: "USD:444(4%)",
+    benchmarkSource: "BOI",
+    worstCurrency: "USD",
+    worstImpliedRate: 3.85,
+    worstReferenceRate: 3.7,
+  },
+  evidenceItemIds: [],
+};
+
+const ALL = [leakage, fxMarkup, subs, renegotiate, statutory, review];
 
 describe("operational generators", () => {
   it("maps every analyzer code — an unmapped operational finding is a bug, not a warning", () => {
     const { drafts, unmappedFindings } = generateOperationalRecommendations(ALL, ASOF);
     expect(unmappedFindings).toEqual([]);
-    expect(drafts).toHaveLength(5);
+    expect(drafts).toHaveLength(6);
+  });
+
+  it("states FX coverage on the card rather than only in the confidence score", () => {
+    // Owner decision 2026-07-29: an analyzer that could not use every row must SAY so.
+    // A lowered confidence score is not a substitute — the reader sees the headline
+    // number either way, and only the prose can explain what was left out.
+    const d = generateOperationalRecommendations([fxMarkup], ASOF).drafts[0]!;
+    expect(d.rationale.sensitivity).toMatch(/3 of 3 foreign-currency payments/);
+    expect(d.rationale.sensitivity).toMatch(/100% coverage, floor 70%/);
+    expect(d.rationaleHe.sensitivity).toMatch(/כיסוי 100%/);
+  });
+
+  it("names the FX spread as a spread, and never as a fee that was billed", () => {
+    // The whole point of the card: a conversion spread appears on no statement line,
+    // so telling the owner to look for a fee would send them hunting for nothing.
+    const d = generateOperationalRecommendations([fxMarkup], ASOF).drafts[0]!;
+    expect(d.rationale.why).toMatch(/never billed as a line|priced into the rate/i);
+    expect(d.impactMonthlyBase).toBe(148);
+    expect(d.assumptionKeysUsed).toContain("leakage_fx_markup_notice_pct");
+    expect(d.assumptionKeysUsed).toContain("opportunity_min_coverage_pct");
   });
 
   it("NEVER claims current spend as a saving on a renegotiation card", () => {
@@ -219,6 +264,19 @@ describe("operational generators", () => {
     const poisoned: Finding = {
       ...statutory,
       metrics: { ...statutory.metrics, nearestTitleEn: "Buy shares in the index ETF" },
+    };
+    expect(() => generateOperationalRecommendations([poisoned], ASOF)).toThrow(
+      /PRODUCT_REFERENCE_IN_GENERATOR/,
+    );
+  });
+
+  it("REJECTS a product name reaching the FX card through a metric", () => {
+    // The FX card interpolates several free-text metrics into its action items, which
+    // is exactly the shape of hole the M38q lesson warns about. Proven per-card, not
+    // assumed to be covered because a different card is.
+    const poisoned: Finding = {
+      ...fxMarkup,
+      metrics: { ...fxMarkup.metrics, worstCurrency: "the index ETF" },
     };
     expect(() => generateOperationalRecommendations([poisoned], ASOF)).toThrow(
       /PRODUCT_REFERENCE_IN_GENERATOR/,

@@ -3,6 +3,7 @@ import {
   runOpportunityAnalyzers,
   type OpportunityCalendarEvent,
   type OpportunityFinding,
+  type OpportunityFxRate,
   type OpportunityTxn,
 } from "@wealthos/engine-operations";
 import {
@@ -61,6 +62,8 @@ async function opportunityAssumptions(db: PrismaClient, householdId: string) {
       subscriptionDormantDays: n("leakage_subscription_dormant_days", 90),
       calendarWindowDays: n("calendar_upcoming_window_days", 60),
       minMonthlyBase: n("opportunity_min_monthly_base", 25),
+      fxMarkupNoticePct: n("leakage_fx_markup_notice_pct", 1.5),
+      minCoveragePct: n("opportunity_min_coverage_pct", 70),
     },
     weights: map["priority_weights"] as PriorityWeights,
     rowsByKey: new Map(rows.map((r) => [r.key, r] as const)),
@@ -87,6 +90,11 @@ async function loadOpportunityTxns(
       id: true,
       bookedAt: true,
       amountBase: true,
+      // M40c: the FX analyzer divides the ILS charge by the foreign original to
+      // recover the rate actually applied. `originalCurrency` is what makes that
+      // division safe — the same column also holds an instalment's ILS סכום עסקה.
+      originalAmount: true,
+      originalCurrency: true,
       status: true,
       merchantKey: true,
       isRecurringCandidate: true,
@@ -104,6 +112,8 @@ async function loadOpportunityTxns(
     id: t.id,
     bookedAt: t.bookedAt,
     amountBase: t.amountBase === null ? null : num(t.amountBase),
+    originalAmount: t.originalAmount === null ? null : num(t.originalAmount),
+    originalCurrency: t.originalCurrency,
     status: t.status,
     categoryKey: t.category?.key ?? null,
     // An owner override beats the category default — that is the whole point of
@@ -112,6 +122,35 @@ async function loadOpportunityTxns(
     merchantKey: t.merchantKey,
     isRecurringCandidate: t.isRecurringCandidate,
     ledgerItemId: t.ledgerItemId,
+  }));
+}
+
+/**
+ * M40c — reference rates for the FX-spread analyzer.
+ *
+ * Loaded for the same window as the transactions plus a week of slack, because the
+ * analyzer benchmarks each row against the most recent rate published ON OR BEFORE its
+ * booking date and a row booked on day one of the window needs the rate that preceded
+ * it. Every source is loaded, not just BOI: the analyzer prefers BOI deterministically
+ * but must be able to fall back rather than silently drop a row as unpriceable.
+ */
+async function loadFxRates(
+  db: PrismaClient,
+  baseCurrency: string,
+  asOf: Date,
+  lookbackDays: number,
+): Promise<OpportunityFxRate[]> {
+  const since = new Date(asOf.getTime() - (lookbackDays + 7) * DAY_MS);
+  const rows = await db.fxRate.findMany({
+    where: { to: baseCurrency, asOf: { gte: since, lte: asOf } },
+    orderBy: { asOf: "desc" },
+  });
+  return rows.map((r) => ({
+    from: r.from,
+    to: r.to,
+    rate: num(r.rate),
+    asOf: r.asOf,
+    source: r.source,
   }));
 }
 
@@ -163,17 +202,31 @@ export async function runOpportunities(
 ): Promise<OpportunityRunResult> {
   const a = await opportunityAssumptions(db, householdId);
 
-  const [transactions, calendarEvents, unreviewedTax] = await Promise.all([
+  // The base currency is the household's own, read rather than assumed: an analyzer
+  // that hardcoded "ILS" would silently mis-handle any household configured otherwise.
+  const household = await db.household.findUniqueOrThrow({
+    where: { id: householdId },
+    select: { baseCurrency: true },
+  });
+  const lookbackDays = Math.max(
+    a.values.baselineMonths * 31,
+    a.values.subscriptionDormantDays + 62,
+  );
+
+  const [transactions, calendarEvents, fxRates, unreviewedTax] = await Promise.all([
     loadOpportunityTxns(db, householdId, asOf, a.values.baselineMonths, a.values.subscriptionDormantDays),
     loadCalendarEvents(db, householdId, asOf, a.values.calendarWindowDays),
+    loadFxRates(db, household.baseCurrency, asOf, lookbackDays),
     hasUnreviewedTaxFigures(db),
   ]);
 
   const findings: OpportunityFinding[] = runOpportunityAnalyzers({
     asOf,
+    baseCurrency: household.baseCurrency,
     assumptions: a.values,
     transactions,
     calendarEvents,
+    fxRates,
   });
 
   // Reproducibility: an operational recommendation pins a snapshot exactly as a

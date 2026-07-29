@@ -20,6 +20,8 @@ const A: OpportunityAssumptions = {
   subscriptionDormantDays: 90,
   calendarWindowDays: 60,
   minMonthlyBase: 25,
+  fxMarkupNoticePct: 1.5,
+  minCoveragePct: 70,
 };
 
 function txn(p: Partial<OpportunityTxn> & { bookedAt: Date; amountBase: number | null }): OpportunityTxn {
@@ -33,15 +35,21 @@ function txn(p: Partial<OpportunityTxn> & { bookedAt: Date; amountBase: number |
     merchantKey: null,
     isRecurringCandidate: false,
     ledgerItemId: null,
+    // Domestic by default: no foreign original means the FX analyzer never treats a
+    // fixture written for another analyzer as a conversion candidate.
+    originalAmount: null,
+    originalCurrency: null,
     ...p,
   };
 }
 
 const input = (over: Partial<OpportunityInput>): OpportunityInput => ({
   asOf: ASOF,
+  baseCurrency: "ILS",
   assumptions: A,
   transactions: [],
   calendarEvents: [],
+  fxRates: [],
   ...over,
 });
 

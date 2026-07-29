@@ -35,11 +35,17 @@ export async function runOpportunitiesAction(fd: FormData): Promise<void> {
   );
 }
 
-/** M40a — owner decision on one opportunity. Journalled server-side in one transaction. */
+/**
+ * M40a — owner decision on one opportunity. Journalled server-side in one transaction.
+ *
+ * M40c: PROPOSED joins the union to support un-accepting. It is a real owner decision
+ * ("put this back on the table"), not an absence of one, and the router journals it as
+ * DEFERRED for exactly that reason.
+ */
 export async function setOpportunityStatusAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const id = str(fd, "id");
-  const status = str(fd, "status") as "ACCEPTED" | "REJECTED" | "IMPLEMENTED";
+  const status = str(fd, "status") as "PROPOSED" | "ACCEPTED" | "REJECTED" | "IMPLEMENTED";
   const note = fd.get("note");
   const trpc = await serverCaller();
   try {

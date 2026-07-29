@@ -1423,8 +1423,10 @@
     "oppsAction": {
       "ACCEPTED": "Accept",
       "IMPLEMENTED": "Mark done",
-      "REJECTED": "Not for us"
+      "REJECTED": "Not for us",
+      "REVERT": "Undo this decision"
     },
+    "oppsRevertHint": "Returns it to open items and to the total.",
     "oppsDifficulty": {
       "TRIVIAL": "Trivial",
       "EASY": "Easy",

@@ -81,6 +81,11 @@ export const DEFAULT_ASSUMPTIONS: Array<{
   // M40b: a card costs the owner attention. M40a shipped a full bilingual card with three
   // action steps for a 6 ILS/month parking charge — the reading cost exceeded the saving.
   { key: "opportunity_min_monthly_base", value: 25, unit: "ILS", description: "Minimum recurring monthly amount (summed across a finding) below which an operational opportunity is not worth surfacing as a card" },
+  // M40c: refuse-and-report-coverage (owner decision, 2026-07-29). An analyzer that can
+  // only price a fraction of the relevant rows must REFUSE rather than publish a figure
+  // built on that fraction with a quietly lowered confidence score — a low confidence
+  // number still reads as a number, whereas a refusal reads as a refusal.
+  { key: "opportunity_min_coverage_pct", value: 70, unit: "PCT", description: "Minimum share of the relevant rows an operational analyzer must be able to price before it may emit a figure at all; below it the finding is withheld and the uncovered count is reported instead" },
   { key: "operations_surplus_drift_pct", value: 20, unit: "PCT", description: "Deviation of realised monthly surplus from the approved plan's assumption that raises a monitoring alert" },
   {
     key: "health_score_weights",

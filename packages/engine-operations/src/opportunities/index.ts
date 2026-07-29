@@ -1,4 +1,5 @@
 import { analyzeDeadlines } from "./deadlines";
+import { analyzeFxMarkup } from "./fx-markup";
 import { analyzeLeakage } from "./leakage";
 import { analyzeRenegotiation } from "./renegotiation";
 import { analyzeSubscriptions } from "./subscriptions";
@@ -12,6 +13,7 @@ import type { OpportunityFinding, OpportunityInput } from "./types";
  */
 export const OPPORTUNITY_ANALYZERS = [
   analyzeLeakage,
+  analyzeFxMarkup,
   analyzeSubscriptions,
   analyzeRenegotiation,
   analyzeDeadlines,
@@ -22,6 +24,7 @@ export function runOpportunityAnalyzers(input: OpportunityInput): OpportunityFin
 }
 
 export { analyzeLeakage, bucketDragByMonth } from "./leakage";
+export { analyzeFxMarkup, priceFxRows, referenceRateOn } from "./fx-markup";
 export { analyzeSubscriptions, clusterSubscriptions } from "./subscriptions";
 export type { SubscriptionCluster } from "./subscriptions";
 export { analyzeRenegotiation } from "./renegotiation";
@@ -32,5 +35,6 @@ export type {
   OpportunityAssumptions,
   OpportunityTxn,
   OpportunityCalendarEvent,
+  OpportunityFxRate,
   OpportunityInput,
 } from "./types";

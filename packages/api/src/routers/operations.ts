@@ -650,6 +650,15 @@ export const operationsRouter = router({
         if (!rec || rec.householdId !== ctx.householdId || rec.origin !== "OPERATIONAL") {
           throw new TRPCError({ code: "NOT_FOUND", message: "OPPORTUNITY_NOT_FOUND" });
         }
+        /*
+         * M40c — reverting to PROPOSED is journalled as DEFERRED, not skipped.
+         *
+         * Un-accepting used to write no journal entry, so the journal's last word on a
+         * reverted item stayed "ACCEPTED" while the card read PROPOSED. Anyone reading
+         * the trail later would conclude the acceptance still stood. DEFERRED is the
+         * schema's own third value and says precisely what happened: the owner took the
+         * decision back without rejecting the idea.
+         */
         const decision =
           input.status === "ACCEPTED"
             ? "ACCEPTED"
@@ -657,21 +666,19 @@ export const operationsRouter = router({
               ? "REJECTED"
               : input.status === "IMPLEMENTED"
                 ? "ACCEPTED"
-                : null;
+                : "DEFERRED";
 
         await ctx.db.$transaction(async (tx) => {
           await tx.recommendation.update({ where: { id: input.id }, data: { status: input.status } });
-          if (decision) {
-            await tx.decisionJournalEntry.create({
-              data: {
-                recommendationId: input.id,
-                decision,
-                decidedBy: "household",
-                implementationDate: input.status === "IMPLEMENTED" ? new Date() : null,
-                notes: input.note ?? null,
-              },
-            });
-          }
+          await tx.decisionJournalEntry.create({
+            data: {
+              recommendationId: input.id,
+              decision,
+              decidedBy: "household",
+              implementationDate: input.status === "IMPLEMENTED" ? new Date() : null,
+              notes: input.note ?? null,
+            },
+          });
         });
         return { id: input.id, status: input.status };
       }),

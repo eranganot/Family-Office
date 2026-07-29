@@ -965,6 +965,12 @@ model Transaction {
   instalmentNumber Int?
   instalmentTotal  Int?
   originalAmount   Decimal? @db.Decimal(18, 4) // סכום עסקה when it differs from סכום חיוב
+  /// M40c — the currency of `originalAmount`. Without it that column is ambiguous:
+  /// it holds the סכום עסקה for BOTH a foreign purchase (USD) and an instalment plan
+  /// (ILS), and the two are indistinguishable by value alone. The FX analyzer needs
+  /// to divide only on genuine conversions — reading an instalment as one would imply
+  /// a ~92% "markup" on a perfectly ordinary ₪1,200-over-12 purchase.
+  originalCurrency String?  @db.Char(3)
 
   /// Links a bank-side aggregate card settlement to the itemised card statement,
   /// so the two never double-count. See Appendix B.3.

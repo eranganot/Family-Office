@@ -66,6 +66,15 @@ export interface TransactionDraft {
   counterpartyMasked?: string | undefined;
   instalmentNumber?: number | undefined;
   instalmentTotal?: number | undefined;
+  /**
+   * M40c — the סכום עסקה when it differs from the charge, with its currency. The PDF
+   * adapter has always parsed both; they were dropped here until the FX-spread
+   * analyzer needed them. The currency is what makes the amount usable: the same
+   * column carries a foreign purchase (USD) and an instalment plan (ILS), and only
+   * the currency separates them.
+   */
+  originalAmount?: string | undefined;
+  originalCurrency?: string | undefined;
   isRecurringCandidate: boolean;
   redactionHits: RedactionHit[];
 }
@@ -385,6 +394,7 @@ export function pdfRowsToDrafts(
     amount: string;
     currency: string;
     originalAmount?: string | undefined;
+    originalCurrency?: string | undefined;
     reference?: string | undefined;
     instalmentNumber?: number | undefined;
     instalmentTotal?: number | undefined;
@@ -406,6 +416,8 @@ export function pdfRowsToDrafts(
       counterpartyMasked: red.counterpartyMasked,
       instalmentNumber: r.instalmentNumber,
       instalmentTotal: r.instalmentTotal,
+      originalAmount: r.originalAmount,
+      originalCurrency: r.originalCurrency,
       isRecurringCandidate: r.isRecurringCandidate,
       redactionHits: red.hits,
     };

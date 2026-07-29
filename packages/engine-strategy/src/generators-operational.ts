@@ -144,6 +144,98 @@ const OPERATIONAL_GENERATORS: Record<string, (f: Finding, asOf: Date) => Body | 
     };
   },
 
+  OPERATIONAL_FX_MARKUP_ABOVE_NOTICE: (f, asOf) => {
+    const monthly = num(f.metrics["monthlyExcessBase"]);
+    const annual = num(f.metrics["annualExcessBase"]);
+    const pct = num(f.metrics["markupPct"]);
+    const volume = num(f.metrics["convertedVolumeBase"]);
+    const coverage = `Measured on ${f.metrics["rowsPriced"]} of ${f.metrics["rowsCandidate"]} foreign-currency payments (${f.metrics["coveragePct"]}% coverage, floor ${f.metrics["minCoveragePct"]}%). ${f.metrics["unpricedNoRate"]} row(s) had no reference rate published within a week of the booking date and were left out rather than assumed to carry no spread. Payments imported before the statement's original currency was recorded cannot be priced at all; if coverage falls below the floor this card is withheld entirely rather than shown from a subset.`;
+    const coverageHe = `נמדד על ${f.metrics["rowsPriced"]} מתוך ${f.metrics["rowsCandidate"]} תשלומים במטבע חוץ (כיסוי ${f.metrics["coveragePct"]}%, רצפה ${f.metrics["minCoveragePct"]}%). ל-${f.metrics["unpricedNoRate"]} שורות לא פורסם שער ייחוס בתוך שבוע ממועד החיוב, והן הושמטו ולא הונח שאין בהן מרווח. תשלומים שיובאו לפני שנרשם מטבע העסקה המקורי אינם ניתנים לתמחור כלל; אם הכיסוי יורד מתחת לרצפה הכרטיס הזה נמנע לחלוטין ולא מוצג מתוך תת-קבוצה.`;
+    const rationale: Rationale = {
+      why: `Foreign-currency payments were converted at about ${pct}% worse than the reference rate for the day they were booked, above the ${f.metrics["thresholdPct"]}% notice threshold. On ${nis(volume)} of converted spend that is ${nis(f.metrics["excessBase"])} of spread, or roughly ${nis(monthly)} a month (${nis(annual)} a year). A spread is never billed as a line — it is priced into the rate — so it does not appear on any statement or in any category view. Worst currency: ${f.metrics["worstCurrency"]}, converted at ${f.metrics["worstImpliedRate"]} against a reference of ${f.metrics["worstReferenceRate"]}.`,
+      benefits: [
+        `Recovers up to ${nis(annual)} a year without changing what the household actually buys`,
+        "A better conversion route is set up once and applies to every future payment",
+        "The saving is already after tax and carries no market exposure",
+      ],
+      risks: [
+        "A card advertising no conversion fee may still apply its own spread; compare the rate received, not the fee advertised",
+        "Holding a foreign-currency balance to avoid conversion introduces currency risk that can exceed the spread saved",
+      ],
+      tradeoffs: [
+        "A cheaper conversion route often means a second account or card to maintain",
+        "Multi-currency arrangements add administrative work for a saving that is proportional to spend",
+      ],
+      taxImplications:
+        "Reducing a conversion spread is not a taxable event. Holding a foreign-currency balance instead can create a taxable exchange gain or loss on realisation, which is a separate decision.",
+      liquidityImplications:
+        "No capital is tied up; the saving appears directly in monthly free cash flow as it is spent.",
+      timeHorizon: "SHORT",
+      sensitivity: `${coverage} Only outgoing conversions are measured — an incoming conversion inverts the arithmetic and would cancel out real spread if averaged in. The reference rate is the most recent published on or before each booking date (source: ${f.metrics["benchmarkSource"]}); a later rate is information nobody had at the time. Explicit conversion fees booked as their own line are excluded here and counted on the fees card instead, so the two do not overlap.`,
+      alternatives: [
+        "Use a card or account that converts at the reference rate for foreign spending",
+        "Convert larger amounts less often, where the spread is charged per conversion",
+        "Ask the current institution what conversion rate it applies and whether a better track exists",
+      ],
+      expectedImpact: `Reduce conversion spread by up to ${nis(monthly)} per month on the same spending.`,
+    };
+    const rationaleHe: Rationale = {
+      why: `תשלומים במטבע חוץ הומרו בכ-${pct}% פחות טוב משער הייחוס ליום החיוב, מעל סף ההתראה של ${f.metrics["thresholdPct"]}%. על ${nis(volume)} של הוצאה מומרת מדובר ב-${nis(f.metrics["excessBase"])} מרווח, כלומר כ-${nis(monthly)} לחודש (${nis(annual)} לשנה). מרווח לעולם אינו מחויב כשורה — הוא מתומחר לתוך השער — ולכן אינו מופיע בשום דף חשבון ובשום תצוגת קטגוריות. המטבע הגרוע ביותר: ${f.metrics["worstCurrency"]}, שהומר לפי ${f.metrics["worstImpliedRate"]} מול ייחוס של ${f.metrics["worstReferenceRate"]}.`,
+      benefits: [
+        `החזר של עד ${nis(annual)} בשנה בלי לשנות דבר ממה שמשק הבית קונה בפועל`,
+        "מסלול המרה זול יותר מוגדר פעם אחת וחל על כל תשלום עתידי",
+        "החיסכון הוא כבר אחרי מס וללא חשיפה לשוק",
+      ],
+      risks: [
+        "כרטיס שמפרסם 'ללא עמלת המרה' עשוי עדיין להחיל מרווח משלו; השוו את השער שהתקבל, לא את העמלה שפורסמה",
+        "החזקת יתרה במטבע חוץ כדי להימנע מהמרה יוצרת סיכון מטבע שעלול לעלות על המרווח שנחסך",
+      ],
+      tradeoffs: [
+        "מסלול המרה זול יותר מצריך לרוב חשבון או כרטיס נוסף לתחזוקה",
+        "הסדר רב-מטבעי מוסיף עבודה אדמיניסטרטיבית עבור חיסכון שגדל ביחס להוצאה",
+      ],
+      taxImplications:
+        "הפחתת מרווח המרה אינה אירוע מס. החזקת יתרה במטבע חוץ במקום זאת עלולה ליצור רווח או הפסד שער החייב במס במימוש, וזו החלטה נפרדת.",
+      liquidityImplications: "לא נכלא הון; החיסכון מופיע ישירות בתזרים החודשי הפנוי עם ההוצאה.",
+      timeHorizon: "SHORT",
+      sensitivity: `${coverageHe} נמדדות רק המרות יוצאות — המרה נכנסת הופכת את החשבון והייתה מקזזת מרווח אמיתי אילו מוצעה יחד איתן. שער הייחוס הוא האחרון שפורסם עד מועד החיוב ועד בכלל (מקור: ${f.metrics["benchmarkSource"]}); שער מאוחר יותר הוא מידע שלא היה בידי איש באותו רגע. עמלות המרה מפורשות שנרשמו כשורה נפרדת מוחרגות כאן ונספרות בכרטיס העמלות, כך שאין חפיפה בין השניים.`,
+      alternatives: [
+        "להשתמש בכרטיס או בחשבון שממיר לפי שער הייחוס עבור הוצאות בחו״ל",
+        "להמיר סכומים גדולים יותר בתדירות נמוכה יותר, היכן שהמרווח נגבה לפי המרה",
+        "לשאול את הגוף הנוכחי איזה שער המרה הוא מחיל והאם קיים מסלול טוב יותר",
+      ],
+      expectedImpact: `הפחתת מרווח ההמרה בעד ${nis(monthly)} לחודש על אותה הוצאה.`,
+    };
+    return {
+      type: "REDUCE_FX_CONVERSION_SPREAD",
+      title: `Cut a ${pct}% currency conversion spread (${nis(monthly)}/month)`,
+      titleHe: `לצמצם מרווח המרת מטבע של ${pct}% (${nis(monthly)} לחודש)`,
+      rationale,
+      rationaleHe,
+      subscores: {
+        impact: Math.min(80, Math.round((pct / Math.max(0.1, num(f.metrics["thresholdPct"]))) * 25)),
+        ease: 65,
+        taxBenefit: 0,
+        riskReduction: 20,
+        goalContribution: 40,
+        urgency: f.severity === "WARNING" ? 55 : 35,
+      },
+      // The spread is measured, not estimated — but only over the rows that could be
+      // priced, so coverage caps the confidence rather than the headline number.
+      confidence: num(f.metrics["coveragePct"]) >= 90 ? 80 : 70,
+      evidenceItemIds: f.evidenceItemIds,
+      goalTypesImproved: ["FINANCIAL_INDEPENDENCE"],
+      assumptionKeysUsed: ["leakage_fx_markup_notice_pct", "opportunity_min_coverage_pct"],
+      cadence: "MONTHLY",
+      difficulty: "EASY",
+      reversibility: "REVERSIBLE",
+      impactMonthlyBase: monthly,
+      impactAnnualBase: annual,
+      impactEoyBase: Math.round(monthly * monthsLeftInYear(asOf) * 100) / 100,
+      expiresAtISO: null,
+    };
+  },
+
   OPERATIONAL_SUBSCRIPTION_REVIEW_DUE: (f, asOf) => {
     const monthly = num(f.metrics["monthlyTotalBase"]);
     const annual = num(f.metrics["annualTotalBase"]);
@@ -502,6 +594,20 @@ const OPERATIONAL_ACTION_ITEMS: Record<
       `פתחו תפעול ← תנועות מסונן לקטגוריית השחיקה הפיננסית וודאו ש-${nis(m["monthlyLeakageBase"])} לחודש הם באמת עמלות ולא הוצאה שסווגה שגוי.`,
       `קחו את המקור הגדול (${m["topSources"]}) לבנק ובקשו מסלול עמלות זול יותר בכתב; ציינו את הסכום החודשי.`,
       `בדקו שוב בחודש הבא: אותו מסך צריך להראות סכום נמוך יותר, ואם לא — השינוי לא יושם.`,
+    ],
+  }),
+  OPERATIONAL_FX_MARKUP_ABOVE_NOTICE: (m) => ({
+    actionItems: [
+      `Open Operations → Transactions and find the foreign-currency payments (${m["currencies"]}). Confirm the converted amounts match the statement — a spread this size can also be a booking error.`,
+      `Ask the institution that converted them what rate and margin it applies to ${m["worstCurrency"]}. Quote the ${m["worstImpliedRate"]} you were charged against the ${m["worstReferenceRate"]} reference for the same day.`,
+      `Compare one alternative conversion route on the rate RECEIVED, not the fee advertised — a zero-fee card can carry a wider spread than a card charging a stated fee.`,
+      `Re-check after the next foreign payment: this card should show a smaller percentage, and if it does not, the route did not change.`,
+    ],
+    actionItemsHe: [
+      `פתחו תפעול ← תנועות ואתרו את התשלומים במטבע חוץ (${m["currencies"]}). ודאו שהסכומים המומרים תואמים לדף החשבון — מרווח בסדר גודל כזה יכול להיות גם שגיאת רישום.`,
+      `שאלו את הגוף שביצע את ההמרה איזה שער ואיזה מרווח הוא מחיל על ${m["worstCurrency"]}. ציינו את ${m["worstImpliedRate"]} שחויבתם מול שער הייחוס ${m["worstReferenceRate"]} לאותו יום.`,
+      `השוו מסלול המרה חלופי אחד לפי השער שמתקבל בפועל, לא לפי העמלה שמפורסמת — כרטיס ללא עמלה עלול לשאת מרווח רחב יותר מכרטיס שגובה עמלה מוצהרת.`,
+      `בדקו שוב אחרי התשלום הבא בחו״ל: הכרטיס הזה אמור להציג אחוז נמוך יותר, ואם לא — המסלול לא באמת השתנה.`,
     ],
   }),
   OPERATIONAL_SUBSCRIPTION_REVIEW_DUE: (m) => ({

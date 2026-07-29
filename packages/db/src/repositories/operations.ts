@@ -20,6 +20,8 @@ export interface CreateTransactionInput {
   instalmentNumber?: number | undefined;
   instalmentTotal?: number | undefined;
   originalAmount?: string | undefined;
+  /** M40c — currency of `originalAmount`; disambiguates a conversion from an instalment. */
+  originalCurrency?: string | undefined;
   isRecurringCandidate?: boolean | undefined;
 }
 
@@ -125,6 +127,7 @@ export const operationsRepo = {
         instalmentNumber: input.instalmentNumber ?? null,
         instalmentTotal: input.instalmentTotal ?? null,
         originalAmount: input.originalAmount ?? null,
+        originalCurrency: input.originalCurrency ?? null,
         isRecurringCandidate: input.isRecurringCandidate ?? false,
       },
     });

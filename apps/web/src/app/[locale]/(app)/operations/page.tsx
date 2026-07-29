@@ -814,7 +814,27 @@ export default async function OperationsPage({
                         </form>
                       ))}
                     </div>
-                  ) : null}
+                  ) : (
+                    /*
+                     * M40c — un-accept. `setStatus` has always accepted PROPOSED, but only
+                     * PROPOSED cards rendered actions, so a mis-click was permanent from the
+                     * screen: an ACCEPTED type is never re-proposed by a run, so the card
+                     * could not come back on its own either. Reverting returns the item to
+                     * the normal lifecycle — it counts toward the headline again and the next
+                     * run may supersede or refresh it.
+                     */
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <form action={setOpportunityStatusAction} className="inline">
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="id" value={o.id} />
+                        <input type="hidden" name="status" value="PROPOSED" />
+                        <button type="submit" className="text-xs text-neutral-500 underline">
+                          {t("oppsAction.REVERT")}
+                        </button>
+                      </form>
+                      <span className="text-xs text-neutral-400">{t("oppsRevertHint")}</span>
+                    </div>
+                  )}
                 </li>
               );
             })}

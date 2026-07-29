@@ -1,0 +1,16 @@
+-- M40c — the currency of Transaction.originalAmount.
+--
+-- `originalAmount` holds the סכום עסקה whenever it differs from the סכום חיוב, which
+-- happens in TWO unrelated cases: a foreign-currency purchase (10.00 USD charged as
+-- 29.79 ILS) and an Israeli instalment plan (1,200.00 ILS charged as 100.00 ILS this
+-- month). By value alone those are indistinguishable, so dividing charge by original
+-- to recover an exchange rate would read the instalment as a ~92% conversion markup.
+--
+-- The PDF adapter has always parsed `originalCurrency`; it was simply dropped at
+-- persistence because nothing consumed it until the M40c FX-spread analyzer.
+--
+-- Nullable with no backfill on purpose: rows imported before this migration genuinely
+-- do not carry the fact, and inventing "ILS" for them would assert something unknown.
+-- The analyzer counts them as unpriced, and its coverage floor makes that visible
+-- rather than silently averaging over a subset.
+ALTER TABLE "Transaction" ADD COLUMN "originalCurrency" CHAR(3);

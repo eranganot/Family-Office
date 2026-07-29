@@ -31,6 +31,9 @@ export {
   runOpportunityAnalyzers,
   OPPORTUNITY_ANALYZERS,
   analyzeLeakage,
+  analyzeFxMarkup,
+  priceFxRows,
+  referenceRateOn,
   analyzeSubscriptions,
   analyzeRenegotiation,
   analyzeDeadlines,
@@ -43,6 +46,7 @@ export type {
   OpportunityAssumptions,
   OpportunityTxn,
   OpportunityCalendarEvent,
+  OpportunityFxRate,
   OpportunityInput,
   SubscriptionCluster,
 } from "./opportunities/index";

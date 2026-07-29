@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parsePdfTable } from "../src/pdf-table";
+import { pdfRowsToDrafts } from "../src/statement-mapping";
 import type { CellLine } from "../src/pdf/extract";
 
 /**
@@ -94,6 +95,18 @@ describe("CARD table (Isracard layout)", () => {
     expect(rows[0]?.amount).toBe("-29.79");
     expect(rows[0]?.originalAmount).toBe("10.00");
     expect(rows[0]?.originalCurrency).toBe("USD");
+  });
+
+  it("M40c — carries the foreign original THROUGH to the draft, currency included", () => {
+    // Both halves were parsed correctly here and then dropped by pdfRowsToDrafts, so
+    // nothing downstream could see a conversion. The currency is the half that makes
+    // the pair usable: originalAmount alone also describes an ILS instalment plan.
+    const { rows } = parsePdfTable([HEADER, FX]);
+    const [draft] = pdfRowsToDrafts(rows);
+    expect(draft?.originalAmount).toBe("10.00");
+    expect(draft?.originalCurrency).toBe("USD");
+    expect(draft?.amount).toBe("-29.79");
+    expect(draft?.currency).toBe("ILS");
   });
 
   it("uses the metadata line beneath a row as context, not as the merchant name", () => {

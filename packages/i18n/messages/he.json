@@ -1423,8 +1423,10 @@
     "oppsAction": {
       "ACCEPTED": "אישור",
       "IMPLEMENTED": "סמן כבוצע",
-      "REJECTED": "לא בשבילנו"
+      "REJECTED": "לא בשבילנו",
+      "REVERT": "ביטול ההחלטה"
     },
+    "oppsRevertHint": "מחזיר אותו לפריטים הפתוחים ולסכום הכולל.",
     "oppsDifficulty": {
       "TRIVIAL": "זניח",
       "EASY": "קל",
