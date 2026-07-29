@@ -60,6 +60,34 @@ export async function setOpportunityStatusAction(fd: FormData): Promise<void> {
   redirect(`/${locale}/operations?oppsUpdated=1#opportunities`);
 }
 
+/**
+ * M40c — move one action through the Action Center's four states.
+ *
+ * A dismissal carries its reason: six months later "why did I skip this" has no answer
+ * without it, and the engine will re-propose the same card into the same silence.
+ */
+export async function setActionStatusAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  const status = str(fd, "status") as "PENDING" | "IN_PROGRESS" | "COMPLETED" | "DISMISSED";
+  const reason = fd.get("dismissalReason");
+  const note = fd.get("note");
+  const trpc = await serverCaller();
+  try {
+    await trpc.operations.actions.setStatus({
+      id,
+      status,
+      ...(typeof reason === "string" && reason.length > 0
+        ? { dismissalReason: reason as "NOT_RELEVANT" }
+        : {}),
+      ...(typeof note === "string" && note.trim().length > 0 ? { note: note.trim() } : {}),
+    });
+  } catch {
+    redirect(`/${locale}/operations?error=action#actions`);
+  }
+  redirect(`/${locale}/operations?actionUpdated=1#actions`);
+}
+
 export async function createManualTransactionAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const direction = str(fd, "direction"); // IN | OUT

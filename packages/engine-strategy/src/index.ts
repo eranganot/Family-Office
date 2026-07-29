@@ -15,7 +15,13 @@ export type { ActionItems } from "./action-items";
 export { scorePriority } from "./scoring";
 export type { PriorityWeights } from "./scoring";
 // --- M40a: operational cadence ---
-export { generateOperationalRecommendations, operationalActionItemsFor } from "./generators-operational";
+export {
+  generateOperationalRecommendations,
+  operationalActionItemsFor,
+  prerequisiteTypesFor,
+  OPERATIONAL_PREREQUISITES,
+  NEVER_BLOCKED_TYPES,
+} from "./generators-operational";
 export type {
   OperationalDraft,
   OperationalGenerationResult,

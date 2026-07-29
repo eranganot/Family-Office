@@ -1427,6 +1427,36 @@
       "REVERT": "Undo this decision"
     },
     "oppsRevertHint": "Returns it to open items and to the total.",
+    "actionsTitle": "Action Center",
+    "actionsHint": "Everything you have committed to, from both engines, in one worklist. Deciding happens in the inboxes below; doing happens here.",
+    "actionsEmpty": "Nothing committed yet. Accept an item below and it appears here.",
+    "actionsSummary": "{open} open · {blocked} waiting on something else",
+    "actionBlockedBy": "Waiting on: {items}",
+    "actionDismissReasonPrompt": "Reason…",
+    "actionState": {
+      "PENDING": "Not started",
+      "IN_PROGRESS": "In progress",
+      "COMPLETED": "Done",
+      "DISMISSED": "Dismissed"
+    },
+    "actionAction": {
+      "PENDING": "Move back to not started",
+      "IN_PROGRESS": "Start",
+      "COMPLETED": "Mark done",
+      "DISMISSED": "Dismiss"
+    },
+    "actionOrigin": {
+      "OPERATIONAL": "Operations",
+      "STRATEGIC": "Strategy"
+    },
+    "actionDismissReason": {
+      "NOT_RELEVANT": "Not relevant to us",
+      "TOO_HARD": "Too much effort",
+      "DISAGREE": "I disagree with it",
+      "ALREADY_DONE": "Already done",
+      "LATER": "Not now",
+      "OTHER": "Other"
+    },
     "oppsDifficulty": {
       "TRIVIAL": "Trivial",
       "EASY": "Easy",

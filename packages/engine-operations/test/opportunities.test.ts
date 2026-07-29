@@ -22,6 +22,8 @@ const A: OpportunityAssumptions = {
   minMonthlyBase: 25,
   fxMarkupNoticePct: 1.5,
   minCoveragePct: 70,
+  cashflowHorizonDays: 180,
+  cashflowPeakNoticePct: 40,
 };
 
 function txn(p: Partial<OpportunityTxn> & { bookedAt: Date; amountBase: number | null }): OpportunityTxn {

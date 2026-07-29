@@ -3,6 +3,9 @@ import type { Finding } from "../src/findings";
 import {
   generateOperationalRecommendations,
   operationalActionItemsFor,
+  prerequisiteTypesFor,
+  NEVER_BLOCKED_TYPES,
+  OPERATIONAL_PREREQUISITES,
 } from "../src/generators-operational";
 import { RationaleSchema } from "../src/rationale";
 
@@ -121,13 +124,61 @@ const fxMarkup: Finding = {
   evidenceItemIds: [],
 };
 
-const ALL = [leakage, fxMarkup, subs, renegotiate, statutory, review];
+const timing: Finding = {
+  code: "OPERATIONAL_CASHFLOW_TIMING_SPIKE",
+  severity: "WARNING",
+  metrics: {
+    peakMonth: "2026-09",
+    peakMonthBase: 5000,
+    typicalMonthBase: 1000,
+    excessBase: 4000,
+    spikePct: 400,
+    thresholdPct: 40,
+    movableBase: 5000,
+    statutoryBase: 0,
+    movableCount: 2,
+    largestMovableEn: "Annual home insurance",
+    largestMovableHe: "ביטוח דירה שנתי",
+    largestMovableBase: 3000,
+    movableTitlesEn: "Annual home insurance · School payment",
+    movableTitlesHe: "ביטוח דירה שנתי · תשלום בית ספר",
+    lightestMonth: "2026-08",
+    lightestMonthBase: 1000,
+    monthsObserved: 4,
+    horizonDays: 180,
+    coveragePct: 100,
+    minCoveragePct: 70,
+    unpricedEvents: 0,
+  },
+  evidenceItemIds: [],
+};
+
+const ALL = [leakage, fxMarkup, subs, renegotiate, timing, statutory, review];
 
 describe("operational generators", () => {
   it("maps every analyzer code — an unmapped operational finding is a bug, not a warning", () => {
     const { drafts, unmappedFindings } = generateOperationalRecommendations(ALL, ASOF);
     expect(unmappedFindings).toEqual([]);
-    expect(drafts).toHaveLength(6);
+    expect(drafts).toHaveLength(7);
+  });
+
+  it("NEVER claims relieved cash pressure as a saving on a timing card", () => {
+    // Moving a payment saves nothing — it changes WHEN cash is needed, not how much.
+    // Putting the relieved amount in the impact columns would feed it into the
+    // Opportunity Center's savings headline and claim liquidity as income.
+    const d = generateOperationalRecommendations([timing], ASOF).drafts[0]!;
+    expect(d.impactMonthlyBase).toBeNull();
+    expect(d.impactAnnualBase).toBeNull();
+    expect(d.impactEoyBase).toBeNull();
+    expect(d.rationale.liquidityImplications).toMatch(/never how much/i);
+    expect(d.rationaleHe.liquidityImplications).toMatch(/לעולם לא כמה/);
+  });
+
+  it("tells the owner to leave statutory dates alone on a timing card", () => {
+    // Proposing to move a tax date is not a strategy, it is advice with a penalty.
+    const d = generateOperationalRecommendations([timing], ASOF).drafts[0]!;
+    expect(d.actionItems.join(" ")).toMatch(/statutory items where they are/i);
+    expect(d.actionItemsHe.join(" ")).toMatch(/סטטוטוריים במקומם/);
   });
 
   it("states FX coverage on the card rather than only in the confidence score", () => {
@@ -268,6 +319,39 @@ describe("operational generators", () => {
     expect(() => generateOperationalRecommendations([poisoned], ASOF)).toThrow(
       /PRODUCT_REFERENCE_IN_GENERATOR/,
     );
+  });
+
+  it("NEVER gives a statutory deadline a prerequisite", () => {
+    // An externally imposed date does not wait for the household to finish its admin.
+    // A lock that delayed one would cause the exact penalty the card exists to prevent.
+    for (const t of NEVER_BLOCKED_TYPES) {
+      expect(prerequisiteTypesFor(t)).toEqual([]);
+    }
+    expect(prerequisiteTypesFor("MEET_STATUTORY_DEADLINE")).toEqual([]);
+  });
+
+  it("declares a prerequisite only where it changes the dependent's numbers", () => {
+    // The map is deliberately sparse. A dependency asserted for tidiness blocks real
+    // work for no reason, so this pins the ONE relationship that currently qualifies:
+    // cancelling or repricing a payment inside the heavy month changes the peak, and
+    // may remove the need to reschedule anything at all.
+    expect(prerequisiteTypesFor("SMOOTH_CASHFLOW_TIMING")).toEqual([
+      "REVIEW_RECURRING_SUBSCRIPTIONS",
+      "RENEGOTIATE_RECURRING_COMMITMENTS",
+    ]);
+    expect(Object.keys(OPERATIONAL_PREREQUISITES)).toEqual(["SMOOTH_CASHFLOW_TIMING"]);
+  });
+
+  it("has no unknown type on either side of the prerequisite map", () => {
+    // A typo'd type name would silently never match, producing a graph that looks
+    // configured and enforces nothing — the M38q failure mode.
+    const generated = new Set(
+      generateOperationalRecommendations(ALL, ASOF).drafts.map((d) => d.type),
+    );
+    for (const [dependent, prereqs] of Object.entries(OPERATIONAL_PREREQUISITES)) {
+      expect(generated).toContain(dependent);
+      for (const p of prereqs) expect(generated).toContain(p);
+    }
   });
 
   it("REJECTS a product name reaching the FX card through a metric", () => {

@@ -1427,6 +1427,36 @@
       "REVERT": "ביטול ההחלטה"
     },
     "oppsRevertHint": "מחזיר אותו לפריטים הפתוחים ולסכום הכולל.",
+    "actionsTitle": "מרכז הפעולות",
+    "actionsHint": "כל מה שהתחייבתם אליו, משני המנועים, ברשימת עבודה אחת. ההחלטות נעשות בתיבות שלמטה; הביצוע נעשה כאן.",
+    "actionsEmpty": "אין עדיין התחייבויות. אשרו פריט למטה והוא יופיע כאן.",
+    "actionsSummary": "{open} פתוחות · {blocked} ממתינות למשהו אחר",
+    "actionBlockedBy": "ממתין ל: {items}",
+    "actionDismissReasonPrompt": "סיבה…",
+    "actionState": {
+      "PENDING": "טרם התחיל",
+      "IN_PROGRESS": "בתהליך",
+      "COMPLETED": "בוצע",
+      "DISMISSED": "נדחה"
+    },
+    "actionAction": {
+      "PENDING": "החזרה למצב טרם התחיל",
+      "IN_PROGRESS": "להתחיל",
+      "COMPLETED": "סמן כבוצע",
+      "DISMISSED": "לדחות"
+    },
+    "actionOrigin": {
+      "OPERATIONAL": "תפעול",
+      "STRATEGIC": "אסטרטגיה"
+    },
+    "actionDismissReason": {
+      "NOT_RELEVANT": "לא רלוונטי לנו",
+      "TOO_HARD": "דורש יותר מדי מאמץ",
+      "DISAGREE": "אני לא מסכים עם זה",
+      "ALREADY_DONE": "כבר בוצע",
+      "LATER": "לא עכשיו",
+      "OTHER": "אחר"
+    },
     "oppsDifficulty": {
       "TRIVIAL": "זניח",
       "EASY": "קל",

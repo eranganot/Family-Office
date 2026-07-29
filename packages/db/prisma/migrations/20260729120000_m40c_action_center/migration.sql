@@ -1,0 +1,17 @@
+-- M40c — Action Center: the "started but not finished" state.
+--
+-- The spec's four action states are PENDING / IN_PROGRESS / COMPLETED / DISMISSED.
+-- Three already exist in RecommendationStatus (ACCEPTED / IMPLEMENTED / REJECTED) and
+-- dismissal reasons already have a home in ActionEvent.dismissalReason, so the only
+-- thing genuinely missing is "the owner has started this".
+--
+-- Deliberately a nullable timestamp rather than a new RecommendationStatus value:
+--   1. Postgres will not let a newly added enum value be USED in the same transaction
+--      that adds it, which is precisely how Prisma runs a migration — a known way to
+--      produce a migration that fails only on the deploy box.
+--   2. A second status vocabulary would give one recommendation two competing sources
+--      of truth, and the two would drift the first time one path forgot to update.
+--
+-- IN_PROGRESS is therefore derived: status = ACCEPTED AND actionStartedAt IS NOT NULL.
+-- No backfill: existing accepted items are PENDING, which is exactly what they are.
+ALTER TABLE "Recommendation" ADD COLUMN "actionStartedAt" TIMESTAMP(3);

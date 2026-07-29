@@ -9,6 +9,7 @@ import { commitStatement, previewStatement } from "../services/statement-import-
 import { linkCardSettlements } from "../services/settlement-service";
 import { regenerateCalendar, upcomingEvents } from "../services/calendar-service";
 import { listOpportunities, runOpportunities } from "../services/opportunity-service";
+import { DISMISSAL_REASONS, listActions, setActionStatus } from "../services/action-service";
 import { rulesWithSuggestions, suggestedAnchorDate } from "@wealthos/domain";
 import {
   ArchiveCategorySchema,
@@ -681,6 +682,61 @@ export const operationsRouter = router({
           });
         });
         return { id: input.id, status: input.status };
+      }),
+  }),
+
+  /**
+   * M40c — the Action Center.
+   *
+   * Defined by STATUS, not by origin: everything the owner has committed to, from
+   * either engine, as one worklist. The two proposal inboxes stay where they are —
+   * this is not a third place to decide, it is the one place to DO.
+   */
+  actions: router({
+    list: operationsProcedure
+      .input(z.object({ includeClosed: z.boolean().optional() }).optional())
+      .query(async ({ ctx, input }) =>
+        listActions(ctx.db, ctx.householdId, { includeClosed: input?.includeClosed ?? false }),
+      ),
+
+    /**
+     * Owner moves an action through PENDING → IN_PROGRESS → COMPLETED, or dismisses it.
+     * Returns the recomputed Opportunity Center totals in the SAME response, per the
+     * real-time requirement in doc 07 §8 — the end-of-year trajectory it also asks for
+     * is M41's and is reported as unavailable rather than approximated.
+     */
+    setStatus: operationsProcedure
+      .input(
+        z.object({
+          id: z.uuid(),
+          status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "DISMISSED"]),
+          dismissalReason: z.enum(DISMISSAL_REASONS).optional(),
+          note: z.string().max(2000).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await setActionStatus(
+            ctx.db,
+            ctx.householdId,
+            {
+              id: input.id,
+              status: input.status,
+              dismissalReason: input.dismissalReason,
+              note: input.note,
+            },
+            ctx.session.email,
+          );
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "ACTION_FAILED";
+          if (msg === "ACTION_NOT_FOUND") {
+            throw new TRPCError({ code: "NOT_FOUND", message: msg });
+          }
+          if (msg === "DISMISSAL_REASON_REQUIRED") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+          }
+          throw e;
+        }
       }),
   }),
 

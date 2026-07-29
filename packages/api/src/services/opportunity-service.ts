@@ -9,6 +9,7 @@ import {
 import {
   ENGINE_VERSION,
   generateOperationalRecommendations,
+  prerequisiteTypesFor,
   scorePriority,
   type OperationalDraft,
   type PriorityWeights,
@@ -41,6 +42,8 @@ export interface OpportunityRunResult {
   snapshotId: string;
   created: number;
   supersededCount: number;
+  /** M40c — dependency edges written this run (both ends created in the same run). */
+  dependencyCount: number;
   findings: string[];
   unmappedFindings: string[];
   /** True when any consumed tax matrix is still `ownerReviewed=false` (B2/B3). */
@@ -64,6 +67,8 @@ async function opportunityAssumptions(db: PrismaClient, householdId: string) {
       minMonthlyBase: n("opportunity_min_monthly_base", 25),
       fxMarkupNoticePct: n("leakage_fx_markup_notice_pct", 1.5),
       minCoveragePct: n("opportunity_min_coverage_pct", 70),
+      cashflowHorizonDays: n("cashflow_timing_horizon_days", 180),
+      cashflowPeakNoticePct: n("cashflow_peak_month_notice_pct", 40),
     },
     weights: map["priority_weights"] as PriorityWeights,
     rowsByKey: new Map(rows.map((r) => [r.key, r] as const)),
@@ -154,6 +159,14 @@ async function loadFxRates(
   }));
 }
 
+/**
+ * Calendar events for the analyzers.
+ *
+ * M40c: loaded over the LONGER of the deadline window and the cash-flow timing
+ * horizon. `analyzeDeadlines` re-filters to `calendarWindowDays` internally, so
+ * widening the load here cannot change what it reports — it only gives the timing
+ * analyzer the months it needs to establish a typical month.
+ */
 async function loadCalendarEvents(
   db: PrismaClient,
   householdId: string,
@@ -215,7 +228,12 @@ export async function runOpportunities(
 
   const [transactions, calendarEvents, fxRates, unreviewedTax] = await Promise.all([
     loadOpportunityTxns(db, householdId, asOf, a.values.baselineMonths, a.values.subscriptionDormantDays),
-    loadCalendarEvents(db, householdId, asOf, a.values.calendarWindowDays),
+    loadCalendarEvents(
+      db,
+      householdId,
+      asOf,
+      Math.max(a.values.calendarWindowDays, a.values.cashflowHorizonDays),
+    ),
     loadFxRates(db, household.baseCurrency, asOf, lookbackDays),
     hasUnreviewedTaxFigures(db),
   ]);
@@ -244,6 +262,7 @@ export async function runOpportunities(
 
   let created = 0;
   let supersededCount = 0;
+  let dependencyCount = 0;
 
   await db.$transaction(async (tx) => {
     const superseded = await tx.recommendation.updateMany({
@@ -263,16 +282,38 @@ export async function runOpportunities(
       ).map((r) => r.type),
     );
 
+    const idByType = new Map<string, string>();
     for (const draft of drafts) {
       if (acceptedTypes.has(draft.type)) continue;
-      await persistOperationalDraft(tx, {
+      const id = await persistOperationalDraft(tx, {
         householdId,
         snapshotId,
         draft,
         weights: a.weights,
         rowsByKey: a.rowsByKey,
       });
+      idByType.set(draft.type, id);
       created += 1;
+    }
+
+    /*
+     * M40c — the dependency graph, written in the SAME transaction as the cards.
+     *
+     * Only edges where BOTH ends were created in this run are written. A prerequisite
+     * that did not fire this time is not a missing dependency, it is a resolved one:
+     * if the subscriptions analyzer found nothing, there is nothing to do first, and
+     * pointing at a superseded row from a previous run would block the dependent
+     * against work that is already irrelevant.
+     */
+    for (const draft of drafts) {
+      const dependentId = idByType.get(draft.type);
+      if (!dependentId) continue;
+      for (const prereqType of prerequisiteTypesFor(draft.type)) {
+        const prerequisiteId = idByType.get(prereqType);
+        if (!prerequisiteId || prerequisiteId === dependentId) continue;
+        await tx.recommendationDependency.create({ data: { dependentId, prerequisiteId } });
+        dependencyCount += 1;
+      }
     }
   });
 
@@ -281,6 +322,7 @@ export async function runOpportunities(
     snapshotId,
     created,
     supersededCount,
+    dependencyCount,
     findings: findings.map((f) => f.code),
     unmappedFindings,
     usesUnreviewedTaxFigures: unreviewedTax,
@@ -298,13 +340,13 @@ async function persistOperationalDraft(
     weights: PriorityWeights;
     rowsByKey: Map<string, { id: string; version: number }>;
   },
-): Promise<void> {
+): Promise<string> {
   const { householdId, snapshotId, draft, weights, rowsByKey } = args;
   const pins = draft.assumptionKeysUsed
     .map((k) => rowsByKey.get(k)?.id)
     .filter((id): id is string => Boolean(id));
 
-  await tx.recommendation.create({
+  const row = await tx.recommendation.create({
     data: {
       householdId,
       snapshotId,
@@ -333,7 +375,9 @@ async function persistOperationalDraft(
       expiresAt: draft.expiresAtISO === null ? null : new Date(`${draft.expiresAtISO}T00:00:00.000Z`),
       assumptionPins: { create: [...new Set(pins)].map((assumptionId) => ({ assumptionId })) },
     },
+    select: { id: true },
   });
+  return row.id;
 }
 
 export interface OperationalRecommendationView {
@@ -356,6 +400,15 @@ export interface OperationalRecommendationView {
   rationale: unknown;
   rationaleHe: unknown;
   actionItems: unknown;
+  /**
+   * M40c — true when a prerequisite of this item is still outstanding. Acting out of
+   * order is not forbidden by the API (the owner may know something the engine does
+   * not); the UI surfaces it so a decision made out of order is a CHOICE rather than
+   * an accident.
+   */
+  isBlocked: boolean;
+  blockedByEn: string[];
+  blockedByHe: string[];
 }
 
 /** The Opportunity Center read model. Expired items are reported, never hidden. */
@@ -369,8 +422,35 @@ export async function listOpportunities(
     orderBy: [{ priorityScore: "desc" }, { generatedAt: "desc" }],
   });
 
+  /*
+   * M40c — resolve the dependency graph for the rows on screen.
+   *
+   * A prerequisite only BLOCKS while it is still outstanding. Once it is IMPLEMENTED
+   * the work is done; once it is REJECTED or SUPERSEDED the question is closed. In
+   * both cases the dependent is free, and continuing to show a lock would strand it
+   * permanently behind an item the owner has already dealt with.
+   */
+  const ids = rows.map((r) => r.id);
+  const edges = ids.length
+    ? await db.recommendationDependency.findMany({
+        where: { dependentId: { in: ids } },
+        select: {
+          dependentId: true,
+          prerequisite: { select: { title: true, titleHe: true, status: true } },
+        },
+      })
+    : [];
+  const blockers = new Map<string, Array<{ title: string; titleHe: string | null }>>();
+  for (const e of edges) {
+    if (e.prerequisite.status !== "PROPOSED" && e.prerequisite.status !== "ACCEPTED") continue;
+    const list = blockers.get(e.dependentId) ?? [];
+    list.push({ title: e.prerequisite.title, titleHe: e.prerequisite.titleHe });
+    blockers.set(e.dependentId, list);
+  }
+
   const items = rows.map((r) => {
     const expiresAt = r.expiresAt ? r.expiresAt.toISOString().slice(0, 10) : null;
+    const blocking = blockers.get(r.id) ?? [];
     return {
       id: r.id,
       type: r.type,
@@ -402,6 +482,9 @@ export async function listOpportunities(
       rationale: r.rationale,
       rationaleHe: r.rationaleHe,
       actionItems: r.actionItems,
+      isBlocked: blocking.length > 0,
+      blockedByEn: blocking.map((b) => b.title),
+      blockedByHe: blocking.map((b) => b.titleHe ?? b.title),
     };
   });
 

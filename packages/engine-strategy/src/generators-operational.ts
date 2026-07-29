@@ -414,6 +414,102 @@ const OPERATIONAL_GENERATORS: Record<string, (f: Finding, asOf: Date) => Body | 
     };
   },
 
+  // No `asOf`: nothing is saved by moving a payment, so there is no end-of-year
+  // benefit to derive. See the impact comment below.
+  OPERATIONAL_CASHFLOW_TIMING_SPIKE: (f) => {
+    const excess = num(f.metrics["excessBase"]);
+    const movable = num(f.metrics["movableBase"]);
+    const statutory = num(f.metrics["statutoryBase"]);
+    const rationale: Rationale = {
+      why: `${f.metrics["peakMonth"]} carries ${nis(f.metrics["peakMonthBase"])} of committed outflows against a typical ${nis(f.metrics["typicalMonthBase"])} — ${nis(excess)} more than usual, or ${f.metrics["spikePct"]}% above the threshold of ${f.metrics["thresholdPct"]}%. Nothing here is wasteful and nothing is saved by acting: the question is whether that month can be met from income rather than from an overdraft or by selling something. ${nis(movable)} of it is household-scheduled and could move; ${nis(statutory)} is statutory and cannot. The largest movable item is "${f.metrics["largestMovableEn"]}" at ${nis(f.metrics["largestMovableBase"])}.`,
+      benefits: [
+        "Avoids an overdraft or a forced asset sale caused purely by timing, not by affordability",
+        `${f.metrics["lightestMonth"]} is the lightest month in the window at ${nis(f.metrics["lightestMonthBase"])} and can absorb some of it`,
+        "Smoothing once fixes every future year where the same dates recur",
+      ],
+      risks: [
+        "Moving a due date can forfeit an early-payment discount or trigger a late fee if the supplier does not agree in advance",
+        "Splitting an annual payment into instalments often costs more in total than paying it once",
+      ],
+      tradeoffs: [
+        "Paying earlier smooths the peak but gives up the use of the money sooner",
+        "Rescheduling takes a conversation with each supplier for a benefit that is liquidity, not money",
+      ],
+      taxImplications:
+        "None from timing alone within a year. Moving a deductible contribution ACROSS 31 December changes which tax year it counts in, which is a separate decision — statutory dates are excluded here for exactly that reason.",
+      liquidityImplications: `This is a liquidity finding, not a savings one: ${nis(excess)} of pressure concentrated in ${f.metrics["peakMonth"]}. It changes when cash is needed, never how much.`,
+      timeHorizon: "SHORT",
+      sensitivity: `Based on ${f.metrics["monthsObserved"]} complete month(s) of forward calendar over ${f.metrics["horizonDays"]} days, at ${f.metrics["coveragePct"]}% coverage (floor ${f.metrics["minCoveragePct"]}%). ${f.metrics["unpricedEvents"]} scheduled item(s) had no amount and were excluded rather than counted as zero — counting them as zero would flatten the very peak this looks for. Only dates the household controls are treated as movable; statutory dates are reported and left alone.`,
+      alternatives: [
+        "Ask the supplier to change the billing date rather than splitting the payment",
+        "Move only the largest movable item and re-measure next month",
+        "Set aside the excess over the preceding months instead of moving anything",
+      ],
+      expectedImpact: `Relieve ${nis(movable)} of avoidable cash pressure in ${f.metrics["peakMonth"]}.`,
+    };
+    const rationaleHe: Rationale = {
+      why: `בחודש ${f.metrics["peakMonth"]} מרוכזים ${nis(f.metrics["peakMonthBase"])} של תשלומים מחויבים מול ${nis(f.metrics["typicalMonthBase"])} בחודש טיפוסי — ${nis(excess)} יותר מהרגיל, כלומר ${f.metrics["spikePct"]}% מעל הסף של ${f.metrics["thresholdPct"]}%. אין כאן בזבוז ואין חיסכון בפעולה: השאלה היא אם אפשר לעמוד באותו חודש מתוך ההכנסה במקום ממסגרת אשראי או ממכירת נכס. ${nis(movable)} מתוכם נקבעו על ידי משק הבית וניתנים להזזה; ${nis(statutory)} הם סטטוטוריים ואינם ניתנים להזזה. הפריט הגדול ביותר שניתן להזיז הוא "${f.metrics["largestMovableHe"]}" בסך ${nis(f.metrics["largestMovableBase"])}.`,
+      benefits: [
+        "מונע משיכת יתר או מכירת נכס בלחץ שנובעים מעיתוי בלבד ולא מיכולת",
+        `${f.metrics["lightestMonth"]} הוא החודש הקל בחלון עם ${nis(f.metrics["lightestMonthBase"])} ויכול לספוג חלק`,
+        "פריסה נכונה פעם אחת מתקנת כל שנה עתידית שבה חוזרים אותם מועדים",
+      ],
+      risks: [
+        "שינוי מועד עלול לבטל הנחת תשלום מראש או לגרור קנס פיגור אם הספק לא אישר מראש",
+        "פריסת תשלום שנתי לתשלומים עולה לרוב יותר בסך הכול",
+      ],
+      tradeoffs: [
+        "תשלום מוקדם מחליק את השיא אך מוותר על השימוש בכסף מוקדם יותר",
+        "שינוי מועדים דורש שיחה מול כל ספק עבור תועלת שהיא נזילות, לא כסף",
+      ],
+      taxImplications:
+        "אין מעיתוי בלבד בתוך אותה שנה. הזזת הפקדה מוכרת מעבר ל-31 בדצמבר משנה לאיזו שנת מס היא נזקפת, וזו החלטה נפרדת — ומשום כך מועדים סטטוטוריים מוחרגים כאן.",
+      liquidityImplications: `זהו ממצא נזילות ולא ממצא חיסכון: ${nis(excess)} של לחץ מרוכז ב-${f.metrics["peakMonth"]}. הוא משנה מתי נדרש המזומן, לעולם לא כמה.`,
+      timeHorizon: "SHORT",
+      sensitivity: `מבוסס על ${f.metrics["monthsObserved"]} חודשים מלאים של יומן קדימה לאורך ${f.metrics["horizonDays"]} ימים, בכיסוי ${f.metrics["coveragePct"]}% (רצפה ${f.metrics["minCoveragePct"]}%). ל-${f.metrics["unpricedEvents"]} פריטים מתוכננים לא היה סכום והם הוחרגו ולא נספרו כאפס — ספירתם כאפס הייתה משטחת בדיוק את השיא שאותו מחפשים. רק מועדים שבשליטת משק הבית נחשבים ניתנים להזזה; מועדים סטטוטוריים מדווחים ונשארים במקומם.`,
+      alternatives: [
+        "לבקש מהספק לשנות את מועד החיוב במקום לפרוס את התשלום",
+        "להזיז רק את הפריט הגדול ביותר ולמדוד מחדש בחודש הבא",
+        "לצבור את העודף לאורך החודשים הקודמים במקום להזיז דבר",
+      ],
+      expectedImpact: `הקלה של ${nis(movable)} בלחץ תזרימי הניתן להימנעות ב-${f.metrics["peakMonth"]}.`,
+    };
+    return {
+      type: "SMOOTH_CASHFLOW_TIMING",
+      title: `${f.metrics["peakMonth"]} is ${nis(excess)} above a typical month`,
+      titleHe: `${f.metrics["peakMonth"]} גבוה ב-${nis(excess)} מחודש טיפוסי`,
+      rationale,
+      rationaleHe,
+      subscores: {
+        impact: Math.min(60, Math.round(movable / 100)),
+        ease: 55,
+        taxBenefit: 0,
+        riskReduction: 55, // the benefit IS risk reduction: no forced sale, no overdraft
+        goalContribution: 25,
+        urgency: f.severity === "WARNING" ? 60 : 40,
+      },
+      confidence: num(f.metrics["coveragePct"]) >= 90 ? 75 : 65,
+      evidenceItemIds: f.evidenceItemIds,
+      goalTypesImproved: ["EMERGENCY_FUND", "FINANCIAL_INDEPENDENCE"],
+      assumptionKeysUsed: [
+        "cashflow_peak_month_notice_pct",
+        "cashflow_timing_horizon_days",
+        "opportunity_min_coverage_pct",
+      ],
+      cadence: "ANNUAL",
+      difficulty: "MODERATE",
+      reversibility: "REVERSIBLE",
+      // Deliberately null across all three horizons. Moving a payment saves NOTHING —
+      // it changes when cash is needed, not how much. Putting the relieved amount in
+      // the savings headline would claim liquidity as income, which is the M40a
+      // mistake wearing yet another costume.
+      impactMonthlyBase: null,
+      impactAnnualBase: null,
+      impactEoyBase: null,
+      expiresAtISO: null,
+    };
+  },
+
   OPERATIONAL_STATUTORY_DEADLINE_NEAR: (f) => {
     const days = num(f.metrics["nearestDaysAway"]);
     const cash = num(f.metrics["cashImpactBase"]);
@@ -636,6 +732,20 @@ const OPERATIONAL_ACTION_ITEMS: Record<
       `בדקו בחודש הבא: החיוב בתפעול ← תנועות אמור לרדת, ואם לא — המחיר החדש לא יושם.`,
     ],
   }),
+  OPERATIONAL_CASHFLOW_TIMING_SPIKE: (m) => ({
+    actionItems: [
+      `Open Operations → Calendar and look at ${m["peakMonth"]}: ${m["movableTitlesEn"]}. Confirm the dates are real and not an artefact of a template suggestion.`,
+      `Call the supplier behind "${m["largestMovableEn"]}" (${nis(m["largestMovableBase"])}) and ask to move the billing date to ${m["lightestMonth"]}, the lightest month in the window. Agree it in writing BEFORE the current date passes.`,
+      `Leave the statutory items where they are — ${nis(m["statutoryBase"])} of that month is externally fixed and moving it carries a penalty.`,
+      `If nothing can move, set aside ${nis(m["excessBase"])} across the preceding months instead. The pressure is the same either way; only the preparation changes.`,
+    ],
+    actionItemsHe: [
+      `פתחו תפעול ← יומן והביטו ב-${m["peakMonth"]}: ${m["movableTitlesHe"]}. ודאו שהמועדים אמיתיים ואינם תוצאה של הצעה מתבנית.`,
+      `התקשרו לספק של "${m["largestMovableHe"]}" (${nis(m["largestMovableBase"])}) ובקשו להעביר את מועד החיוב ל-${m["lightestMonth"]}, החודש הקל בחלון. סכמו זאת בכתב לפני שהמועד הנוכחי חולף.`,
+      `השאירו את הפריטים הסטטוטוריים במקומם — ${nis(m["statutoryBase"])} מאותו חודש קבועים חיצונית והזזתם גוררת קנס.`,
+      `אם דבר אינו ניתן להזזה, הפרישו ${nis(m["excessBase"])} על פני החודשים שלפני. הלחץ זהה כך או כך; רק ההיערכות משתנה.`,
+    ],
+  }),
   OPERATIONAL_STATUTORY_DEADLINE_NEAR: (m) => ({
     actionItems: [
       `Open Operations → Calendar and read the ${m["eventCount"]} item(s) due inside ${m["windowDays"]} days: ${m["titlesEn"]}.`,
@@ -669,6 +779,37 @@ export function operationalActionItemsFor(
   const builder = OPERATIONAL_ACTION_ITEMS[code];
   if (!builder) throw new Error(`ACTION_ITEMS_MISSING:${code}`);
   return builder(m);
+}
+
+/**
+ * M40c — which operational actions have to happen before which.
+ *
+ * DELIBERATELY SPARSE. A dependency is only declared where acting on the prerequisite
+ * would CHANGE THE DEPENDENT'S NUMBERS — not merely where one feels tidier first. A
+ * dependency asserted without that justification blocks real work for no reason, and a
+ * blocked card the owner disagrees with is worse than no graph at all.
+ *
+ * The one relationship that currently qualifies: rescheduling a heavy month assumes the
+ * payments in it are still going to happen at their current size. Cancelling a
+ * subscription or repricing a commitment inside that month changes the peak — possibly
+ * below the threshold, in which case there is nothing left to reschedule. Doing the
+ * cheap reversible thing before the effortful irreversible one is the point.
+ *
+ * `MEET_STATUTORY_DEADLINE` is intentionally absent as a dependent and must NEVER be
+ * given a prerequisite: an externally imposed date does not wait for the household to
+ * finish its admin, and a lock that delayed one would cause the exact penalty the card
+ * exists to prevent.
+ */
+export const OPERATIONAL_PREREQUISITES: Readonly<Record<string, readonly string[]>> = {
+  SMOOTH_CASHFLOW_TIMING: ["REVIEW_RECURRING_SUBSCRIPTIONS", "RENEGOTIATE_RECURRING_COMMITMENTS"],
+};
+
+/** Types that may never be blocked, whatever a future prerequisite map says. */
+export const NEVER_BLOCKED_TYPES: readonly string[] = ["MEET_STATUTORY_DEADLINE"];
+
+export function prerequisiteTypesFor(type: string): readonly string[] {
+  if (NEVER_BLOCKED_TYPES.includes(type)) return [];
+  return OPERATIONAL_PREREQUISITES[type] ?? [];
 }
 
 export interface OperationalGenerationResult {

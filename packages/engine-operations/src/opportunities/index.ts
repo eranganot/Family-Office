@@ -1,3 +1,4 @@
+import { analyzeCashflowTiming } from "./cashflow-timing";
 import { analyzeDeadlines } from "./deadlines";
 import { analyzeFxMarkup } from "./fx-markup";
 import { analyzeLeakage } from "./leakage";
@@ -16,6 +17,7 @@ export const OPPORTUNITY_ANALYZERS = [
   analyzeFxMarkup,
   analyzeSubscriptions,
   analyzeRenegotiation,
+  analyzeCashflowTiming,
   analyzeDeadlines,
 ] as const;
 
@@ -29,6 +31,7 @@ export { analyzeSubscriptions, clusterSubscriptions } from "./subscriptions";
 export type { SubscriptionCluster } from "./subscriptions";
 export { analyzeRenegotiation } from "./renegotiation";
 export { analyzeDeadlines } from "./deadlines";
+export { analyzeCashflowTiming, bucketCommittedByMonth } from "./cashflow-timing";
 export type {
   OpportunityFinding,
   OpportunitySeverity,

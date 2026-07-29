@@ -54,6 +54,17 @@ export interface OpportunityAssumptions {
    * reads as a number; a refusal reads as a refusal.
    */
   minCoveragePct: number;
+  /**
+   * `cashflow_timing_horizon_days` — M40c. Forward calendar window the timing
+   * analyzer buckets by month. Longer than `calendarWindowDays` on purpose: two
+   * months cannot establish a "typical" month to be unusual against.
+   */
+  cashflowHorizonDays: number;
+  /**
+   * `cashflow_peak_month_notice_pct` — M40c. How far above a typical month the
+   * heaviest month must sit before the clustering is worth an action.
+   */
+  cashflowPeakNoticePct: number;
 }
 
 /**

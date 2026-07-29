@@ -2,14 +2,76 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
-## Current state (2026-07-29, session 31) — M40c ⚠️ BUILT, NOT YET VERIFIED
+## Current state (2026-07-29, session 31) — M40c part 2 ⚠️ BUILT, GATE NOT YET RUN
+
+- **M40c part 2 — cash-flow timing, dependency graph, Action Center.
+  `deploy-m40c-part2.ps1`. ⚠️ CONTAINS A MIGRATION
+  (`20260729120000_m40c_action_center`). NO LOCKFILE CHANGE.** Apply after part 1.
+- **This completes M40.** Part 1 (un-accept + FX spread) passed its gate and is on main.
+- **Cash-flow timing — the first analyzer here that finds no money.** It asks whether
+  committed outflows CLUSTER into one month; a household can be solvent across the year
+  and still be forced into an overdraft in September. **All three impact columns are
+  null** — moving a payment changes *when* cash is needed, never *how much*, and putting
+  the relieved amount in the savings headline would claim liquidity as income.
+- **Its defining refusal: a statutory date does not move.** The spike is split into
+  movable and immovable; **if the whole spike is statutory it emits NOTHING.** A card
+  reporting an expensive month while offering no permitted action is how an inbox trains
+  the owner to ignore it. Also refuses on thin coverage, on <3 complete months (two
+  months give a bigger and a smaller, not a *typical* one), and drops the trailing
+  partial month — it looks cheap only because it is short.
+- **Dependency graph.** `RecommendationDependency` existed since M36 and was never
+  written to. Edges are written in the SAME transaction as the cards, and only when
+  **both ends were created in the same run** — a prerequisite that did not fire is a
+  *resolved* dependency, not a missing one. **The map is deliberately sparse (one
+  edge):** a dependency asserted for tidiness blocks real work for no reason. Blocking
+  is **reported, never enforced** — the owner may know something the engine does not.
+  **`MEET_STATUTORY_DEADLINE` can never be given a prerequisite** (pinned by a test); a
+  lock that delayed one would cause the exact penalty the card prevents.
+- **Action Center is defined by STATUS, not origin** — everything committed to, from
+  BOTH engines, as one worklist. Not a third inbox: two proposal inboxes already exist
+  and a third would just be somewhere else to not decide. Crossing the origin partition
+  is deliberate — that partition stops one engine's run superseding the other's
+  proposals; it was never about hiding accepted work. A household has one Saturday.
+- **Migration `Recommendation.actionStartedAt` (nullable).** Three of the spec's four
+  action states already existed (`ACCEPTED` / `IMPLEMENTED` / `REJECTED`) and dismissal
+  reasons already had a home in `ActionEvent.dismissalReason`; only "started but not
+  finished" had nowhere to live. **Not a new enum value — Postgres will not let a newly
+  added enum value be USED in the transaction that adds it, which is exactly how Prisma
+  runs a migration**, so it would pass locally and fail on the deploy box. The part-2
+  gate now REFUSES any migration containing `ALTER TYPE` for that reason.
+  `IN_PROGRESS` := `status = ACCEPTED AND actionStartedAt IS NOT NULL`.
+- **A dismissal requires a reason.** Without one, "why did I skip this" has no answer
+  six months later and the engine re-proposes the same card into the same silence.
+- **NOT BUILT, on purpose:** doc 07 §8 wants a recomputed EOY trajectory in the same
+  response as a status change. **That projection engine is M41.** `setStatus` returns the
+  genuinely recomputed Opportunity Center totals plus
+  `eoyUnavailableReason=EOY_PROJECTION_ARRIVES_IN_M41` rather than an approximation.
+- **TWO NEW ASSUMPTION KEYS:** `cashflow_timing_horizon_days` (180) —
+  deliberately longer than `calendar_upcoming_window_days`, since two months cannot
+  establish a typical month — and `cashflow_peak_month_notice_pct` (40). A new
+  assumption version **INVALIDATES pinned recommendations**; rerun the Opportunity
+  Center once.
+- **Calendar loading widened** to `max(calendarWindowDays, cashflowHorizonDays)`.
+  Safe because `analyzeDeadlines` re-filters to its own window internally.
+- **Tests:** new `cashflow-timing.test.ts` (13 cases — statutory-only spike refusal,
+  movable/statutory split, <3-month refusal, null-amount coverage refusal, materiality
+  floor); generator cases pinning null impact columns and the leave-statutory-alone
+  action step; dependency-map cases including one asserting every type in the map is a
+  type that is actually generated (a typo would enforce nothing — the M38q failure mode).
+
+### Next up — M41
+Surplus → deployment-engine hand-off; EOY projection (current vs optimised); monthly
+review + close/reopen + `OPERATIONS_REVIEW` snapshot + drift alerts back to Strategy.
+**The Action Center's `eoyUnavailableReason` is the seam M41 fills.**
+
+## Current state (2026-07-29, session 31) — M40c part 1 ✅ GATE PASSED, ON MAIN
 
 - **M40c — un-accept control + FX conversion-spread analyzer. `deploy-m40c.ps1`.
   ⚠️ CONTAINS A MIGRATION (`20260729090000_m40c_transaction_original_currency`).
   NO LOCKFILE CHANGE.** Apply after `m40b`.
-- **⚠️ The sandbox VM never started this session.** Nothing here has been typechecked,
-  tested or linted — `deploy-m40c.ps1` is the only thing that will run it, and it
-  refuses to commit if any gate fails. Same posture as M40a; do not bypass it.
+- **✅ Gate passed and pushed.** The sandbox VM never started this session, so
+  `deploy-m40c.ps1` was the only thing that ran the code — as designed, it caught a
+  defect (below) and refused to commit until it was fixed.
 - **Item 1 — un-accept.** `setStatus` always accepted `PROPOSED`; only the UI gated it,
   and because a run never re-proposes an ACCEPTED type, a mis-click could not correct
   itself either. ACCEPTED/IMPLEMENTED cards now render a revert. **The router now
@@ -59,21 +121,40 @@
   rather than assumed covered by another card's test; an ingestion test pinning that
   `originalCurrency` survives `pdfRowsToDrafts` — the seam that was dropping it.
 
-### Next up — M40c items 3 & 4 (not started)
+### M40c item 3 — CLOSED WITHOUT CODE (owner decision, 2026-07-29)
 
-3. **Employer-benefit analyzer — BLOCKED ON A DATA DECISION, not on code.**
-   Doc 07 §B.4 requires contribution vs statutory ceiling **per employed member**.
-   `FamilyMember` has `employmentStatus` but **no per-member salary or contribution
-   figure exists anywhere in the schema** — pension/gemel/hishtalmut are household-level
-   `LedgerItem`s with `OwnershipShare`, and transactions are not attributed to a member.
-   Decide the data path before writing the analyzer. Under refuse-and-report-coverage
-   thin coverage means it correctly emits nothing, so the plumbing must come first.
-   Owner confirmed 2026-07-29: **no additional income beyond the two salaries.**
-4. Cash-flow timing analyzer, dependency graph, Action Center.
+**Item 3 will not be built. It duplicates an analyzer that already ships.**
 
-**Owner decision, applies to 3 (2026-07-29): REFUSE-AND-REPORT-COVERAGE**, now
-implemented generically as `opportunity_min_coverage_pct` — reuse it rather than
-adding another key.
+- `engine-strategy/src/analyzers/tax-utilization.ts` **already does exactly what item 3
+  describes**: per-adult-member `HISHTALMUT_CONTRIBUTION` / `PENSION_CONTRIBUTION`
+  totals (via `CashFlowDetail` + `OwnershipShare` → `ownerMemberIds`) against the
+  registry `HISHTALMUT_CEILINGS` / `PENSION_CEILINGS`, with months remaining in the tax
+  year. It already refuses rather than guesses — a member with no mapped contribution
+  flows is simply not assessed, and deposits are never inferred from salary.
+- **Doc 07 contradicts itself.** Line 542 says Tax optimization and Pension come from
+  *"Existing `engine-strategy/analyzers/*` — surfaced in the operational inbox, **not
+  re-implemented**"*; line 547 then asks for a NEW analyzer described identically.
+  Building line 547 would put the same unused headroom in BOTH inboxes and count it
+  twice in the savings headline — the M40b subscriptions/renegotiation double-listing
+  problem, repeated.
+- **Correction to the session-31 note above:** it claimed no per-member contribution
+  data exists. That was wrong — it checked `FamilyMember` and `Transaction` but not
+  `CashFlowDetail` + `OwnershipShare`, which is how strategy already attributes them.
+- **What WOULD be genuinely new, if ever wanted:** employer contribution *rate*
+  compliance (is the employer paying the statutory rates, is the hishtalmut match being
+  captured) — a different question from ceiling utilisation. Blocked on two things:
+  `CashFlowDetail` carries ONE `amount` with **no employer/employee split** (needs a
+  migration, and form 106 / `TAX_106` is the document that has the split), and the 2026
+  rates are still `ownerReviewed=false` with **bituach leumi employee rates deliberately
+  null** (sources conflicted). Do not start this without B3 signed off.
+
+### Next up — M40c item 4
+
+4. Cash-flow timing analyzer, dependency graph, Action Center. (`RecommendationDependency`
+   already landed in `20260727090000_m36_operations_core` — no migration needed for the graph.)
+
+**Owner decision (2026-07-29): REFUSE-AND-REPORT-COVERAGE** is now implemented generically
+as `opportunity_min_coverage_pct` — reuse it in any new analyzer rather than adding a key.
 
 ### ⚠️ Lesson worth keeping from this session
 A milestone plan written before the data was inspected specified a formula that would

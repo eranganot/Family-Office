@@ -608,6 +608,14 @@ model Recommendation {
   impactEoyBase     Decimal?             @db.Decimal(18, 4)
   operatingPeriodId String?
   calendarEventId   String?
+  /// M40c — Action Center. The spec's four action states are PENDING / IN_PROGRESS /
+  /// COMPLETED / DISMISSED, and three of them already exist in RecommendationStatus
+  /// (ACCEPTED / IMPLEMENTED / REJECTED). Only "started but not finished" had nowhere
+  /// to live. A nullable timestamp rather than a new enum value: adding to a Postgres
+  /// enum cannot be used in the same transaction that adds it, which makes it a
+  /// migration hazard, and a second status vocabulary would give the same item two
+  /// competing sources of truth. IN_PROGRESS := status ACCEPTED AND this is set.
+  actionStartedAt   DateTime?
 
   assumptionPins RecommendationAssumption[]
   goalImpacts    RecommendationGoal[]

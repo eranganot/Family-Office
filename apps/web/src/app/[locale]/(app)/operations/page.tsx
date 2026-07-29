@@ -22,6 +22,7 @@ import {
   upsertCategoryAction,
   runOpportunitiesAction,
   setOpportunityStatusAction,
+  setActionStatusAction,
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
 import { CategoryPicker, type PickerCategory } from "../../../../components/operations/category-picker";
@@ -54,6 +55,7 @@ export default async function OperationsPage({
     y?: string; m?: string; cat?: string; beh?: string; dupesRemoved?: string;
     calendarBuilt?: string; calendarUpdated?: string; recurringSaved?: string; suggestApplied?: string; cw?: string;
     oppsRun?: string; oppsUpdated?: string; oppsUnreviewed?: string;
+    actionUpdated?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -104,6 +106,8 @@ export default async function OperationsPage({
   // list is whatever the last explicit run produced, so a page refresh cannot
   // silently supersede the owner's inbox.
   const opps = await trpc.operations.opportunities.list().catch(() => null);
+  // M40c — the Action Center: committed work from BOTH engines. Reading never mutates.
+  const actions = await trpc.operations.actions.list().catch(() => null);
   const { year, month, row: periodRow, computed } = period;
   const diag = await trpc.operations.diagnostics.month({ year, month }).catch(() => null);
   const flow = computed.flow;
@@ -679,6 +683,107 @@ export default async function OperationsPage({
       </Card>
 
       <div id="suspense" />
+      {/* ---------------------------------------------------------- M40c --- */}
+      {/*
+        The Action Center sits ABOVE the Opportunity Center on purpose: work already
+        committed to outranks new suggestions. An inbox that shows fresh proposals
+        first quietly rewards deciding over doing.
+      */}
+      <div id="actions" />
+      <Card title={t("actionsTitle")}>
+        <p className="mb-4 text-xs text-neutral-500">{t("actionsHint")}</p>
+        <SuccessBanner message={sp.actionUpdated ? tf("saved") : undefined} />
+
+        {actions && actions.items.length > 0 ? (
+          <>
+            <p className="mb-3 text-xs text-neutral-600">
+              {t("actionsSummary", { open: actions.openCount, blocked: actions.blockedCount })}
+            </p>
+            <ul className="divide-y divide-neutral-200">
+              {actions.items.map((a) => (
+                <li key={a.id} className="py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-medium">
+                      {loc === "he" ? (a.titleHe ?? a.title) : a.title}
+                    </h3>
+                    <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+                      {t(`actionState.${a.actionStatus}`)}
+                    </span>
+                    <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
+                      {t(`actionOrigin.${a.origin}`)}
+                    </span>
+                  </div>
+
+                  {a.isBlocked ? (
+                    /*
+                      Reported, never enforced. The owner may know something the engine
+                      does not, so the API still accepts the change — the lock exists so
+                      that acting out of order is a CHOICE rather than an accident.
+                    */
+                    <p className="mt-1 text-xs text-amber-700">
+                      {t("actionBlockedBy", {
+                        items: (loc === "he" ? a.blockedByHe : a.blockedByEn).join(" · "),
+                      })}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    {(["IN_PROGRESS", "COMPLETED", "PENDING"] as const)
+                      .filter((s) => s !== a.actionStatus)
+                      .map((s) => (
+                        <form key={s} action={setActionStatusAction} className="inline">
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="id" value={a.id} />
+                          <input type="hidden" name="status" value={s} />
+                          <button type="submit" className="text-xs text-emerald-700 underline">
+                            {t(`actionAction.${s}`)}
+                          </button>
+                        </form>
+                      ))}
+
+                    {/* A dismissal must carry a reason — the select is required. */}
+                    <form action={setActionStatusAction} className="inline-flex items-center gap-2">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="id" value={a.id} />
+                      <input type="hidden" name="status" value="DISMISSED" />
+                      <select
+                        name="dismissalReason"
+                        required
+                        defaultValue=""
+                        className="rounded border border-neutral-300 px-1 py-0.5 text-xs"
+                      >
+                        <option value="" disabled>
+                          {t("actionDismissReasonPrompt")}
+                        </option>
+                        {(
+                          [
+                            "NOT_RELEVANT",
+                            "TOO_HARD",
+                            "DISAGREE",
+                            "ALREADY_DONE",
+                            "LATER",
+                            "OTHER",
+                          ] as const
+                        ).map((r) => (
+                          <option key={r} value={r}>
+                            {t(`actionDismissReason.${r}`)}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="submit" className="text-xs text-neutral-500 underline">
+                        {t("actionAction.DISMISSED")}
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="text-sm text-neutral-500">{t("actionsEmpty")}</p>
+        )}
+      </Card>
+
       {/* ---------------------------------------------------------- M39 --- */}
       <div id="opportunities" />
       <Card title={t("oppsTitle")}>

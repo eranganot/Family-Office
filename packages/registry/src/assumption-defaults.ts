@@ -86,6 +86,10 @@ export const DEFAULT_ASSUMPTIONS: Array<{
   // built on that fraction with a quietly lowered confidence score — a low confidence
   // number still reads as a number, whereas a refusal reads as a refusal.
   { key: "opportunity_min_coverage_pct", value: 70, unit: "PCT", description: "Minimum share of the relevant rows an operational analyzer must be able to price before it may emit a figure at all; below it the finding is withheld and the uncovered count is reported instead" },
+  // M40c: cash-flow TIMING. Deliberately a longer window than calendar_upcoming_window_days —
+  // two months cannot establish a "typical" month for the heaviest one to be unusual against.
+  { key: "cashflow_timing_horizon_days", value: 180, unit: "DAYS", description: "Forward calendar window the cash-flow timing analyzer buckets by month when looking for committed outflows that cluster into one month" },
+  { key: "cashflow_peak_month_notice_pct", value: 40, unit: "PCT", description: "How far above a typical month the heaviest month's committed outflows must sit before the clustering is worth an action (a liquidity finding, never a saving)" },
   { key: "operations_surplus_drift_pct", value: 20, unit: "PCT", description: "Deviation of realised monthly surplus from the approved plan's assumption that raises a monitoring alert" },
   {
     key: "health_score_weights",

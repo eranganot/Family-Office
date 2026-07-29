@@ -37,6 +37,8 @@ export {
   analyzeSubscriptions,
   analyzeRenegotiation,
   analyzeDeadlines,
+  analyzeCashflowTiming,
+  bucketCommittedByMonth,
   bucketDragByMonth,
   clusterSubscriptions,
 } from "./opportunities/index";
