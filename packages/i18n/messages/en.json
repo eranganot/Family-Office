@@ -1404,7 +1404,7 @@
     "colDue": "Due",
     "colEvent": "Event",
     "colKind": "Type",
-    "daysAway": "{n}d",
+    "daysAway": "in {n}d",
     "markDone": "Done",
     "markSkipped": "Skip",
     "recurringTitle": "Recurring decisions",
@@ -1412,12 +1412,29 @@
     "recurringActive": "Active",
     "calendarKind": {
       "TAX_DEADLINE": "Tax deadline",
-      "CONTRIBUTION_WINDOW": "Contribution window",
-      "POLICY_REVIEW": "Policy review",
+      "BITUACH_LEUMI": "Bituach leumi",
+      "PENSION_WINDOW": "Pension window",
+      "HISHTALMUT_CEILING": "Hishtalmut ceiling",
+      "GEMEL_CONTRIBUTION": "Provident deposit",
+      "MORTGAGE_RESET": "Mortgage reset",
+      "INSURANCE_RENEWAL": "Insurance renewal",
+      "ARNONA": "Arnona",
+      "VEHICLE_LICENSE": "Vehicle licence",
+      "VEHICLE_INSURANCE": "Vehicle insurance",
+      "SCHOOL_PAYMENT": "School payment",
+      "CHILDCARE_PAYMENT": "Childcare payment",
+      "SALARY_BONUS": "Bonus",
+      "HOLIDAY_SPENDING": "Holiday spending",
+      "ANNUAL_SUBSCRIPTION": "Annual subscription",
       "INSTALMENT": "Instalment",
-      "RATE_RESET": "Rate reset",
-      "REBALANCE": "Rebalance",
+      "REVIEW": "Review",
       "OTHER": "Other"
-    }
+    },
+    "colAmount": "Amount",
+    "colActions": "",
+    "daysAgo": "{n}d ago",
+    "dueToday": "today",
+    "suggestedDates": "Dates below are our suggestion, spaced away from the tax deadlines. Change any that do not match your reality.",
+    "whyThisDate": "Why this date"
   }
 }

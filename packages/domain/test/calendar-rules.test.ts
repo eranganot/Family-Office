@@ -5,6 +5,7 @@ import {
   nextOccurrence,
   occurrencesInWindow,
   type CalendarRule,
+  SUGGESTED_DATE_RATIONALE,
 } from "../src/operations/calendar-rules";
 
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -91,5 +92,40 @@ describe("seeded rule sets", () => {
   it("marks money-moving events as cash impacting so they reach the liquidity forecast", () => {
     expect(IL_STATUTORY_RULES.find((r) => r.key === "hishtalmut.ceiling_check")?.cashImpacting).toBe(true);
     expect(IL_STATUTORY_RULES.find((r) => r.key === "tax.year_end_review")?.cashImpacting).toBe(false);
+  });
+});
+
+/**
+ * Regression: every default-on rule must state its own month.
+ *
+ * Rules with no month fell back to 1 January, which put five unrelated household reviews
+ * on the same fabricated day. The owner spotted it immediately — five items stacked on
+ * 01/01 is not a schedule, it is a missing value wearing a date.
+ */
+describe("suggested dates are chosen, not defaulted", () => {
+  const all = [...IL_STATUTORY_RULES, ...HOUSEHOLD_TEMPLATE_RULES];
+
+  it("every default-enabled non-monthly rule declares a month", () => {
+    const bad = all
+      .filter((r) => r.defaultEnabled && r.cadence !== "MONTHLY" && r.month === undefined)
+      .map((r) => r.key);
+    expect(bad).toEqual([]);
+  });
+
+  it("no two default-enabled annual rules share the same day of the year", () => {
+    const seen = new Map<string, string>();
+    for (const r of all) {
+      if (!r.defaultEnabled || r.cadence === "MONTHLY" || r.month === undefined) continue;
+      const slot = `${r.month}-${r.day}`;
+      expect(seen.has(slot), `${r.key} collides with ${seen.get(slot)} on ${slot}`).toBe(false);
+      seen.set(slot, r.key);
+    }
+  });
+
+  it("every default-on household review explains its suggested date", () => {
+    const unexplained = HOUSEHOLD_TEMPLATE_RULES
+      .filter((r) => r.defaultEnabled && !SUGGESTED_DATE_RATIONALE[r.key])
+      .map((r) => r.key);
+    expect(unexplained).toEqual([]);
   });
 });

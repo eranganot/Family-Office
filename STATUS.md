@@ -1516,6 +1516,28 @@ per-person auth, connectors (new ValuationSource), estate module deep-dive.
 - Auth still env-var based (swap to DB User row planned).
 - next build skips its own TS pass; tsc --noEmit gates types via turbo/CI instead.
 
+## M39b — calendar display + suggested dates (owner-reported)
+
+Three bugs the owner caught in one screenshot pass:
+
+1. **Date and days-away shared one cell.** In RTL "312 ימים" ran into "2026-07-31" and read
+   as a single number. Split into its own column with an `ltr` date cell and a coloured
+   chip, plus proper past/today/future wording.
+2. **`operations.calendarKind.REVIEW` rendered raw.** The i18n map used invented kind names
+   (`CONTRIBUTION_WINDOW`, `POLICY_REVIEW`, `RATE_RESET`, `REBALANCE`) instead of the actual
+   `CalendarEventKind` enum, so every real kind fell through. All 18 enum members now
+   mapped. `colAmount` / `colActions` were missing outright.
+3. **Five household reviews all sat on 01/01/2026.** Those rules declared no `month`, so
+   `ensureRecurringDecisions` fell back to January. This directly contradicted the M39 claim
+   that nothing ships on a date we invented — the fallback WAS an invented date, just a
+   quieter one. Every default-on rule now declares a month and carries a stated reason
+   (`SUGGESTED_DATE_RATIONALE`) shown in the UI, and `gemel.year_end_deposit` moved 25 Dec →
+   15 Dec because the deposit must be *credited* by 31 Dec and funds take days to clear.
+
+Three regression tests pin it: every default-on non-monthly rule declares a month, no two
+share a slot, and every default-on household review explains its date.
+
+
 ## M39 — Financial calendar + recurring decisions
 
 **Shipped.** Forward-looking calendar over three sources: Israeli statutory deadlines,

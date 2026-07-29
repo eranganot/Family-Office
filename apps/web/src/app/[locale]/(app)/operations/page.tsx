@@ -22,6 +22,7 @@ import {
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
 import { CategoryPicker, type PickerCategory } from "../../../../components/operations/category-picker";
+import { SUGGESTED_DATE_RATIONALE } from "@wealthos/domain";
 import { serverCaller } from "../../../../lib/trpc-server";
 
 const BEHAVIORAL = ["FIXED_CONTRACTUAL", "VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG", "SAVINGS_FLOW", "TRANSFER"] as const;
@@ -689,6 +690,7 @@ export default async function OperationsPage({
               <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
                 <tr>
                   <th className="py-2 text-start">{t("colDue")}</th>
+                  <th className="py-2 text-start" />
                   <th className="py-2 text-start">{t("colEvent")}</th>
                   <th className="py-2 text-start">{t("colKind")}</th>
                   <th className="py-2 text-end">{t("colAmount")}</th>
@@ -698,10 +700,22 @@ export default async function OperationsPage({
               <tbody>
                 {calendar.events.map((e) => (
                   <tr key={e.id} className="border-b border-neutral-100">
-                    <td className="py-2 tabular-nums">
-                      {e.dueDate}
-                      <span className={`ms-2 text-xs ${e.daysAway < 0 ? "text-red-600" : e.daysAway <= 14 ? "text-amber-600" : "text-neutral-400"}`}>
-                        {t("daysAway", { n: e.daysAway })}
+                    <td className="py-2 tabular-nums" dir="ltr">{e.dueDate}</td>
+                    <td className="py-2">
+                      <span
+                        className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-xs ${
+                          e.daysAway < 0
+                            ? "bg-red-50 text-red-700"
+                            : e.daysAway <= 14
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-neutral-100 text-neutral-500"
+                        }`}
+                      >
+                        {e.daysAway === 0
+                          ? t("dueToday")
+                          : e.daysAway < 0
+                            ? t("daysAgo", { n: Math.abs(e.daysAway) })
+                            : t("daysAway", { n: e.daysAway })}
                       </span>
                     </td>
                     <td className="py-2">{loc === "he" ? e.titleHe : e.titleEn}</td>
@@ -733,12 +747,23 @@ export default async function OperationsPage({
         )}
 
         <h3 className="mt-8 mb-2 text-sm font-semibold">{t("recurringTitle")}</h3>
-        <p className="mb-3 text-xs text-neutral-500">{t("recurringHint")}</p>
+        <p className="mb-1 text-xs text-neutral-500">{t("recurringHint")}</p>
+        <p className="mb-3 text-xs text-neutral-500">{t("suggestedDates")}</p>
         <table className="w-full text-start text-sm">
           <tbody>
             {recurring.map((r) => (
               <tr key={r.id} className="border-b border-neutral-100">
-                <td className="py-2">{loc === "he" ? r.titleHe : r.titleEn}</td>
+                <td className="py-2 align-top">
+                  {loc === "he" ? r.titleHe : r.titleEn}
+                  {(() => {
+                    const why = SUGGESTED_DATE_RATIONALE[r.key];
+                    return why ? (
+                      <p className="mt-1 max-w-md text-xs font-normal text-neutral-400">
+                        {loc === "he" ? why.he : why.en}
+                      </p>
+                    ) : null;
+                  })()}
+                </td>
                 <td className="py-2">
                   <form action={upsertRecurringAction} className="flex flex-wrap items-center gap-2">
                     <input type="hidden" name="locale" value={locale} />

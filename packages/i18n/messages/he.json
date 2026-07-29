@@ -1404,7 +1404,7 @@
     "colDue": "מועד",
     "colEvent": "אירוע",
     "colKind": "סוג",
-    "daysAway": "{n} ימים",
+    "daysAway": "בעוד {n} ימים",
     "markDone": "בוצע",
     "markSkipped": "דלג",
     "recurringTitle": "החלטות חוזרות",
@@ -1412,12 +1412,29 @@
     "recurringActive": "פעיל",
     "calendarKind": {
       "TAX_DEADLINE": "מועד מס",
-      "CONTRIBUTION_WINDOW": "חלון הפקדה",
-      "POLICY_REVIEW": "בדיקת פוליסה",
+      "BITUACH_LEUMI": "ביטוח לאומי",
+      "PENSION_WINDOW": "חלון פנסיוני",
+      "HISHTALMUT_CEILING": "תקרת השתלמות",
+      "GEMEL_CONTRIBUTION": "הפקדה לגמל",
+      "MORTGAGE_RESET": "עדכון משכנתא",
+      "INSURANCE_RENEWAL": "חידוש ביטוח",
+      "ARNONA": "ארנונה",
+      "VEHICLE_LICENSE": "רישיון רכב",
+      "VEHICLE_INSURANCE": "ביטוח רכב",
+      "SCHOOL_PAYMENT": "תשלומי בית ספר",
+      "CHILDCARE_PAYMENT": "תשלומי מעון",
+      "SALARY_BONUS": "בונוס",
+      "HOLIDAY_SPENDING": "הוצאות חג",
+      "ANNUAL_SUBSCRIPTION": "מנוי שנתי",
       "INSTALMENT": "תשלום עסקאות",
-      "RATE_RESET": "עדכון ריבית",
-      "REBALANCE": "איזון מחדש",
+      "REVIEW": "בדיקה",
       "OTHER": "אחר"
-    }
+    },
+    "colAmount": "סכום",
+    "colActions": "",
+    "daysAgo": "לפני {n} ימים",
+    "dueToday": "היום",
+    "suggestedDates": "התאריכים למטה הם ההצעה שלנו, מרוחקים ממועדי המס. שנה כל תאריך שאינו מתאים למציאות שלך.",
+    "whyThisDate": "למה התאריך הזה"
   }
 }

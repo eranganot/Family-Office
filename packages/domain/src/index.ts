@@ -48,5 +48,6 @@ export {
   HOUSEHOLD_TEMPLATE_RULES,
   nextOccurrence,
   occurrencesInWindow,
+  SUGGESTED_DATE_RATIONALE,
 } from "./operations/calendar-rules";
 export type { CalendarRule, CalendarRuleKind, Cadence } from "./operations/calendar-rules";

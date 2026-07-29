@@ -84,7 +84,7 @@ export const IL_STATUTORY_RULES: CalendarRule[] = [
     kind: "GEMEL_CONTRIBUTION",
     titleEn: "Kupat Gemel / pension — year-end deposit window",
     titleHe: "קופת גמל / פנסיה — חלון הפקדה לסוף השנה",
-    cadence: "ANNUAL", month: 12, day: 25, leadDays: 45,
+    cadence: "ANNUAL", month: 12, day: 15, leadDays: 45,
     origin: "STATUTORY", cashImpacting: true, defaultEnabled: true,
     sourceNote: "Deposits must clear before 31/12 to count for the tax year",
   },
@@ -104,11 +104,11 @@ export const IL_STATUTORY_RULES: CalendarRule[] = [
  * confident, wrong calendar.
  */
 export const HOUSEHOLD_TEMPLATE_RULES: CalendarRule[] = [
-  { key: "review.insurance", kind: "REVIEW", titleEn: "Review insurance cover", titleHe: "סקירת כיסויים ביטוחיים", cadence: "ANNUAL", day: 1, leadDays: 30, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
-  { key: "review.mortgage", kind: "REVIEW", titleEn: "Review mortgage / refinance check", titleHe: "בדיקת משכנתא ומיחזור", cadence: "ANNUAL", day: 1, leadDays: 30, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
-  { key: "review.ips", kind: "REVIEW", titleEn: "Review investment policy (IPS)", titleHe: "סקירת מדיניות ההשקעות", cadence: "QUARTERLY", day: 1, leadDays: 14, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
-  { key: "review.emergency_fund", kind: "REVIEW", titleEn: "Review emergency fund", titleHe: "בדיקת קרן חירום", cadence: "MONTHLY", day: 1, leadDays: 7, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
-  { key: "review.fees", kind: "REVIEW", titleEn: "Review bank and management fees", titleHe: "סקירת עמלות בנק ודמי ניהול", cadence: "SEMI_ANNUAL", day: 1, leadDays: 21, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
+  { key: "review.insurance", kind: "REVIEW", titleEn: "Review insurance cover", titleHe: "סקירת כיסויים ביטוחיים", cadence: "ANNUAL", month: 9, day: 1, leadDays: 30, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
+  { key: "review.mortgage", kind: "REVIEW", titleEn: "Review mortgage / refinance check", titleHe: "בדיקת משכנתא ומיחזור", cadence: "ANNUAL", month: 3, day: 1, leadDays: 30, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
+  { key: "review.ips", kind: "REVIEW", titleEn: "Review investment policy (IPS)", titleHe: "סקירת מדיניות ההשקעות", cadence: "QUARTERLY", month: 1, day: 15, leadDays: 14, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
+  { key: "review.emergency_fund", kind: "REVIEW", titleEn: "Review emergency fund", titleHe: "בדיקת קרן חירום", cadence: "MONTHLY", day: 10, leadDays: 7, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
+  { key: "review.fees", kind: "REVIEW", titleEn: "Review bank and management fees", titleHe: "סקירת עמלות בנק ודמי ניהול", cadence: "SEMI_ANNUAL", month: 2, day: 15, leadDays: 21, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true },
   { key: "vehicle.license", kind: "VEHICLE_LICENSE", titleEn: "Vehicle licence renewal", titleHe: "חידוש רישיון רכב", cadence: "ANNUAL", day: 1, leadDays: 30, origin: "HOUSEHOLD", cashImpacting: true, defaultEnabled: false },
   { key: "vehicle.insurance", kind: "VEHICLE_INSURANCE", titleEn: "Vehicle insurance renewal", titleHe: "חידוש ביטוח רכב", cadence: "ANNUAL", day: 1, leadDays: 30, origin: "HOUSEHOLD", cashImpacting: true, defaultEnabled: false },
   { key: "insurance.home", kind: "INSURANCE_RENEWAL", titleEn: "Home insurance renewal", titleHe: "חידוש ביטוח דירה", cadence: "ANNUAL", day: 1, leadDays: 30, origin: "HOUSEHOLD", cashImpacting: true, defaultEnabled: false },
@@ -170,3 +170,44 @@ export function occurrencesInWindow(rule: CalendarRule, from: Date, until: Date)
   }
   return out;
 }
+
+
+/**
+ * Why each suggested date is what it is.
+ *
+ * These are OUR suggestion, not the owner's decision. Rules with no month previously
+ * fell back to 1 January, which put five unrelated reviews on the same fabricated day —
+ * a date nobody chose, presented as though someone had. Every default-on rule now
+ * carries a month and a stated reason, and the UI shows the reason so the owner can
+ * disagree with it on the merits rather than guessing what we meant.
+ *
+ * The scheduling principle: keep discretionary reviews OFF the statutory cluster
+ * (31 Jan, 30 Apr, 31 Jul, 30 Nov, 1 + 15 Dec) so a policy review never lands in the
+ * same week as a capital-gains advance.
+ */
+export const SUGGESTED_DATE_RATIONALE: Record<string, { en: string; he: string }> = {
+  "review.fees": {
+    en: "Mid-February: annual bank and fund statements land in January, so you review fees with the real figures in hand rather than from memory. Repeats mid-August.",
+    he: "אמצע פברואר: הדוחות השנתיים מהבנק ומהקופות מגיעים בינואר, כך שהסקירה נעשית מול הנתונים האמיתיים ולא מהזיכרון. חוזר באמצע אוגוסט.",
+  },
+  "review.ips": {
+    en: "15th, quarterly (Jan/Apr/Jul/Oct) — about two weeks BEFORE each capital-gains and filing date, so the portfolio review informs the tax action rather than arriving after it.",
+    he: "ה-15, רבעוני (ינו׳/אפר׳/יולי/אוק׳) — כשבועיים לפני כל מועד רווחי הון והגשה, כך שסקירת התיק מזינה את פעולת המס במקום להגיע אחריה.",
+  },
+  "review.emergency_fund": {
+    en: "10th of the month: after salary has landed and the month's card settlement has cleared, so the buffer you see is the real post-settlement figure, not a pre-salary trough.",
+    he: "ה-10 בחודש: אחרי כניסת המשכורת ואחרי חיוב האשראי, כך שהיתרה שנראית היא המצב האמיתי ולא שפל שלפני המשכורת.",
+  },
+  "review.insurance": {
+    en: "1 September: clear of every tax deadline, and early enough that a change takes effect before the year turns.",
+    he: "1 בספטמבר: מרוחק מכל מועדי המס, ומוקדם מספיק כדי ששינוי ייכנס לתוקף לפני סוף השנה.",
+  },
+  "review.mortgage": {
+    en: "1 March: after the year's first Bank of Israel rate decisions, and clear of the 30 April filing date.",
+    he: "1 במרץ: אחרי החלטות הריבית הראשונות של בנק ישראל, ומרוחק ממועד הגשת הדוח ב-30 באפריל.",
+  },
+  "gemel.year_end_deposit": {
+    en: "Moved from 25 to 15 December: the deposit must be CREDITED by 31 December, and provident funds routinely take several business days. The 25th left no margin.",
+    he: "הוזז מ-25 ל-15 בדצמבר: ההפקדה חייבת להיזקף עד 31 בדצמבר, ולקופות לוקח מספר ימי עסקים. ה-25 לא השאיר מרווח.",
+  },
+};
