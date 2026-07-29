@@ -97,6 +97,15 @@ export const MERCHANT_RULES: MerchantRule[] = [
   { id: "ins.generic", match: "ביטוח", categoryKey: "insurance.life", behavioral: "FIXED_CONTRACTUAL", confidence: 0.55 },
   { id: "ins.harel", match: "הראל", categoryKey: "insurance.life", behavioral: "FIXED_CONTRACTUAL", confidence: 0.6 },
   { id: "ins.clal", match: "כלל ביטוח", categoryKey: "insurance.life", behavioral: "FIXED_CONTRACTUAL", confidence: 0.7 },
+  // The insurers missing here are why מגדל_מבטחים_חיים fell into the suspense bucket and
+  // was offered for cancellation (M40a re-QA, 2026-07-29). "מבטחים" is the tell that the
+  // "ביטוח" rules above all miss — it is the same root in a different form.
+  { id: "ins.mivtachim", match: "מבטחים", categoryKey: "insurance.life", behavioral: "FIXED_CONTRACTUAL", confidence: 0.7 },
+  { id: "ins.migdal", match: "מגדל", categoryKey: "insurance.life", behavioral: "FIXED_CONTRACTUAL", confidence: 0.6 },
+  { id: "ins.menora", match: "מנורה", categoryKey: "insurance.life", behavioral: "FIXED_CONTRACTUAL", confidence: 0.6 },
+  { id: "ins.phoenix", match: "הפניקס", categoryKey: "insurance.life", behavioral: "FIXED_CONTRACTUAL", confidence: 0.7 },
+  { id: "ins.ayalon", match: "איילון", categoryKey: "insurance.life", behavioral: "FIXED_CONTRACTUAL", confidence: 0.6 },
+  { id: "ins.shirbit", match: "שירביט", categoryKey: "transport.vehicle_insurance", behavioral: "FIXED_CONTRACTUAL", confidence: 0.7 },
 
   // --- Transport
   { id: "tr.fuel_sonol", match: "סונול", categoryKey: "transport.fuel", behavioral: "VARIABLE_DISCRETIONARY", confidence: 0.9 },

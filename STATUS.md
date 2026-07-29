@@ -33,6 +33,35 @@
   EOY = ×6 both checked out in QA). The defect was entirely in *which rows were eligible*.
   A correct calculation over a wrong input set is the most convincing kind of wrong.
 
+### Second defect — the one that SURVIVED the first fix (re-QA, same day)
+The mortgage was gone, but the card then offered **`מגדל_מבטחים_חיים` (life insurance,
+₪510.23/month)** as "the biggest decision here".
+
+- **`other.unclassified` carries `defaultBehavioralClass: "VARIABLE_DISCRETIONARY"`.** So
+  **"we do not know what this is" and "this is discretionary spending" are the same value**
+  by the time an analyzer sees it. The `behavioral !== null` guard could therefore never
+  fire — an unclassified row is not null, it is *discretionary*. The allowlist had a hole
+  exactly the size of the suspense bucket.
+- **Why that merchant specifically:** no merchant rule matched `מגדל`. The insurance rules
+  key on `ביטוח`; `מבטחים` is the same root in a different form and matched nothing.
+  `הראל_ביטוח_שיניים` was excluded in the same run only because `ins.harel` happened to hit.
+- **Fixes:** (1) `isProtectedCategory` refuses null, `other.*`, and the `insurance.` /
+  `debt.` / `taxes.` / `savings.` / mortgage / vehicle- and home-insurance subtrees
+  regardless of behavioural class; (2) six Israeli insurers added to `merchant-rules`
+  (`מבטחים`, `מגדל`, `מנורה`, `הפניקס`, `איילון`, `שירביט`) — a classification fix that
+  helps every consumer, not just this analyzer.
+- **Cross-engine contradiction avoided:** `engine-strategy/analyzers/insurance.ts` checks
+  for coverage GAPS. An operations engine proposing cancellation of the same policy would
+  put two engines in direct contradiction — and cancelling life cover is frequently
+  irreversible, since re-underwriting after aging or a diagnosis is not guaranteed at the
+  old rate. Insurance is strategy's territory; operations stays out of it.
+- **Generalised lesson (applies to every future analyzer):** a default on the *suspense*
+  category is not a neutral default. Any analyzer that reads `behavioral` must also ask
+  whether the row was actually classified. Checking for `null` does not answer that question
+  in this schema.
+- 4 further regression tests, including the exact `מגדל_מבטחים_חיים` row arriving as
+  VARIABLE_DISCRETIONARY from the suspense bucket.
+
 ## Current state (2026-07-29, session 30) — M40a
 
 - **M40a — Opportunity Center: operational findings → Recommendations. `deploy-m40a.ps1`.

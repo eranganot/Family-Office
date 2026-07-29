@@ -24,7 +24,9 @@ function txn(p: Partial<OpportunityTxn> & { bookedAt: Date; amountBase: number |
   return {
     id: Math.random().toString(36).slice(2),
     status: "BOOKED",
-    categoryKey: null,
+    // A benign, genuinely-subscribable default. It must NOT be null or the suspense
+    // bucket: both are now refused outright, which is the point of the second fix.
+    categoryKey: "leisure.subscriptions",
     behavioral: "VARIABLE_DISCRETIONARY",
     merchantKey: null,
     isRecurringCandidate: false,
@@ -202,6 +204,72 @@ describe("subscription analyzer", () => {
       behavioral: null,
     }));
     expect(analyzeSubscriptions(input({ transactions: unknown }))).toEqual([]);
+  });
+
+  // ------------------------------------------------------------------
+  // REGRESSION 2 — the defect that SURVIVED the first fix (re-QA 2026-07-29).
+  // `other.unclassified` carries defaultBehavioralClass VARIABLE_DISCRETIONARY, so an
+  // unclassified row is NOT null by the time the analyzer sees it — it is "discretionary".
+  // The behavioural allowlist alone therefore let מגדל_מבטחים_חיים (life insurance, no
+  // matching merchant rule) through, and step 2 told the owner to start with it.
+  // ------------------------------------------------------------------
+  it("refuses a suspense-bucket row even though it arrives as VARIABLE_DISCRETIONARY", () => {
+    const suspense = monthly("מגדל_מבטחים_חיים", 510.23, 6).map((t) => ({
+      ...t,
+      behavioral: "VARIABLE_DISCRETIONARY" as const, // what the fallback category gives it
+      categoryKey: "other.unclassified",
+    }));
+    expect(analyzeSubscriptions(input({ transactions: suspense }))).toEqual([]);
+  });
+
+  it("NEVER offers an insurance-category charge, whatever its behavioural class says", () => {
+    // engine-strategy's insurance analyzer checks for coverage GAPS. Operations proposing
+    // cancellation would put two engines in contradiction about the same contract — and
+    // cancelling life cover is frequently irreversible.
+    for (const key of [
+      "insurance.life",
+      "insurance.health",
+      "insurance.disability",
+      "insurance.long_term_care",
+      "housing.home_insurance",
+      "transport.vehicle_insurance",
+    ]) {
+      const rows = monthly("some_insurer", 510, 6).map((t) => ({
+        ...t,
+        behavioral: "VARIABLE_DISCRETIONARY" as const, // deliberately the permissive class
+        categoryKey: key,
+      }));
+      expect(analyzeSubscriptions(input({ transactions: rows }))).toEqual([]);
+    }
+  });
+
+  it("NEVER offers debt service, tax or savings as a subscription", () => {
+    for (const key of ["debt.loan_repayment", "taxes.bituach_leumi", "savings.pension", "housing.mortgage"]) {
+      const rows = monthly("whatever", 900, 6).map((t) => ({
+        ...t,
+        behavioral: "VARIABLE_DISCRETIONARY" as const,
+        categoryKey: key,
+      }));
+      expect(analyzeSubscriptions(input({ transactions: rows }))).toEqual([]);
+    }
+  });
+
+  it("still finds a genuine classified subscription beside all of those", () => {
+    const insurance = monthly("מגדל_מבטחים_חיים", 510.23, 6).map((t) => ({
+      ...t,
+      behavioral: "VARIABLE_DISCRETIONARY" as const,
+      categoryKey: "other.unclassified",
+    }));
+    const streaming = monthly("streaming_svc", 55, 6).map((t) => ({
+      ...t,
+      categoryKey: "leisure.subscriptions",
+    }));
+    const f = analyzeSubscriptions(input({ transactions: [...insurance, ...streaming] }));
+    expect(f).toHaveLength(1);
+    expect(Number(f[0]!.metrics["subscriptionCount"])).toBe(1);
+    expect(Number(f[0]!.metrics["monthlyTotalBase"])).toBeCloseTo(55, 2);
+    expect(String(f[0]!.metrics["merchants"])).not.toContain("מבטחים");
+    expect(Number(f[0]!.metrics["excludedUnclassified"])).toBeGreaterThan(0);
   });
 
   it("still finds the real subscriptions mixed in beside the obligations", () => {

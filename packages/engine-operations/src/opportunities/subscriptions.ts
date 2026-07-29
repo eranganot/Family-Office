@@ -1,3 +1,4 @@
+import { UNCLASSIFIED_KEY } from "@wealthos/domain";
 import type { OpportunityFinding, OpportunityInput, OpportunityTxn } from "./types";
 
 /**
@@ -66,6 +67,41 @@ function median(values: number[]): number {
  */
 const SUBSCRIBABLE = new Set(["VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG"]);
 
+/**
+ * ⚠️ SECOND M40a defect, caught in re-QA — the behavioural allowlist ALONE is not enough.
+ *
+ * `other.unclassified` (the suspense bucket) carries
+ * `defaultBehavioralClass: "VARIABLE_DISCRETIONARY"`. So **"we do not know what this is"
+ * and "this is discretionary spending" are the same value by the time the analyzer sees
+ * it.** The `behavioral !== null` guard therefore never fired: an unclassified row is not
+ * null, it is discretionary.
+ *
+ * That is how מגדל_מבטחים_חיים — a life insurance policy — was offered for cancellation
+ * after the mortgage was fixed. No merchant rule matched "מגדל", so it fell to the
+ * suspense bucket and inherited "discretionary".
+ *
+ * Whole-category exclusions below are defence in depth on top of that. Insurance
+ * especially: `engine-strategy/analyzers/insurance.ts` checks for coverage GAPS, so an
+ * operations engine proposing cancellation would put two engines in direct contradiction
+ * about the same contract. Cancelling life cover is also frequently irreversible —
+ * re-underwriting after aging or a diagnosis is not guaranteed at the old rate.
+ */
+const NEVER_SUBSCRIPTION_PREFIXES = [
+  "insurance.", // life / health / disability / long-term care — engine-strategy's territory
+  "housing.home_insurance",
+  "transport.vehicle_insurance",
+  "housing.mortgage",
+  "debt.",
+  "taxes.",
+  "savings.",
+];
+
+function isProtectedCategory(key: string | null): boolean {
+  if (key === null) return true; // no category at all → refuse to judge
+  if (key === UNCLASSIFIED_KEY || key.startsWith("other.")) return true;
+  return NEVER_SUBSCRIPTION_PREFIXES.some((p) => key === p || key.startsWith(p));
+}
+
 function eligible(t: OpportunityTxn): boolean {
   return (
     t.status === "BOOKED" &&
@@ -76,6 +112,7 @@ function eligible(t: OpportunityTxn): boolean {
     // insurance policy) is an obligation, not a subscription — regardless of how
     // regular it looks.
     t.ledgerItemId === null &&
+    !isProtectedCategory(t.categoryKey) &&
     t.behavioral !== null &&
     SUBSCRIBABLE.has(t.behavioral)
   );
@@ -97,8 +134,10 @@ export function countExcludedRecurring(txns: OpportunityTxn[]): {
     if (t.status !== "BOOKED" || t.amountBase === null || t.amountBase >= 0) continue;
     if (t.merchantKey === null) continue;
     if (t.behavioral === "TRANSFER" || t.behavioral === "SAVINGS_FLOW") continue;
-    if (t.ledgerItemId !== null || t.behavioral === "FIXED_CONTRACTUAL") contractual += 1;
-    else if (t.behavioral === null) unclassified += 1;
+    const suspense = t.categoryKey === null || t.categoryKey === UNCLASSIFIED_KEY || t.categoryKey.startsWith("other.");
+    if (suspense || t.behavioral === null) unclassified += 1;
+    else if (t.ledgerItemId !== null || t.behavioral === "FIXED_CONTRACTUAL" || isProtectedCategory(t.categoryKey))
+      contractual += 1;
   }
   return { contractual, unclassified };
 }
@@ -171,6 +210,7 @@ export function analyzeSubscriptions(input: OpportunityInput): OpportunityFindin
         dormantDays,
         excludedContractual: excluded.contractual,
         excludedUnclassified: excluded.unclassified,
+        subscribableCategoryNote: "insurance, debt, tax and savings categories are never listed",
         largestMerchant: candidates[0]!.merchantKey,
         largestMonthlyBase: candidates[0]!.monthlyBase,
         merchants: candidates
