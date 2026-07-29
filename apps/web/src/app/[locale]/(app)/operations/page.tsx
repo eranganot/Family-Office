@@ -23,7 +23,7 @@ import {
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
 import { CategoryPicker, type PickerCategory } from "../../../../components/operations/category-picker";
-import { SUGGESTED_DATE_RATIONALE, suggestedAnchorDate } from "@wealthos/domain";
+import { SUGGESTED_DATE_RATIONALE, nextOccurrenceForDecision, suggestedAnchorDate } from "@wealthos/domain";
 import { serverCaller } from "../../../../lib/trpc-server";
 
 const BEHAVIORAL = ["FIXED_CONTRACTUAL", "VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG", "SAVINGS_FLOW", "TRANSFER"] as const;
@@ -50,7 +50,7 @@ export default async function OperationsPage({
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
     mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string; reused?: string;
     y?: string; m?: string; cat?: string; beh?: string; dupesRemoved?: string;
-    calendarBuilt?: string; calendarUpdated?: string; recurringSaved?: string; suggestApplied?: string;
+    calendarBuilt?: string; calendarUpdated?: string; recurringSaved?: string; suggestApplied?: string; cw?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -92,7 +92,10 @@ export default async function OperationsPage({
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
   // M39 — forward calendar. Empty until the owner presses "build calendar"; nothing is
   // auto-generated on read, because generating writes rows and a read must not.
-  const calendar = await trpc.operations.calendar.upcoming({ windowDays: 120 }).catch(() => null);
+  const calWindow = sp.cw ? Math.min(400, Math.max(30, Number(sp.cw))) : 400;
+  const calendar = await trpc.operations.calendar
+    .upcoming({ windowDays: calWindow })
+    .catch(() => null);
   const recurring = await trpc.operations.recurring.list().catch(() => []);
   const { year, month, row: periodRow, computed } = period;
   const diag = await trpc.operations.diagnostics.month({ year, month }).catch(() => null);
@@ -678,10 +681,22 @@ export default async function OperationsPage({
         <SuccessBanner message={sp.calendarUpdated || sp.recurringSaved ? tf("saved") : undefined} />
         <SuccessBanner message={sp.suggestApplied ? t("suggestionsApplied", { n: sp.suggestApplied }) : undefined} />
 
-        <form action={regenerateCalendarAction} className="mb-4">
-          <input type="hidden" name="locale" value={locale} />
-          <SubmitButton label={t("calendarRebuild")} />
-        </form>
+        <div className="mb-4 flex flex-wrap items-center gap-4">
+          <form action={regenerateCalendarAction}>
+            <input type="hidden" name="locale" value={locale} />
+            <SubmitButton label={t("calendarRebuild")} />
+          </form>
+          <span className="text-xs text-neutral-500">{t("windowLabel")}</span>
+          {[60, 120, 400].map((d) => (
+            <a
+              key={d}
+              href={`?cw=${d}#calendar`}
+              className={`text-xs underline ${d === calWindow ? "font-semibold text-neutral-900" : "text-blue-700"}`}
+            >
+              {t("windowDays", { n: d })}
+            </a>
+          ))}
+        </div>
 
         {calendar && calendar.events.length > 0 ? (
           <>
@@ -745,7 +760,9 @@ export default async function OperationsPage({
             </table>
           </>
         ) : (
-          <p className="text-sm text-neutral-500">{t("calendarEmpty")}</p>
+          <p className="text-sm text-neutral-500">
+            {calendar ? t("calendarEmptyWindow") : t("calendarEmpty")}
+          </p>
         )}
 
         <h3 className="mt-8 mb-2 text-sm font-semibold">{t("recurringTitle")}</h3>
@@ -787,6 +804,14 @@ export default async function OperationsPage({
                     </label>
                     <button type="submit" className="text-xs text-blue-700 underline">{tf("save")}</button>
                   </form>
+                  {(() => {
+                    const nxt = nextOccurrenceForDecision(r.anchorDate, r.cadence as never);
+                    return nxt ? (
+                      <p className="mt-1 text-xs text-neutral-600">
+                        {t("nextFires", { date: nxt.toISOString().slice(0, 10) })}
+                      </p>
+                    ) : null;
+                  })()}
                   {(() => {
                     const sug = suggestedAnchorDate(r.key, new Date().getUTCFullYear());
                     if (!sug) return null;

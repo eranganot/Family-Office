@@ -238,3 +238,28 @@ export function rulesWithSuggestions(): string[] {
     .filter((r) => r.defaultEnabled && (r.cadence === "MONTHLY" || r.month !== undefined))
     .map((r) => r.key);
 }
+
+/**
+ * When a saved recurring decision will next fire.
+ *
+ * The recurring list needs this because the calendar above it only shows a bounded
+ * window: an annual review saved for next March is stored correctly and shown nowhere,
+ * so pressing save looked like it did nothing. Feedback must not depend on whether the
+ * result happens to fall inside the current view.
+ */
+export function nextOccurrenceForDecision(
+  anchorDate: Date,
+  cadence: Cadence,
+  from: Date = new Date(),
+): Date | null {
+  return nextOccurrence(
+    {
+      key: "", kind: "OTHER", titleEn: "", titleHe: "",
+      cadence,
+      month: cadence === "MONTHLY" ? undefined : anchorDate.getUTCMonth() + 1,
+      day: anchorDate.getUTCDate(),
+      leadDays: 0, origin: "HOUSEHOLD", cashImpacting: false, defaultEnabled: true,
+    },
+    from,
+  );
+}

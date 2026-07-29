@@ -1442,6 +1442,10 @@
     "applyAllSuggested": "החל את כל התאריכים המומלצים",
     "suggestedIs": "מומלץ: {date}",
     "suggestionsApplied": "{n} תאריכים עודכנו לערכים המומלצים.",
-    "matchesSuggestion": "תואם להמלצה שלנו"
+    "matchesSuggestion": "תואם להמלצה שלנו",
+    "windowLabel": "טווח:",
+    "windowDays": "{n} ימים",
+    "nextFires": "הבא: {date}",
+    "calendarEmptyWindow": "אין פריטים בטווח הזה. נסה טווח ארוך יותר — פריטים שנתיים בדרך כלל רחוקים יותר."
   }
 }

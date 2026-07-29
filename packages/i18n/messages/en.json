@@ -1442,6 +1442,10 @@
     "applyAllSuggested": "Apply all suggested dates",
     "suggestedIs": "suggested: {date}",
     "suggestionsApplied": "{n} dates updated to the suggested values.",
-    "matchesSuggestion": "matches our suggestion"
+    "matchesSuggestion": "matches our suggestion",
+    "windowLabel": "Window:",
+    "windowDays": "{n} days",
+    "nextFires": "next: {date}",
+    "calendarEmptyWindow": "Nothing falls inside this window. Try a longer one — annual items are often further out."
   }
 }

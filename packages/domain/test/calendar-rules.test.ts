@@ -8,6 +8,7 @@ import {
   SUGGESTED_DATE_RATIONALE,
   suggestedAnchorDate,
   rulesWithSuggestions,
+  nextOccurrenceForDecision,
 } from "../src/operations/calendar-rules";
 
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -157,5 +158,32 @@ describe("suggestedAnchorDate", () => {
     for (const key of rulesWithSuggestions()) {
       expect(suggestedAnchorDate(key, Y), key).not.toBeNull();
     }
+  });
+});
+
+describe("nextOccurrenceForDecision", () => {
+  // The bug this guards: an annual review saved for next March was stored correctly and
+  // displayed nowhere, because the calendar only rendered a 120-day window. Feedback for
+  // a save must never depend on the current view.
+  const from = new Date(Date.UTC(2026, 6, 29)); // 29 Jul 2026
+
+  it("rolls an annual date that has already passed this year into next year", () => {
+    const mar1 = new Date(Date.UTC(2026, 2, 1));
+    expect(nextOccurrenceForDecision(mar1, "ANNUAL", from)?.toISOString().slice(0, 10))
+      .toBe("2027-03-01");
+  });
+
+  it("finds the next monthly occurrence without inventing a month", () => {
+    const day10 = new Date(Date.UTC(2026, 0, 10));
+    expect(nextOccurrenceForDecision(day10, "MONTHLY", from)?.toISOString().slice(0, 10))
+      .toBe("2026-08-10");
+  });
+
+  it("reports a date beyond the old 120-day window rather than nothing", () => {
+    const dec15 = new Date(Date.UTC(2026, 11, 15));
+    const next = nextOccurrenceForDecision(dec15, "ANNUAL", from);
+    expect(next).not.toBeNull();
+    const days = (next!.getTime() - from.getTime()) / 86_400_000;
+    expect(days).toBeGreaterThan(120); // invisible under the old window; still reported
   });
 });

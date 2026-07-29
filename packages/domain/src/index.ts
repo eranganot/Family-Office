@@ -51,5 +51,6 @@ export {
   SUGGESTED_DATE_RATIONALE,
   suggestedAnchorDate,
   rulesWithSuggestions,
+  nextOccurrenceForDecision,
 } from "./operations/calendar-rules";
 export type { CalendarRule, CalendarRuleKind, Cadence } from "./operations/calendar-rules";

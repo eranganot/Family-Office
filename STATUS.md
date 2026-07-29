@@ -1516,6 +1516,24 @@ per-person auth, connectors (new ValuationSource), estate module deep-dive.
 - Auth still env-var based (swap to DB User row planned).
 - next build skips its own TS pass; tsc --noEmit gates types via turbo/CI instead.
 
+## M39d — save had no visible effect (owner-reported)
+
+The dates were saving correctly the whole time. The failure was that nothing said so.
+
+- **The calendar rendered a fixed 120-day window.** Today being 29 Jul 2026, that hid the
+  provident deposit (15 Dec, 139d), the year-end tax review (1 Dec, 125d), the hishtalmut
+  ceiling check (30 Nov, **124d — missed by four days**), and every annual rule whose next
+  occurrence is in 2027. So saving an annual date wrote the right row and changed nothing
+  on screen. Window is now selectable (60 / 120 / 400) and defaults to 400.
+- **Each recurring row now shows its own next occurrence** (`nextOccurrenceForDecision`).
+  This is the actual fix: feedback for a save must not depend on whether the result happens
+  to land inside the current view.
+- Empty state now distinguishes "no events generated yet" from "nothing in THIS window",
+  which are different problems with different actions.
+
+3 new tests, 23 in the calendar suite.
+
+
 ## M39c — suggested dates you can actually apply
 
 Owner report: the improved dates from M39b never reached the UI, and every save button
