@@ -322,7 +322,9 @@
       "goal": "Goal",
       "none": "— not earmarked —",
       "save": "Save earmark"
-    }
+    },
+    "save": "Save",
+    "saved": "Saved"
   },
   "fx": {
     "title": "FX rates (manual)",
@@ -1435,6 +1437,11 @@
     "daysAgo": "{n}d ago",
     "dueToday": "today",
     "suggestedDates": "Dates below are our suggestion, spaced away from the tax deadlines. Change any that do not match your reality.",
-    "whyThisDate": "Why this date"
+    "whyThisDate": "Why this date",
+    "applySuggested": "Use this date",
+    "applyAllSuggested": "Apply all suggested dates",
+    "suggestedIs": "suggested: {date}",
+    "suggestionsApplied": "{n} dates updated to the suggested values.",
+    "matchesSuggestion": "matches our suggestion"
   }
 }

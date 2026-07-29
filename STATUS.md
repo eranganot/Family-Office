@@ -1516,6 +1516,31 @@ per-person auth, connectors (new ValuationSource), estate module deep-dive.
 - Auth still env-var based (swap to DB User row planned).
 - next build skips its own TS pass; tsc --noEmit gates types via turbo/CI instead.
 
+## M39c — suggested dates you can actually apply
+
+Owner report: the improved dates from M39b never reached the UI, and every save button
+read `forms.save`.
+
+- **`forms.save` / `forms.saved` did not exist.** The `forms` namespace had `submit` but no
+  `save`, so next-intl rendered the key path. Both added.
+- **The suggestions could not reach an already-seeded household.**
+  `ensureRecurringDecisions` never overwrites an existing row — right, because the owner's
+  date must beat a template — but that also froze five reviews on 1 January permanently.
+  Silently overwriting would have been the wrong fix: it cannot tell a date the owner chose
+  from one the old fallback invented.
+  So applying a suggestion is now an **explicit owner action**: `recurring.applySuggested`
+  takes an optional key (one rule) or none (all), skips rows already matching, and
+  regenerates the forward window only if something changed.
+- UI shows each rule's suggested date inline with a **"use this date"** button, an
+  **"apply all suggested dates"** button above the list, and a green "matches our
+  suggestion" note where the date already agrees — so it is visible which dates are ours
+  and which are his.
+
+`suggestedAnchorDate` returns null for rules only the owner can date (home insurance,
+vehicle, arnona, mortgage reset), so those never get a fabricated one-click value.
+4 new tests, 20 in the calendar suite.
+
+
 ## M39b — calendar display + suggested dates (owner-reported)
 
 Three bugs the owner caught in one screenshot pass:

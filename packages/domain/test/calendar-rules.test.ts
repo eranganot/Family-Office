@@ -6,6 +6,8 @@ import {
   occurrencesInWindow,
   type CalendarRule,
   SUGGESTED_DATE_RATIONALE,
+  suggestedAnchorDate,
+  rulesWithSuggestions,
 } from "../src/operations/calendar-rules";
 
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -127,5 +129,33 @@ describe("suggested dates are chosen, not defaulted", () => {
       .filter((r) => r.defaultEnabled && !SUGGESTED_DATE_RATIONALE[r.key])
       .map((r) => r.key);
     expect(unexplained).toEqual([]);
+  });
+});
+
+describe("suggestedAnchorDate", () => {
+  const Y = 2026;
+
+  it("returns the rule's own month and day", () => {
+    // review.fees is mid-February: annual statements land in January.
+    expect(suggestedAnchorDate("review.fees", Y)?.toISOString().slice(0, 10)).toBe("2026-02-15");
+    // The provident deposit moved off the 25th so it can actually clear by 31 Dec.
+    expect(suggestedAnchorDate("gemel.year_end_deposit", Y)?.toISOString().slice(0, 10)).toBe("2026-12-15");
+  });
+
+  it("gives monthly rules a day without inventing a month", () => {
+    // Only the day matters for a monthly rule; January is just the anchor's carrier.
+    expect(suggestedAnchorDate("review.emergency_fund", Y)?.getUTCDate()).toBe(10);
+  });
+
+  it("has no suggestion for rules the owner must date himself", () => {
+    // Nobody but the owner knows when his home insurance renews.
+    expect(suggestedAnchorDate("insurance.home", Y)).toBeNull();
+    expect(suggestedAnchorDate("does.not.exist", Y)).toBeNull();
+  });
+
+  it("every rule offered for one-click apply actually yields a date", () => {
+    for (const key of rulesWithSuggestions()) {
+      expect(suggestedAnchorDate(key, Y), key).not.toBeNull();
+    }
   });
 });

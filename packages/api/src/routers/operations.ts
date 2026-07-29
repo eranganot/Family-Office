@@ -8,6 +8,7 @@ import { autoClassify, computePeriod, operationsAssumptions } from "../services/
 import { commitStatement, previewStatement } from "../services/statement-import-service";
 import { linkCardSettlements } from "../services/settlement-service";
 import { regenerateCalendar, upcomingEvents } from "../services/calendar-service";
+import { rulesWithSuggestions, suggestedAnchorDate } from "@wealthos/domain";
 import {
   ArchiveCategorySchema,
   BulkClassifyByMerchantSchema,
@@ -620,6 +621,41 @@ export const operationsRouter = router({
         orderBy: [{ isActive: "desc" }, { key: "asc" }],
       }),
     ),
+
+    /**
+     * Apply our suggested date to one rule, or to every rule that has one.
+     *
+     * This exists because `ensureRecurringDecisions` never overwrites an existing row —
+     * correct, since the owner's date must beat a template, but it also meant a corrected
+     * suggestion could never reach a household that had already seeded. Rather than
+     * silently clobbering dates the owner may have chosen deliberately, applying a
+     * suggestion is an explicit action he takes per rule (or in bulk, knowingly).
+     */
+    applySuggested: operationsProcedure
+      .input(z.object({ key: z.string().min(1).max(80).optional() }).optional())
+      .mutation(async ({ ctx, input }) => {
+        const year = new Date().getUTCFullYear();
+        const keys = input?.key ? [input.key] : rulesWithSuggestions();
+        let applied = 0;
+        for (const key of keys) {
+          const suggested = suggestedAnchorDate(key, year);
+          if (!suggested) continue;
+          const row = await ctx.db.recurringDecision.findUnique({
+            where: { householdId_key: { householdId: ctx.householdId, key } },
+            select: { id: true, anchorDate: true },
+          });
+          if (!row) continue;
+          if (row.anchorDate.getTime() === suggested.getTime()) continue;
+          await ctx.db.recurringDecision.update({
+            where: { id: row.id },
+            data: { anchorDate: suggested },
+          });
+          applied += 1;
+        }
+        // Dates changed, so the forward window is stale.
+        if (applied > 0) await regenerateCalendar(ctx.db, ctx.householdId);
+        return { applied };
+      }),
 
     /**
      * Set a recurring decision's own anchor date / cadence / active flag.

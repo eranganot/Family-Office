@@ -49,5 +49,7 @@ export {
   nextOccurrence,
   occurrencesInWindow,
   SUGGESTED_DATE_RATIONALE,
+  suggestedAnchorDate,
+  rulesWithSuggestions,
 } from "./operations/calendar-rules";
 export type { CalendarRule, CalendarRuleKind, Cadence } from "./operations/calendar-rules";

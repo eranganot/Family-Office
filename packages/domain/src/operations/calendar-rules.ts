@@ -211,3 +211,30 @@ export const SUGGESTED_DATE_RATIONALE: Record<string, { en: string; he: string }
     he: "הוזז מ-25 ל-15 בדצמבר: ההפקדה חייבת להיזקף עד 31 בדצמבר, ולקופות לוקח מספר ימי עסקים. ה-25 לא השאיר מרווח.",
   },
 };
+
+/**
+ * The date a rule WOULD be given if it were being seeded fresh.
+ *
+ * `ensureRecurringDecisions` deliberately never overwrites an existing row — the owner's
+ * date must win over a template. But that also meant an improved suggestion could never
+ * reach a household that had already seeded, which is how five reviews stayed stuck on
+ * 1 January after the fix. Applying a suggestion is therefore an explicit, per-rule owner
+ * action, and this is the value that action writes.
+ *
+ * Returns null for rules with no suggestion of their own (monthly rules use only a day,
+ * and rules the owner must date themselves have nothing to suggest).
+ */
+export function suggestedAnchorDate(key: string, year: number): Date | null {
+  const rule = [...IL_STATUTORY_RULES, ...HOUSEHOLD_TEMPLATE_RULES].find((r) => r.key === key);
+  if (!rule) return null;
+  if (rule.cadence === "MONTHLY") return new Date(Date.UTC(year, 0, rule.day));
+  if (rule.month === undefined) return null;
+  return new Date(Date.UTC(year, rule.month - 1, rule.day));
+}
+
+/** Rules that carry a suggestion the owner can apply with one click. */
+export function rulesWithSuggestions(): string[] {
+  return [...IL_STATUTORY_RULES, ...HOUSEHOLD_TEMPLATE_RULES]
+    .filter((r) => r.defaultEnabled && (r.cadence === "MONTHLY" || r.month !== undefined))
+    .map((r) => r.key);
+}

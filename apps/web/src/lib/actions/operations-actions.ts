@@ -436,3 +436,24 @@ export async function upsertRecurringAction(fd: FormData): Promise<void> {
   }
   redirect(`/${locale}/operations?recurringSaved=1#calendar`);
 }
+
+/**
+ * Overwrite a recurring decision's date with our suggested one — or every rule at once.
+ *
+ * Kept as an explicit owner action rather than something the seeder does: the seeder must
+ * never clobber a date the owner chose deliberately, but that same rule meant a corrected
+ * suggestion could not reach a household that had already seeded.
+ */
+export async function applySuggestedDateAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const key = str(fd, "key");
+  const trpc = await serverCaller();
+  let applied = 0;
+  try {
+    const r = await trpc.operations.recurring.applySuggested(key ? { key } : undefined);
+    applied = r.applied;
+  } catch {
+    redirect(`/${locale}/operations?error=recurring#calendar`);
+  }
+  redirect(`/${locale}/operations?suggestApplied=${applied}#calendar`);
+}

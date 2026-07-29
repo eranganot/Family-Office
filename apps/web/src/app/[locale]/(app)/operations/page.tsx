@@ -9,6 +9,7 @@ import {
   regenerateCalendarAction,
   setCalendarStatusAction,
   upsertRecurringAction,
+  applySuggestedDateAction,
   reopenPeriodAction,
   commitAllPendingAction,
   commitStatementAction,
@@ -22,7 +23,7 @@ import {
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
 import { CategoryPicker, type PickerCategory } from "../../../../components/operations/category-picker";
-import { SUGGESTED_DATE_RATIONALE } from "@wealthos/domain";
+import { SUGGESTED_DATE_RATIONALE, suggestedAnchorDate } from "@wealthos/domain";
 import { serverCaller } from "../../../../lib/trpc-server";
 
 const BEHAVIORAL = ["FIXED_CONTRACTUAL", "VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG", "SAVINGS_FLOW", "TRANSFER"] as const;
@@ -49,7 +50,7 @@ export default async function OperationsPage({
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
     mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string; reused?: string;
     y?: string; m?: string; cat?: string; beh?: string; dupesRemoved?: string;
-    calendarBuilt?: string; calendarUpdated?: string; recurringSaved?: string;
+    calendarBuilt?: string; calendarUpdated?: string; recurringSaved?: string; suggestApplied?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -675,6 +676,7 @@ export default async function OperationsPage({
 
         <SuccessBanner message={sp.calendarBuilt ? t("calendarBuilt", { n: sp.calendarBuilt }) : undefined} />
         <SuccessBanner message={sp.calendarUpdated || sp.recurringSaved ? tf("saved") : undefined} />
+        <SuccessBanner message={sp.suggestApplied ? t("suggestionsApplied", { n: sp.suggestApplied }) : undefined} />
 
         <form action={regenerateCalendarAction} className="mb-4">
           <input type="hidden" name="locale" value={locale} />
@@ -748,7 +750,12 @@ export default async function OperationsPage({
 
         <h3 className="mt-8 mb-2 text-sm font-semibold">{t("recurringTitle")}</h3>
         <p className="mb-1 text-xs text-neutral-500">{t("recurringHint")}</p>
-        <p className="mb-3 text-xs text-neutral-500">{t("suggestedDates")}</p>
+        <p className="mb-2 text-xs text-neutral-500">{t("suggestedDates")}</p>
+        <form action={applySuggestedDateAction} className="mb-3">
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="key" value="" />
+          <SubmitButton label={t("applyAllSuggested")} />
+        </form>
         <table className="w-full text-start text-sm">
           <tbody>
             {recurring.map((r) => (
@@ -780,6 +787,26 @@ export default async function OperationsPage({
                     </label>
                     <button type="submit" className="text-xs text-blue-700 underline">{tf("save")}</button>
                   </form>
+                  {(() => {
+                    const sug = suggestedAnchorDate(r.key, new Date().getUTCFullYear());
+                    if (!sug) return null;
+                    const sugIso = sug.toISOString().slice(0, 10);
+                    if (sugIso === r.anchorDate.toISOString().slice(0, 10)) {
+                      return <p className="mt-1 text-xs text-emerald-700">{t("matchesSuggestion")}</p>;
+                    }
+                    return (
+                      <form action={applySuggestedDateAction} className="mt-1 flex items-center gap-2">
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="key" value={r.key} />
+                        <span className="text-xs text-neutral-500" dir="ltr">
+                          {t("suggestedIs", { date: sugIso })}
+                        </span>
+                        <button type="submit" className="text-xs text-blue-700 underline">
+                          {t("applySuggested")}
+                        </button>
+                      </form>
+                    );
+                  })()}
                 </td>
               </tr>
             ))}
