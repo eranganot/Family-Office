@@ -741,11 +741,23 @@ export default async function OperationsPage({
                         </form>
                       ))}
 
-                    {/* A dismissal must carry a reason — the select is required. */}
+                    {/*
+                      A dismissal must carry a reason — the select is `required`.
+
+                      The button comes FIRST in the DOM so that in RTL it renders on the
+                      leading side and the reason follows it: "dismiss — because…". With
+                      the select first, Hebrew put the dropdown ahead of the verb, which
+                      reads as though the reason were being chosen for no stated action.
+                      Source order drives this in both directions, so LTR reads the same
+                      way round without a direction-specific override.
+                    */}
                     <form action={setActionStatusAction} className="inline-flex items-center gap-2">
                       <input type="hidden" name="locale" value={locale} />
                       <input type="hidden" name="id" value={a.id} />
                       <input type="hidden" name="status" value="DISMISSED" />
+                      <button type="submit" className="text-xs text-neutral-500 underline">
+                        {t("actionAction.DISMISSED")}
+                      </button>
                       <select
                         name="dismissalReason"
                         required
@@ -770,9 +782,6 @@ export default async function OperationsPage({
                           </option>
                         ))}
                       </select>
-                      <button type="submit" className="text-xs text-neutral-500 underline">
-                        {t("actionAction.DISMISSED")}
-                      </button>
                     </form>
                   </div>
                 </li>

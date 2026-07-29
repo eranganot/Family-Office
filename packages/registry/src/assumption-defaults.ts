@@ -90,6 +90,9 @@ export const DEFAULT_ASSUMPTIONS: Array<{
   // two months cannot establish a "typical" month for the heaviest one to be unusual against.
   { key: "cashflow_timing_horizon_days", value: 180, unit: "DAYS", description: "Forward calendar window the cash-flow timing analyzer buckets by month when looking for committed outflows that cluster into one month" },
   { key: "cashflow_peak_month_notice_pct", value: 40, unit: "PCT", description: "How far above a typical month the heaviest month's committed outflows must sit before the clustering is worth an action (a liquidity finding, never a saving)" },
+  // M41: a trajectory drawn through one closed month is a straight line through an
+  // accident — and it renders with the same confident styling as a real one.
+  { key: "projection_min_closed_months", value: 3, unit: "MONTHS", description: "Minimum verified CLOSED months in the current year before an end-of-year trajectory may be drawn at all" },
   { key: "operations_surplus_drift_pct", value: 20, unit: "PCT", description: "Deviation of realised monthly surplus from the approved plan's assumption that raises a monitoring alert" },
   {
     key: "health_score_weights",

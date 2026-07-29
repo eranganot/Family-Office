@@ -10,6 +10,7 @@ import { linkCardSettlements } from "../services/settlement-service";
 import { regenerateCalendar, upcomingEvents } from "../services/calendar-service";
 import { listOpportunities, runOpportunities } from "../services/opportunity-service";
 import { DISMISSAL_REASONS, listActions, setActionStatus } from "../services/action-service";
+import { eoyProjection } from "../services/projection-service";
 import { rulesWithSuggestions, suggestedAnchorDate } from "@wealthos/domain";
 import {
   ArchiveCategorySchema,
@@ -738,6 +739,17 @@ export const operationsRouter = router({
           throw e;
         }
       }),
+  }),
+
+  /**
+   * M41 — end-of-year trajectory, current vs optimised.
+   *
+   * A query, not a mutation: reading a projection must never write one. It returns a
+   * discriminated union, so "not enough closed months" is a first-class result the UI
+   * has to handle rather than a zero it can render as a flat line.
+   */
+  projection: router({
+    eoy: operationsProcedure.query(async ({ ctx }) => eoyProjection(ctx.db, ctx.householdId)),
   }),
 
   recurring: router({

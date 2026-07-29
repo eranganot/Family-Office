@@ -26,6 +26,16 @@ export type {
   FutureInstalment,
 } from "./settlement";
 
+// --- M41: end-of-year projection (current vs optimised) ---
+export { projectEndOfYear } from "./eoy-projection";
+export type {
+  ClosedMonth,
+  PendingImpact,
+  EoyProjectionInput,
+  EoyMonthPoint,
+  EoyProjection,
+} from "./eoy-projection";
+
 // --- M40a: opportunity analyzers ---
 export {
   runOpportunityAnalyzers,

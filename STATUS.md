@@ -2,7 +2,66 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
-## Current state (2026-07-29, session 31) — M40c part 2 ⚠️ BUILT, GATE NOT YET RUN
+## Current state (2026-07-29, session 31) — M41a ⚠️ BUILT, GATE NOT YET RUN
+
+- **M41a — EOY projection (current vs optimised) + the Action Center RTL fix.
+  `deploy-m41a.ps1`. NO MIGRATION. NO LOCKFILE CHANGE.** Apply after M40c part 2.
+- **Closes the seam M40c left open.** `setActionStatus` returned
+  `eoyUnavailableReason=EOY_PROJECTION_ARRIVES_IN_M41`; it now returns a real
+  `EoyProjection`. The refusal still exists — but now it is made by something entitled
+  to make it.
+- **What "optimised" counts, and what it refuses to count — the integrity of the chart:**
+  ACCEPTED-but-unfinished only, **from the month it was accepted** (taken from the
+  decision journal, not `generatedAt` — a card proposed in January and accepted in
+  September did not start saving in January). **PROPOSED excluded** (would promise money
+  from decisions never made; the gap would measure the engine's optimism rather than
+  follow-through). **IMPLEMENTED excluded from the delta** (already inside the observed
+  run-rate — the double-count, in its fourth costume). **`impactMonthlyBase = null`
+  contributes nothing** — renegotiation and timing cards carry no saving by design, and
+  inventing one here would smuggle back the figure those generators refused to state.
+- **Refusals:** `< projection_min_closed_months` verified closed months → `ok:false` with
+  a reason, never a line. Provisional months excluded from the run-rate and reported. A
+  month with no closed period is **missing data, not zero surplus**. The optimised line
+  never rewrites a closed month — only the future diverges.
+- `operations.projection.eoy` is a **query** returning a discriminated union, so "not
+  enough months" is a first-class result the UI must handle, not a zero it renders flat.
+- **NEW ASSUMPTION KEY `projection_min_closed_months` (3)** — invalidates pinned
+  recommendations; rerun the Opportunity Center once.
+- **No projection UI yet** — API-only in this slice. `projection/section.tsx` is
+  outstanding.
+
+### ⚠️ Deploy scripts must be ASCII-ONLY
+`deploy-m40c-ui.ps1` died with `TerminatorExpectedAtEndOfString`: PowerShell 5.1 reads a
+`.ps1` as **ANSI when there is no BOM**, so one Hebrew word in a `Write-Host` became
+mojibake containing a quote and broke parsing. Commit messages are fine — they are
+written to a temp file as UTF-8 (data, not script). **That script is superseded and can
+be deleted; its page fix is folded into M41a.**
+
+### Next up — M41b (the rest of M41)
+1. **`OPERATIONS_REVIEW` snapshot on period close.** ⚠️ `SnapshotKind` has only
+   `SCHEDULED | PRE_STRATEGY | MANUAL`, and adding an enum value is the hazard the M40c
+   gate now refuses. Plan: nullable `snapshotId` FK on `OperatingPeriod` instead — the
+   reference itself carries the semantics better than a label would.
+2. **Drift alerts back to Strategy.** `operations_surplus_drift_pct` is seeded and read
+   by nothing. `MonitoringAlert` already has the right shape (`kind`, `severity`,
+   `detail` with baseline/current/delta/threshold, `recommendedAction`); needs a new
+   kind plus a `MonitoringRun` to hang alerts from.
+3. **Surplus → deployment engine hand-off** (`operations.allocation.propose`).
+
+## Current state (2026-07-29, session 31) — M40c part 2 ✅ GATE PASSED
+
+> **M40 IS COMPLETE.** Follow-up UI fix in `deploy-m40c-ui.ps1` (one file, no migration,
+> no assumption change → no recompute): the Action Center's dismissal-reason dropdown
+> rendered on the leading side of the Dismiss button in Hebrew, so the row read as a
+> reason chosen for no stated action. Button moved first in SOURCE order, which puts it
+> on the leading side in both directions without a `dir`-specific override.
+>
+> **Two gate lessons from this milestone, both about the gate rather than the code:**
+> the migration guard matched `IS NOT NULL` inside a *comment* (now strips `--` lines),
+> and the staged-file list included `deploy-*.ps1`, which `.gitignore` line 18 excludes
+> by design. Both wasted a full gate run each. The part-2 script now runs
+> `git check-ignore` over `$Files` in step 1, so an untrackable path fails in the first
+> second instead of after typecheck + tests + lint have been paid for.
 
 - **M40c part 2 — cash-flow timing, dependency graph, Action Center.
   `deploy-m40c-part2.ps1`. ⚠️ CONTAINS A MIGRATION

@@ -1,5 +1,7 @@
 import type { PrismaClient } from "@wealthos/db";
+import type { EoyProjection } from "@wealthos/engine-operations";
 import { listOpportunities } from "./opportunity-service";
+import { eoyProjection } from "./projection-service";
 
 /**
  * M40c — the Action Center.
@@ -146,17 +148,19 @@ export interface SetActionStatusResult {
   id: string;
   actionStatus: ActionStatus;
   /**
-   * Recomputed in the SAME response, as the spec requires — but only what can honestly
-   * be recomputed. Completing an action changes the Opportunity Center totals
-   * immediately (an accepted saving stops counting as still-available), so those are
-   * real. The end-of-year TRAJECTORY the spec also asks for belongs to M41's projection
-   * engine, which does not exist yet, so it is reported as unavailable rather than
-   * approximated — a plausible-looking forecast produced by no forecaster is the kind
-   * of confident wrong number this module keeps having to remove.
+   * Recomputed in the SAME response, as doc 07 §8 requires. Completing an action
+   * changes the Opportunity Center totals immediately (an accepted saving stops
+   * counting as still-available).
    */
   totals: { monthlyBase: number; annualBase: number };
-  eoyProjection: null;
-  eoyUnavailableReason: "EOY_PROJECTION_ARRIVES_IN_M41";
+  /**
+   * M41 closes the seam M40c left open here. This used to be a hard-coded null with an
+   * `eoyUnavailableReason`, because approximating a forecast with no forecaster behind
+   * it is the confident-wrong number this module keeps removing. The projection engine
+   * now exists — and it still returns `ok: false` with a REASON when there are too few
+   * closed months, which is the same refusal expressed by something entitled to make it.
+   */
+  eoyProjection: EoyProjection;
 }
 
 export async function setActionStatus(
@@ -213,13 +217,17 @@ export async function setActionStatus(
     });
   });
 
-  const { totalMonthlyBase, totalAnnualBase } = await listOpportunities(db, householdId);
+  // Both recomputed AFTER the transaction commits, so the response reflects the change
+  // the owner just made rather than the state that preceded it.
+  const [{ totalMonthlyBase, totalAnnualBase }, projection] = await Promise.all([
+    listOpportunities(db, householdId),
+    eoyProjection(db, householdId),
+  ]);
 
   return {
     id: input.id,
     actionStatus: input.status,
     totals: { monthlyBase: totalMonthlyBase, annualBase: totalAnnualBase },
-    eoyProjection: null,
-    eoyUnavailableReason: "EOY_PROJECTION_ARRIVES_IN_M41",
+    eoyProjection: projection,
   };
 }
