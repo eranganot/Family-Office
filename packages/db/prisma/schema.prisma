@@ -723,6 +723,8 @@ model HouseholdSnapshot {
 
   recommendations Recommendation[]
   monitoringRuns  MonitoringRun[] @relation("monitoringSnapshot")
+  /// M41 — closed operating periods that pinned this snapshot as their monthly review.
+  reviewedPeriods OperatingPeriod[] @relation("periodReviewSnapshot")
 
   @@index([householdId, takenAt])
   allocationPlans AllocationPlan[]
@@ -1061,6 +1063,20 @@ model OperatingPeriod {
   reviewNote           String?
   closedAt             DateTime?
   createdAt            DateTime       @default(now())
+
+  /// M41 — the monthly-review snapshot taken when this period was CLOSED, so a closed
+  /// month can be re-derived later even after assumptions, rules or the ledger change.
+  /// `computed` + `pins` already freeze the operational figures; this freezes the
+  /// HOUSEHOLD they were computed against, which is what a strategy rerun compares to.
+  ///
+  /// Deliberately a nullable FK rather than a new `SnapshotKind` value: Postgres will
+  /// not let a newly added enum value be USED in the transaction that adds it, which is
+  /// exactly how Prisma runs a migration, and the M40c deploy gate now refuses any
+  /// migration containing ALTER TYPE. The reference also carries the semantics better
+  /// than a label would - it says WHICH snapshot belongs to this month, not merely that
+  /// one of some kind exists.
+  reviewSnapshotId String?
+  reviewSnapshot   HouseholdSnapshot? @relation("periodReviewSnapshot", fields: [reviewSnapshotId], references: [id])
 
   @@unique([householdId, year, month])
   @@index([householdId, year, month])

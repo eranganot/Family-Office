@@ -11,6 +11,7 @@ import { regenerateCalendar, upcomingEvents } from "../services/calendar-service
 import { listOpportunities, runOpportunities } from "../services/opportunity-service";
 import { DISMISSAL_REASONS, listActions, setActionStatus } from "../services/action-service";
 import { eoyProjection } from "../services/projection-service";
+import { allocationHandoffReadiness, runCloseReview } from "../services/review-service";
 import { rulesWithSuggestions, suggestedAnchorDate } from "@wealthos/domain";
 import {
   ArchiveCategorySchema,
@@ -509,12 +510,39 @@ export const operationsRouter = router({
           reviewNote: input.reviewNote ?? null,
         },
       });
-      return { id: row.id, status: row.status, provisional: row.surplusIsProvisional };
+
+      /*
+       * M41 — the monthly review runs AFTER the period row is CLOSED, never inside the
+       * upsert. A review snapshot describes the household as of a month that is already
+       * frozen; taking it mid-write would pin a state the period does not yet claim.
+       *
+       * It is also deliberately not fatal: a failed snapshot or drift check must not
+       * roll back a close the owner just performed. The month is closed either way, and
+       * `reviewSnapshotId` staying null says truthfully that no review was recorded.
+       */
+      let review: Awaited<ReturnType<typeof runCloseReview>> | null = null;
+      try {
+        review = await runCloseReview(ctx.db, ctx.householdId, input.year, input.month);
+      } catch {
+        review = null;
+      }
+
+      return {
+        id: row.id,
+        status: row.status,
+        provisional: row.surplusIsProvisional,
+        reviewSnapshotId: review?.snapshotId ?? null,
+        drift: review?.drift ?? null,
+        driftAlertId: review?.alertId ?? null,
+      };
     }),
 
     reopen: operationsProcedure.input(PeriodRefSchema).mutation(async ({ ctx, input }) => {
       const row = await ctx.db.operatingPeriod.update({
         where: { householdId_year_month: { householdId: ctx.householdId, year: input.year, month: input.month } },
+        // M41: the review snapshot is NOT cleared on reopen. It records what the
+        // household looked like when the month was closed, which stays true even after
+        // the month is reopened — and closing again simply pins a fresh one.
         data: { status: "OPEN", closedAt: null },
       });
       return { id: row.id, status: row.status };
@@ -750,6 +778,24 @@ export const operationsRouter = router({
    */
   projection: router({
     eoy: operationsProcedure.query(async ({ ctx }) => eoyProjection(ctx.db, ctx.householdId)),
+  }),
+
+  /**
+   * M41 — surplus → deployment engine hand-off.
+   *
+   * A QUERY, not a mutation. Generating the plan stays with `allocation.generate`
+   * behind `workflowGuard("ALLOCATION")`: the operational workspace is cross-phase by
+   * design, so a mutation here would let a MAPPING-phase household produce a deployment
+   * plan — precisely what the guard exists to prevent. This reports whether the
+   * hand-off can happen and what the VERIFIED figure is; the existing engine still
+   * makes the plan.
+   */
+  allocation: router({
+    readiness: operationsProcedure
+      .input(PeriodRefSchema)
+      .query(async ({ ctx, input }) =>
+        allocationHandoffReadiness(ctx.db, ctx.householdId, input.year, input.month),
+      ),
   }),
 
   recurring: router({

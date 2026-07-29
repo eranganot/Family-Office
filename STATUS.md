@@ -2,6 +2,45 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-29, session 31) — M41b ⚠️ BUILT, GATE NOT YET RUN
+
+- **M41b — monthly review snapshot, surplus drift alerts, allocation hand-off.
+  `deploy-m41b.ps1`. ⚠️ CONTAINS A MIGRATION
+  (`20260729140000_m41_period_review_snapshot`). NO LOCKFILE CHANGE. NO NEW ASSUMPTION
+  KEY** (so pins are NOT invalidated and no recompute is needed). Apply after M41a.
+- **Review snapshot.** Close already froze the *operational* figures (`computed`,
+  `pins`, `engineVersion`); it did not freeze the *household* those figures describe,
+  which is what a strategy rerun compares against. `OperatingPeriod.reviewSnapshotId`
+  (nullable FK) now pins it. **Not a new `SnapshotKind` value** — that's the ALTER TYPE
+  hazard the M40c gate refuses, and this migration honours its own gate rather than
+  carving an exception. **The review is non-fatal to the close**, and **reopen does not
+  clear it** (it records what was true at close).
+- **Surplus drift — with a recorded deviation from the spec.** The assumption's own
+  description says "deviation from the approved plan's assumption", but **no
+  approved-plan monthly-surplus figure exists in the schema** — `committedPlan` carries
+  booleans, not a surplus. Baseline is instead the mean of previously CLOSED,
+  non-provisional months (≤6). That's a fact the system holds, and it answers what the
+  alert is for. **Raised in BOTH directions** — surplus far above baseline is money the
+  plan isn't deploying, so the sign lives in the title and `detail.direction`.
+  First close reports `NO_BASELINE_MONTHS`; a zero baseline refuses rather than divides.
+  `MonitoringRun.stalenessReport` is marked `NOT_A_STALENESS_SWEEP` so nobody later
+  reads it as a completed sweep.
+- **Allocation hand-off is a QUERY, not a mutation.** `runAllocation` sits behind
+  `workflowGuard("ALLOCATION")` and the operations workspace is cross-phase (D2), so a
+  mutation here would let a MAPPING-phase household generate a deployment plan — exactly
+  what the guard prevents. A **PROVISIONAL surplus is refused**: this is the one place
+  in the module where being wrong moves real cash.
+
+### ⚠️ M41 outstanding (deliberate, not forgotten)
+1. **Feeding verified surplus INTO the deployment engine's deployable amount.**
+   `computeDeploymentPlans(snapshot, ctx)` derives free cash from snapshot CASH and
+   takes no surplus parameter — so this is an engine signature change and a separate
+   decision. The readiness query is the seam; the wiring is not guessed at.
+2. **No UI for either the EOY projection or the review/drift results.**
+   `projection/section.tsx` and surfacing `SURPLUS_DRIFT` alerts are both outstanding.
+3. **No tests for `review-service`** — it is DB-bound, and those suites run with
+   `fileParallelism` disabled against a shared test DB.
+
 ## Current state (2026-07-29, session 31) — M41a ⚠️ BUILT, GATE NOT YET RUN
 
 - **M41a — EOY projection (current vs optimised) + the Action Center RTL fix.
