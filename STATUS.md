@@ -2,6 +2,37 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-29, session 30) — M40a-fix
+
+- **M40a-fix — the subscription analyzer offered the owner's MORTGAGE for cancellation.
+  `deploy-m40a-fix.ps1`. NO MIGRATION, NO LOCKFILE CHANGE.** Apply after `m40a`.
+- **What shipped and what it said.** QA §3 surfaced a card reading *"לבדוק 10 חיובים חוזרים
+  בסך ₪16,794 לחודש"*, whose step 2 was *"start with פועלים_משכנתא at ₪15,072/month — the
+  biggest decision here"* and step 3 *"cancel directly with the provider."* The mortgage was
+  90% of the headline; life and dental insurance were next. The Opportunity Center was
+  claiming ~₪201k/year of recoverable saving that does not exist.
+- **Cause is structural, not a typo.** `eligible()` was a DENYLIST (excluded TRANSFER and
+  SAVINGS_FLOW, passed everything else). `FIXED_CONTRACTUAL` is defined in the schema as
+  *"mortgage, arnona, tuition, insurance premiums"* — obligations that are **by construction**
+  a stable monthly amount from a consistent merchant, i.e. exactly the shape the clusterer
+  hunts for. **A recurring-payment detector that does not exclude unstoppable recurring
+  payments will always rank them first, because they are the largest and most regular.**
+- **Fix:** eligibility is now an **ALLOWLIST** — only `VARIABLE_DISCRETIONARY` and
+  `FINANCIAL_DRAG` can be a subscription. Plus `ledgerItemId === null`: a payment that is
+  evidence for a mapped ledger stream is an obligation however regular it looks, and that
+  check holds even when the behavioural class is wrong or missing (most likely on a fresh
+  import). An **unclassified** row is refused outright — silence beats a confident wrong
+  instruction.
+- **Transparency half of the fix:** `excludedContractual` / `excludedUnclassified` counts are
+  reported in the finding and stated in both rationales, so "why isn't my Netflix here" has a
+  visible answer instead of looking like a broken feature.
+- **6 new regression tests** pinned to the owner's real July data, including the exact
+  ₪15,071.52 `פועלים_משכנתא` row: it must never cluster, and the mixed case must return
+  ₪578/month from 2 merchants rather than ₪16,794 from 10.
+- **Lesson worth keeping:** the analyzer's arithmetic was right the whole time (annual = ×12,
+  EOY = ×6 both checked out in QA). The defect was entirely in *which rows were eligible*.
+  A correct calculation over a wrong input set is the most convincing kind of wrong.
+
 ## Current state (2026-07-29, session 30) — M40a
 
 - **M40a — Opportunity Center: operational findings → Recommendations. `deploy-m40a.ps1`.

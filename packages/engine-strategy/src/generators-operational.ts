@@ -167,7 +167,7 @@ const OPERATIONAL_GENERATORS: Record<string, (f: Finding, asOf: Date) => Body | 
         "None for household subscriptions. A business-deductible subscription should be checked separately before cancelling.",
       liquidityImplications: "Each cancellation converts directly into monthly free cash flow.",
       timeHorizon: "IMMEDIATE",
-      sensitivity: `Detection requires at least 3 charges, a 25–35 day cadence and a stable amount, so genuinely irregular spending is not flagged. Charges that already stopped are excluded — cancelling them would save nothing.`,
+      sensitivity: `Detection requires at least 3 charges, a 25–35 day cadence and a stable amount, so genuinely irregular spending is not flagged. Charges that already stopped are excluded — cancelling them would save nothing. Contractual obligations are NEVER listed here: ${f.metrics["excludedContractual"]} recurring charge(s) were excluded as mortgage, loan or insurance payments, and ${f.metrics["excludedUnclassified"]} because they are not yet classified. Classify those in Operations → Transactions if you want them considered.`,
       alternatives: [
         "Downgrade to a lower tier instead of cancelling",
         "Switch annual billing on for the ones you keep, where it is cheaper",
@@ -193,7 +193,7 @@ const OPERATIONAL_GENERATORS: Record<string, (f: Finding, asOf: Date) => Body | 
       taxImplications: "אין לגבי מנויים ביתיים. מנוי שמוכר כהוצאה עסקית יש לבדוק בנפרד לפני ביטול.",
       liquidityImplications: "כל ביטול מתורגם ישירות לתזרים חודשי פנוי.",
       timeHorizon: "IMMEDIATE",
-      sensitivity: `הזיהוי דורש לפחות 3 חיובים, קצב של 25–35 ימים וסכום יציב, ולכן הוצאה לא סדירה אינה מסומנת. חיובים שכבר הפסיקו מוחרגים — ביטולם לא יחסוך דבר.`,
+      sensitivity: `הזיהוי דורש לפחות 3 חיובים, קצב של 25–35 ימים וסכום יציב, ולכן הוצאה לא סדירה אינה מסומנת. חיובים שכבר הפסיקו מוחרגים — ביטולם לא יחסוך דבר. התחייבויות חוזיות לעולם אינן מופיעות כאן: ${f.metrics["excludedContractual"]} חיובים חוזרים הוחרגו כתשלומי משכנתא, הלוואה או ביטוח, ו-${f.metrics["excludedUnclassified"]} משום שטרם סווגו. סווגו אותם בתפעול ← תנועות אם ברצונכם שייכללו.`,
       alternatives: [
         "לרדת למסלול נמוך יותר במקום לבטל",
         "לעבור לחיוב שנתי במה שנשאר, היכן שזה זול יותר",

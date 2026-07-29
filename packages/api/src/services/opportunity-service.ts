@@ -90,6 +90,10 @@ async function loadOpportunityTxns(
       merchantKey: true,
       isRecurringCandidate: true,
       behavioralClass: true,
+      // M40a-fix: the subscription analyzer must be able to tell an obligation from a
+      // subscription. A row that is evidence for a mapped ledger stream is never
+      // cancellable, however regular it looks.
+      ledgerItemId: true,
       category: { select: { key: true, defaultBehavioralClass: true } },
     },
     orderBy: { bookedAt: "asc" },
@@ -106,6 +110,7 @@ async function loadOpportunityTxns(
     behavioral: t.behavioralClass ?? t.category?.defaultBehavioralClass ?? null,
     merchantKey: t.merchantKey,
     isRecurringCandidate: t.isRecurringCandidate,
+    ledgerItemId: t.ledgerItemId,
   }));
 }
 

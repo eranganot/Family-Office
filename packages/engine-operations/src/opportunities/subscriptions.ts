@@ -46,15 +46,61 @@ function median(values: number[]): number {
   return s.length % 2 === 0 ? (s[mid - 1]! + s[mid]!) / 2 : s[mid]!;
 }
 
+/**
+ * ⚠️ M40a-fix — the eligibility rule is an ALLOWLIST, not a denylist.
+ *
+ * The first version excluded TRANSFER and SAVINGS_FLOW and let everything else through.
+ * That shipped a card telling the owner to "start with פועלים_משכנתא at ₪15,072/month —
+ * the biggest decision here" and to "cancel directly with the provider". It was advising
+ * him to cancel his mortgage, and it inflated the headline saving by ~₪181k/year.
+ *
+ * The cause is structural, not a typo: `FIXED_CONTRACTUAL` is defined in the schema as
+ * "mortgage, arnona, tuition, insurance premiums" — obligations that are BY CONSTRUCTION
+ * a stable monthly amount from a consistent merchant, which is exactly the shape this
+ * analyzer hunts for. A recurring-payment detector that does not exclude the category of
+ * unstoppable recurring payments will always find them first, because they are the
+ * largest and the most regular.
+ *
+ * So: only two behavioural classes can ever be a cancellable subscription, and an
+ * unclassified row is NOT one of them. Silence beats a confident wrong instruction.
+ */
+const SUBSCRIBABLE = new Set(["VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG"]);
+
 function eligible(t: OpportunityTxn): boolean {
   return (
     t.status === "BOOKED" &&
     t.amountBase !== null &&
     t.amountBase < 0 && // outflow only
     t.merchantKey !== null &&
-    t.behavioral !== "TRANSFER" &&
-    t.behavioral !== "SAVINGS_FLOW"
+    // A payment that is evidence for a mapped ledger stream (mortgage track, loan,
+    // insurance policy) is an obligation, not a subscription — regardless of how
+    // regular it looks.
+    t.ledgerItemId === null &&
+    t.behavioral !== null &&
+    SUBSCRIBABLE.has(t.behavioral)
   );
+}
+
+/**
+ * Rows that look like a subscription but were deliberately not treated as one. Reported
+ * in the finding so the exclusion is VISIBLE — an owner who wonders why a charge is
+ * missing should be able to see that we chose not to guess, rather than assume the
+ * feature is broken.
+ */
+export function countExcludedRecurring(txns: OpportunityTxn[]): {
+  contractual: number;
+  unclassified: number;
+} {
+  let contractual = 0;
+  let unclassified = 0;
+  for (const t of txns) {
+    if (t.status !== "BOOKED" || t.amountBase === null || t.amountBase >= 0) continue;
+    if (t.merchantKey === null) continue;
+    if (t.behavioral === "TRANSFER" || t.behavioral === "SAVINGS_FLOW") continue;
+    if (t.ledgerItemId !== null || t.behavioral === "FIXED_CONTRACTUAL") contractual += 1;
+    else if (t.behavioral === null) unclassified += 1;
+  }
+  return { contractual, unclassified };
 }
 
 export function clusterSubscriptions(txns: OpportunityTxn[], asOf: Date): SubscriptionCluster[] {
@@ -112,6 +158,7 @@ export function analyzeSubscriptions(input: OpportunityInput): OpportunityFindin
   if (candidates.length === 0) return [];
 
   const monthlyTotal = round2(candidates.reduce((s, c) => s + c.monthlyBase, 0));
+  const excluded = countExcludedRecurring(input.transactions);
 
   return [
     {
@@ -122,6 +169,8 @@ export function analyzeSubscriptions(input: OpportunityInput): OpportunityFindin
         monthlyTotalBase: monthlyTotal,
         annualTotalBase: round2(monthlyTotal * 12),
         dormantDays,
+        excludedContractual: excluded.contractual,
+        excludedUnclassified: excluded.unclassified,
         largestMerchant: candidates[0]!.merchantKey,
         largestMonthlyBase: candidates[0]!.monthlyBase,
         merchants: candidates

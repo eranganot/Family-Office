@@ -36,6 +36,8 @@ const subs: Finding = {
     largestMerchant: "streaming",
     largestMonthlyBase: 60,
     merchants: "streaming:60, gym:50, cloud:40",
+    excludedContractual: 4,
+    excludedUnclassified: 2,
   },
   evidenceItemIds: [],
 };
@@ -139,6 +141,15 @@ describe("operational generators", () => {
     ).drafts[0]!;
     const rising = generateOperationalRecommendations([leakage], ASOF).drafts[0]!;
     expect(rising.subscores.urgency).toBeGreaterThan(flat.subscores.urgency);
+  });
+
+  it("states what the subscription analyzer refused to consider, in both languages", () => {
+    // The M40a QA defect was partly a transparency failure: the owner had no way to see
+    // that contractual obligations were (or were not) being filtered out.
+    const d = generateOperationalRecommendations([subs], ASOF).drafts[0]!;
+    expect(d.rationale.sensitivity).toContain("4");
+    expect(d.rationale.sensitivity).toMatch(/mortgage, loan or insurance/);
+    expect(d.rationaleHe.sensitivity).toMatch(/משכנתא/);
   });
 
   it("throws on a code with no action items — the same rule M23c set for strategy", () => {

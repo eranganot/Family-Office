@@ -25,9 +25,10 @@ function txn(p: Partial<OpportunityTxn> & { bookedAt: Date; amountBase: number |
     id: Math.random().toString(36).slice(2),
     status: "BOOKED",
     categoryKey: null,
-    behavioral: null,
+    behavioral: "VARIABLE_DISCRETIONARY",
     merchantKey: null,
     isRecurringCandidate: false,
+    ledgerItemId: null,
     ...p,
   };
 }
@@ -152,6 +153,81 @@ describe("subscription analyzer", () => {
   it("excludes transfers and savings flows", () => {
     const rows = monthly("pension", 1000, 6).map((t) => ({ ...t, behavioral: "SAVINGS_FLOW" as const }));
     expect(analyzeSubscriptions(input({ transactions: rows }))).toEqual([]);
+  });
+
+  // ------------------------------------------------------------------
+  // REGRESSION — the M40a defect the owner caught in QA on 2026-07-29.
+  // The shipped card said: "start with פועלים_משכנתא at ₪15,072/month — the biggest
+  // decision here" and "cancel directly with the provider". It was telling him to
+  // cancel his mortgage, and 90% of a ₪16,794/month headline was that one row.
+  // ------------------------------------------------------------------
+  it("NEVER offers a mortgage as a cancellable subscription", () => {
+    const mortgage = monthly("פועלים_משכנתא", 15071.52, 6).map((t) => ({
+      ...t,
+      behavioral: "FIXED_CONTRACTUAL" as const,
+    }));
+    expect(clusterSubscriptions(mortgage, ASOF)).toEqual([]);
+    expect(analyzeSubscriptions(input({ transactions: mortgage }))).toEqual([]);
+  });
+
+  it("NEVER offers an insurance premium as a cancellable subscription", () => {
+    const life = monthly("מגדל_מבטחים_חיים", 510.23, 6).map((t) => ({
+      ...t,
+      behavioral: "FIXED_CONTRACTUAL" as const,
+    }));
+    const dental = monthly("הראל_ביטוח_שיניים", 303.82, 6).map((t) => ({
+      ...t,
+      behavioral: "FIXED_CONTRACTUAL" as const,
+    }));
+    expect(analyzeSubscriptions(input({ transactions: [...life, ...dental] }))).toEqual([]);
+  });
+
+  it("excludes any charge that is evidence for a mapped ledger stream", () => {
+    // Even if the behavioural class is wrong or missing, a payment linked to a ledger
+    // item is a known obligation. Belt and braces, because the classification is the
+    // thing most likely to be wrong on a fresh import.
+    const linked = monthly("some_loan", 2000, 6).map((t) => ({
+      ...t,
+      behavioral: "VARIABLE_DISCRETIONARY" as const,
+      ledgerItemId: "ledger-item-1",
+    }));
+    expect(analyzeSubscriptions(input({ transactions: linked }))).toEqual([]);
+  });
+
+  it("refuses to judge an UNCLASSIFIED recurring charge", () => {
+    // Silence beats a confident wrong instruction: we cannot tell a streaming service
+    // from a tuition payment before it is classified.
+    const unknown = monthly("unknown_merchant", 400, 6).map((t) => ({
+      ...t,
+      behavioral: null,
+    }));
+    expect(analyzeSubscriptions(input({ transactions: unknown }))).toEqual([]);
+  });
+
+  it("still finds the real subscriptions mixed in beside the obligations", () => {
+    // The owner's actual July data: a mortgage and two insurance policies that must be
+    // excluded, plus two genuinely reviewable recurring services that must survive.
+    const mortgage = monthly("פועלים_משכנתא", 15071.52, 6).map((t) => ({
+      ...t,
+      behavioral: "FIXED_CONTRACTUAL" as const,
+    }));
+    const dental = monthly("הראל_ביטוח_שיניים", 303.82, 6).map((t) => ({
+      ...t,
+      behavioral: "FIXED_CONTRACTUAL" as const,
+    }));
+    const bezeq = monthly("בזק_הוראת_קבע", 198, 6);
+    const service = monthly("ht_waerermore", 380, 6);
+
+    const f = analyzeSubscriptions(
+      input({ transactions: [...mortgage, ...dental, ...bezeq, ...service] }),
+    );
+    expect(f).toHaveLength(1);
+    expect(Number(f[0]!.metrics["subscriptionCount"])).toBe(2);
+    // 578, not 16,794.
+    expect(Number(f[0]!.metrics["monthlyTotalBase"])).toBeCloseTo(578, 2);
+    expect(String(f[0]!.metrics["merchants"])).not.toContain("משכנתא");
+    // The exclusion is reported, not silent.
+    expect(Number(f[0]!.metrics["excludedContractual"])).toBeGreaterThan(0);
   });
 });
 

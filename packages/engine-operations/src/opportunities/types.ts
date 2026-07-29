@@ -54,6 +54,12 @@ export interface OpportunityTxn {
     | null;
   merchantKey: string | null;
   isRecurringCandidate: boolean;
+  /**
+   * Set when this transaction is evidence for a canonical LEDGER stream — a mortgage
+   * track, a loan, an insurance policy. Load-bearing for the subscription analyzer:
+   * a payment against a mapped obligation is never a cancellable subscription.
+   */
+  ledgerItemId: string | null;
 }
 
 /** One scheduled calendar event, reduced to what the deadline analyzer needs. */
