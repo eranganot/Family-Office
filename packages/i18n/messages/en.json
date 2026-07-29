@@ -1405,6 +1405,7 @@
     "oppsTotals": "Proposed savings: {monthly} / month · {annual} / year",
     "oppsImpact": "Impact: {monthly} per month · {annual} per year · {eoy} by 31 December",
     "oppsNoCashImpact": "No recurring cash impact — the cost of ignoring this is a missed date, not an outflow.",
+    "oppsSpendNotSaving": "The amount shown is your current spend, not an estimated saving. How much comes off is known only once you have a competing quote.",
     "oppsExpiresIn": "expires in {n} day(s)",
     "oppsExpired": "expired",
     "oppsWhyNot": "Risks and trade-offs",

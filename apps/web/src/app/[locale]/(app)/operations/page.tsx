@@ -767,6 +767,10 @@ export default async function OperationsPage({
                         eoy: formatMoney(o.impactEoyBase ?? 0, baseCurrency, loc),
                       })}
                     </p>
+                  ) : o.type === "RENEGOTIATE_RECURRING_COMMITMENTS" ? (
+                    // Renegotiation knows the SPEND, not the saving. Saying so on the card
+                    // matters: an amount with no label reads as a saving by default.
+                    <p className="mt-2 text-xs text-neutral-500">{t("oppsSpendNotSaving")}</p>
                   ) : (
                     <p className="mt-2 text-xs text-neutral-500">{t("oppsNoCashImpact")}</p>
                   )}

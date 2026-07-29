@@ -60,6 +60,7 @@ async function opportunityAssumptions(db: PrismaClient, householdId: string) {
       leakageFeeNoticeBase: n("leakage_bank_fee_monthly_notice_base", 40),
       subscriptionDormantDays: n("leakage_subscription_dormant_days", 90),
       calendarWindowDays: n("calendar_upcoming_window_days", 60),
+      minMonthlyBase: n("opportunity_min_monthly_base", 25),
     },
     weights: map["priority_weights"] as PriorityWeights,
     rowsByKey: new Map(rows.map((r) => [r.key, r] as const)),

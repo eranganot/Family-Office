@@ -2,6 +2,49 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-29, session 30) — M40b part 1
+
+- **M40b part 1 — commitment policy, renegotiation, materiality floor. `deploy-m40b.ps1`.
+  NO MIGRATION. NEW ASSUMPTION KEY `opportunity_min_monthly_base` (25 ILS)** — seeded via
+  the existing idempotent preDeploy path, but note a new assumption version **INVALIDATES
+  pinned recommendations**; rerun the Opportunity Center once after deploying.
+- **Why:** re-QA of `m40a-fix` returned a subscriptions card worth **₪6/month**. Every
+  exclusion was individually right; together they gutted the feature. `utilities.subscriptions`
+  — the literal *Subscriptions* category — is `FIXED_CONTRACTUAL`, as are `utilities.mobile`,
+  `utilities.cloud_software` and `housing.internet_tv`. **Banning that behavioural class
+  banned every real subscription the household has.**
+- **THE root cause, now fixed properly.** `BehavioralClass` answers *"is this predictable
+  enough to budget?"*; the analyzers were asking *"can the household get out of it?"*. Those
+  are orthogonal. Using the first as a proxy for the second failed twice in ONE DAY, in
+  opposite directions — first offering the **mortgage** for cancellation, then finding ₪6.
+- **`packages/domain/src/operations/commitment-policy.ts`** gives the second question its own
+  answer, as data, with two independent flags per category prefix (longest wins):
+  `cancellable` (stop paying, don't have it) and `renegotiable` (keep it, pay less).
+  - **Insurance: renegotiable, NEVER cancellable.** Coverage level belongs to
+    `engine-strategy/analyzers/insurance.ts`, which checks for GAPS on the same policy —
+    operations proposing cancellation would put two engines in direct contradiction, and
+    life cover is frequently irreversible (re-underwriting after aging or diagnosis).
+  - **Mortgage: neither.** Refinancing is strategy's `MORTGAGE_ABOVE_BENCHMARK`.
+  - Unknown / unlisted categories default to **neither** — never assumed actionable.
+- **New `RENEGOTIATE_RECURRING_COMMITMENTS` analyzer** — telecom, mobile, energy, insurance.
+  It **estimates no saving and leaves all three impact columns null**: WealthOS has no market
+  rate for a mobile plan, and putting current spend into the savings headline would claim the
+  whole bill as recoverable — the M40a mistake in a different costume. The card says on its
+  face that the figure is spend, not saving.
+- **Materiality floor** (`opportunity_min_monthly_base`, applied to a finding's TOTAL so small
+  charges can still aggregate). M40a shipped a full bilingual card with three action steps for
+  a ₪6 parking charge; reading it cost more than the saving.
+- **Tests:** new `packages/domain/test/commitment-policy.test.ts` pins the rule that
+  `housing.mortgage` and `utilities.subscriptions` land on OPPOSITE sides while both are
+  `FIXED_CONTRACTUAL`; plus renegotiation analyzer tests, a materiality test, and a generator
+  test asserting the word "cancel"/"לבטל" never appears on a renegotiation card.
+
+### Still open for M40c
+FX markup + employer-benefit analyzers (owner chose the **refuse-and-report-coverage** posture:
+state how many rows were unusable and refuse a figure when coverage is thin), cash-flow timing,
+the dependency graph, the Action Center, and an **un-accept** control — M40a's UI only shows
+actions on PROPOSED cards, so accepting is currently one-way even though the API can revert it.
+
 ## Current state (2026-07-29, session 30) — M40a-fix
 
 - **M40a-fix — the subscription analyzer offered the owner's MORTGAGE for cancellation.

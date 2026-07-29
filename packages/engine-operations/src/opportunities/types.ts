@@ -35,6 +35,12 @@ export interface OpportunityAssumptions {
   subscriptionDormantDays: number;
   /** `calendar_upcoming_window_days` — deadline horizon. */
   calendarWindowDays: number;
+  /**
+   * `opportunity_min_monthly_base` — M40b materiality floor. Below this, a recurring
+   * charge does not earn a card. M40a shipped a full bilingual card with three action
+   * steps for a ₪6/month parking charge; the cost of reading it exceeded the saving.
+   */
+  minMonthlyBase: number;
 }
 
 /** One observed transaction, reduced to what the opportunity analyzers need. */

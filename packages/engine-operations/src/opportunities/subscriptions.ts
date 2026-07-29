@@ -1,4 +1,4 @@
-import { UNCLASSIFIED_KEY } from "@wealthos/domain";
+import { UNCLASSIFIED_KEY, canCancel } from "@wealthos/domain";
 import type { OpportunityFinding, OpportunityInput, OpportunityTxn } from "./types";
 
 /**
@@ -65,7 +65,18 @@ function median(values: number[]): number {
  * So: only two behavioural classes can ever be a cancellable subscription, and an
  * unclassified row is NOT one of them. Silence beats a confident wrong instruction.
  */
-const SUBSCRIBABLE = new Set(["VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG"]);
+/**
+ * ⚠️ M40b — eligibility moved OFF the behavioural axis entirely.
+ *
+ * M40a tried a denylist on `BehavioralClass` (shipped a "cancel your mortgage" card), then
+ * an allowlist on it (found ₪6/month, because `utilities.subscriptions` — the literal
+ * Subscriptions category — is FIXED_CONTRACTUAL, along with mobile, cloud software and
+ * internet/TV). Both failed for the same reason: `BehavioralClass` answers "is this
+ * budgetable?", not "can the household get out of it?".
+ *
+ * That second question now has its own answer in `domain/operations/commitment-policy`.
+ * See that file for why insurance is repriceable but never cancellable.
+ */
 
 /**
  * ⚠️ SECOND M40a defect, caught in re-QA — the behavioural allowlist ALONE is not enough.
@@ -86,35 +97,36 @@ const SUBSCRIBABLE = new Set(["VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG"]);
  * about the same contract. Cancelling life cover is also frequently irreversible —
  * re-underwriting after aging or a diagnosis is not guaranteed at the old rate.
  */
-const NEVER_SUBSCRIPTION_PREFIXES = [
-  "insurance.", // life / health / disability / long-term care — engine-strategy's territory
-  "housing.home_insurance",
-  "transport.vehicle_insurance",
-  "housing.mortgage",
-  "debt.",
-  "taxes.",
-  "savings.",
-];
-
-function isProtectedCategory(key: string | null): boolean {
-  if (key === null) return true; // no category at all → refuse to judge
-  if (key === UNCLASSIFIED_KEY || key.startsWith("other.")) return true;
-  return NEVER_SUBSCRIPTION_PREFIXES.some((p) => key === p || key.startsWith(p));
+/** Unclassified rows are refused outright: the suspense bucket is not a verdict. */
+function isSuspense(key: string | null): boolean {
+  return key === null || key === UNCLASSIFIED_KEY || key.startsWith("other.");
 }
 
-function eligible(t: OpportunityTxn): boolean {
+/**
+ * Shape only: could this row be PART of a recurring commitment at all? No policy here.
+ *
+ * TRANSFER and SAVINGS_FLOW are excluded structurally rather than by policy: a movement
+ * between the household's own accounts, or a pension contribution, is not an expense in the
+ * first place (owner decision D7), so it can be neither cancelled nor repriced.
+ */
+function isRecurringShape(t: OpportunityTxn): boolean {
   return (
     t.status === "BOOKED" &&
     t.amountBase !== null &&
     t.amountBase < 0 && // outflow only
     t.merchantKey !== null &&
+    t.behavioral !== "TRANSFER" &&
+    t.behavioral !== "SAVINGS_FLOW"
+  );
+}
+
+/** Can the household stop paying this entirely? (subscription analyzer's question) */
+function subscriptionEligible(t: OpportunityTxn): boolean {
+  return (
     // A payment that is evidence for a mapped ledger stream (mortgage track, loan,
-    // insurance policy) is an obligation, not a subscription — regardless of how
-    // regular it looks.
-    t.ledgerItemId === null &&
-    !isProtectedCategory(t.categoryKey) &&
-    t.behavioral !== null &&
-    SUBSCRIBABLE.has(t.behavioral)
+    // insurance policy) is an obligation however regular it looks. Holds even when the
+    // classification is wrong or missing — the likely state on a fresh import.
+    t.ledgerItemId === null && !isSuspense(t.categoryKey) && canCancel(t.categoryKey)
   );
 }
 
@@ -134,18 +146,24 @@ export function countExcludedRecurring(txns: OpportunityTxn[]): {
     if (t.status !== "BOOKED" || t.amountBase === null || t.amountBase >= 0) continue;
     if (t.merchantKey === null) continue;
     if (t.behavioral === "TRANSFER" || t.behavioral === "SAVINGS_FLOW") continue;
-    const suspense = t.categoryKey === null || t.categoryKey === UNCLASSIFIED_KEY || t.categoryKey.startsWith("other.");
-    if (suspense || t.behavioral === null) unclassified += 1;
-    else if (t.ledgerItemId !== null || t.behavioral === "FIXED_CONTRACTUAL" || isProtectedCategory(t.categoryKey))
-      contractual += 1;
+    if (isSuspense(t.categoryKey)) unclassified += 1;
+    else if (!canCancel(t.categoryKey) || t.ledgerItemId !== null) contractual += 1;
   }
   return { contractual, unclassified };
 }
 
-export function clusterSubscriptions(txns: OpportunityTxn[], asOf: Date): SubscriptionCluster[] {
+/**
+ * Pure cadence detection — NO policy. Split out in M40b because `analyzeRenegotiation`
+ * needs the same monthly-cluster logic over a DIFFERENT eligible set. When the two were
+ * one function, renegotiation silently returned nothing: it filtered for `renegotiable`
+ * categories and then handed them to a clusterer that required `cancellable`, which is the
+ * exact complement. A shared helper that quietly re-applies one caller's policy to another
+ * caller's data cannot work.
+ */
+export function clusterRecurring(txns: OpportunityTxn[], asOf: Date): SubscriptionCluster[] {
   const byMerchant = new Map<string, OpportunityTxn[]>();
   for (const t of txns) {
-    if (!eligible(t)) continue;
+    if (!isRecurringShape(t)) continue;
     const key = t.merchantKey!;
     byMerchant.set(key, [...(byMerchant.get(key) ?? []), t]);
   }
@@ -184,6 +202,11 @@ export function clusterSubscriptions(txns: OpportunityTxn[], asOf: Date): Subscr
   return clusters.sort((a, b) => b.monthlyBase - a.monthlyBase);
 }
 
+/** Recurring clusters the household could stop paying entirely. */
+export function clusterSubscriptions(txns: OpportunityTxn[], asOf: Date): SubscriptionCluster[] {
+  return clusterRecurring(txns.filter(subscriptionEligible), asOf);
+}
+
 export function analyzeSubscriptions(input: OpportunityInput): OpportunityFinding[] {
   const dormantDays = input.assumptions.subscriptionDormantDays;
   const clusters = clusterSubscriptions(input.transactions, input.asOf);
@@ -195,6 +218,12 @@ export function analyzeSubscriptions(input: OpportunityInput): OpportunityFindin
     (c) => c.daysRunning >= dormantDays && c.daysSinceLastCharge <= MAX_GAP_DAYS * 2,
   );
   if (candidates.length === 0) return [];
+
+  // M40b materiality floor. A card costs the owner attention; below the registry floor
+  // the saving does not repay reading it. Applied to the TOTAL, not per-merchant, so
+  // several small charges can still add up to something worth a look.
+  const gross = candidates.reduce((s, c) => s + c.monthlyBase, 0);
+  if (gross < input.assumptions.minMonthlyBase) return [];
 
   const monthlyTotal = round2(candidates.reduce((s, c) => s + c.monthlyBase, 0));
   const excluded = countExcludedRecurring(input.transactions);

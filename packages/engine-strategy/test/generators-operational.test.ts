@@ -80,13 +80,54 @@ const review: Finding = {
   evidenceItemIds: [],
 };
 
-const ALL = [leakage, subs, statutory, review];
+const renegotiate: Finding = {
+  code: "OPERATIONAL_RENEGOTIABLE_COMMITMENTS",
+  severity: "NOTICE",
+  metrics: {
+    commitmentCount: 2,
+    monthlyTotalBase: 708.23,
+    annualTotalBase: 8498.76,
+    largestMerchant: "מגדל_מבטחים_חיים",
+    largestMonthlyBase: 510.23,
+    largestGroup: "INSURANCE",
+    groups: "INSURANCE:510.23, TELECOM:198",
+    merchants: "מגדל_מבטחים_חיים:510.23, בזק_הוראת_קבע:198",
+  },
+  evidenceItemIds: [],
+};
+
+const ALL = [leakage, subs, renegotiate, statutory, review];
 
 describe("operational generators", () => {
   it("maps every analyzer code — an unmapped operational finding is a bug, not a warning", () => {
     const { drafts, unmappedFindings } = generateOperationalRecommendations(ALL, ASOF);
     expect(unmappedFindings).toEqual([]);
-    expect(drafts).toHaveLength(4);
+    expect(drafts).toHaveLength(5);
+  });
+
+  it("NEVER claims current spend as a saving on a renegotiation card", () => {
+    // The impact columns feed the Opportunity Center's headline "proposed savings" total.
+    // Renegotiation knows the SPEND, not the saving — WealthOS has no market rate for a
+    // mobile plan or an insurance policy. Putting spend there would claim the whole bill
+    // as recoverable: the M40a mistake in a different costume.
+    const d = generateOperationalRecommendations([renegotiate], ASOF).drafts[0]!;
+    expect(d.impactMonthlyBase).toBeNull();
+    expect(d.impactAnnualBase).toBeNull();
+    expect(d.impactEoyBase).toBeNull();
+    expect(d.rationale.sensitivity).toMatch(/not an estimated saving/i);
+    expect(d.rationaleHe.sensitivity).toMatch(/אינו אומדן חיסכון/);
+  });
+
+  it("never tells the owner to cancel insurance cover", () => {
+    // engine-strategy's insurance analyzer checks for coverage GAPS on the same policy.
+    const d = generateOperationalRecommendations([renegotiate], ASOF).drafts[0]!;
+    const allText = [
+      d.title, d.titleHe, d.rationale.why, d.rationaleHe.why,
+      ...d.actionItems, ...d.actionItemsHe,
+      ...d.rationale.alternatives, ...d.rationaleHe.alternatives,
+    ].join(" ");
+    expect(allText).not.toMatch(/\bcancel\b/i);
+    expect(allText).not.toMatch(/לבטל|ביטול/);
   });
 
   it("emits a FULL bilingual rationale that satisfies the same schema as strategy", () => {

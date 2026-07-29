@@ -78,6 +78,9 @@ export const DEFAULT_ASSUMPTIONS: Array<{
   { key: "leakage_bank_fee_monthly_notice_base", value: 40, unit: "ILS", description: "Monthly bank fees (amlot) above which fee drag is flagged" },
   { key: "safe_to_spend_window_days", value: 30, unit: "DAYS", description: "Horizon for the Discretionary Liquidity Floor (Safe-to-Spend) calculation" },
   { key: "calendar_upcoming_window_days", value: 60, unit: "DAYS", description: "Horizon for 'upcoming financial deadlines' on the dashboard and in the liquidity forecast" },
+  // M40b: a card costs the owner attention. M40a shipped a full bilingual card with three
+  // action steps for a 6 ILS/month parking charge — the reading cost exceeded the saving.
+  { key: "opportunity_min_monthly_base", value: 25, unit: "ILS", description: "Minimum recurring monthly amount (summed across a finding) below which an operational opportunity is not worth surfacing as a card" },
   { key: "operations_surplus_drift_pct", value: 20, unit: "PCT", description: "Deviation of realised monthly surplus from the approved plan's assumption that raises a monitoring alert" },
   {
     key: "health_score_weights",

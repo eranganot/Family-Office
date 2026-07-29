@@ -32,6 +32,7 @@ export {
   OPPORTUNITY_ANALYZERS,
   analyzeLeakage,
   analyzeSubscriptions,
+  analyzeRenegotiation,
   analyzeDeadlines,
   bucketDragByMonth,
   clusterSubscriptions,

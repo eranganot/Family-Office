@@ -229,6 +229,99 @@ const OPERATIONAL_GENERATORS: Record<string, (f: Finding, asOf: Date) => Body | 
     };
   },
 
+  // No `asOf`: this generator leaves every impact column null, so there is no end-of-year
+  // figure to derive. See the impactMonthlyBase comment below for why.
+  OPERATIONAL_RENEGOTIABLE_COMMITMENTS: (f) => {
+    const monthly = num(f.metrics["monthlyTotalBase"]);
+    const annual = num(f.metrics["annualTotalBase"]);
+    const count = num(f.metrics["commitmentCount"]);
+    // NOTE: no saving is estimated anywhere below. WealthOS does not know the market rate
+    // for the owner's mobile plan or his insurance cover, and a "you could save 30%" figure
+    // would be exactly the confident-wrong number M40a already shipped once. The observed
+    // SPEND is real; the saving is explicitly unknown until he gets a quote.
+    const rationale: Rationale = {
+      why: `${count} recurring commitment(s) costing ${nis(monthly)} a month (${nis(annual)} a year) are of a kind you can keep and pay less for — ${f.metrics["groups"]}. These renew silently, and a contract that has rolled over for years is usually priced above what the same supplier offers a new customer. The largest is ${f.metrics["largestMerchant"]} at ${nis(f.metrics["largestMonthlyBase"])} a month.`,
+      benefits: [
+        "Keeps the service and the cover exactly as they are — only the price changes",
+        "A single call or comparison usually covers a whole group at once",
+        "Any reduction is permanent and already after tax",
+      ],
+      risks: [
+        "A cheaper quote can hide reduced cover or a shorter commitment window — compare terms, not just the monthly figure",
+        "Switching supplier can involve a setup fee or a transition gap",
+      ],
+      tradeoffs: [
+        "Comparing and negotiating takes owner time",
+        "A longer lock-in usually buys a lower price, at the cost of flexibility",
+      ],
+      taxImplications: "None. Reducing a household bill is not a taxable event.",
+      liquidityImplications: "Any reduction shows up directly in monthly free cash flow.",
+      timeHorizon: "SHORT",
+      sensitivity: `This figure is your CURRENT spend, observed from ${count} recurring charge(s) — it is not an estimated saving. WealthOS does not know the market rate for these services, so how much (if anything) comes off is only known once you have a competing quote.`,
+      alternatives: [
+        "Ask the current supplier to match a competitor before switching — usually the fastest route",
+        "Renegotiate only the largest one and re-measure next month",
+        "For insurance, ask to reprice the SAME cover rather than changing it",
+      ],
+      expectedImpact: `Put ${nis(monthly)} a month of recurring spend up for repricing.`,
+    };
+    const rationaleHe: Rationale = {
+      why: `${count} התחייבויות חוזרות בעלות ${nis(monthly)} לחודש (${nis(annual)} לשנה) הן מסוג שאפשר להשאיר ולשלם עליו פחות — ${f.metrics["groups"]}. הן מתחדשות בשקט, וחוזה שמתגלגל שנים מתומחר בדרך כלל מעל מה שאותו ספק מציע ללקוח חדש. הגדולה ביותר היא ${f.metrics["largestMerchant"]} בסך ${nis(f.metrics["largestMonthlyBase"])} לחודש.`,
+      benefits: [
+        "השירות והכיסוי נשארים בדיוק כפי שהם — רק המחיר משתנה",
+        "שיחה אחת או השוואה אחת מכסות בדרך כלל קבוצה שלמה",
+        "כל הפחתה היא קבועה וכבר אחרי מס",
+      ],
+      risks: [
+        "הצעה זולה יותר עלולה להסתיר כיסוי מצומצם או תקופת התחייבות קצרה — השוו תנאים, לא רק את הסכום החודשי",
+        "מעבר ספק עשוי לכלול דמי התקנה או פער במעבר",
+      ],
+      tradeoffs: [
+        "השוואה ומשא ומתן גוזלים זמן",
+        "התחייבות ארוכה יותר בדרך כלל קונה מחיר נמוך יותר, במחיר גמישות",
+      ],
+      taxImplications: "אין. הפחתת חשבון ביתי אינה אירוע מס.",
+      liquidityImplications: "כל הפחתה מופיעה ישירות בתזרים החודשי הפנוי.",
+      timeHorizon: "SHORT",
+      sensitivity: `הסכום הזה הוא ההוצאה הנוכחית שלכם, שנצפתה מ-${count} חיובים חוזרים — הוא אינו אומדן חיסכון. ל-WealthOS אין נתונים על מחיר השוק לשירותים האלה, ולכן כמה (אם בכלל) יירד יתברר רק מול הצעה מתחרה.`,
+      alternatives: [
+        "לבקש מהספק הנוכחי להשוות להצעה מתחרה לפני מעבר — בדרך כלל המסלול המהיר ביותר",
+        "לנהל משא ומתן רק על הגדולה ביותר ולמדוד מחדש בחודש הבא",
+        "בביטוח — לבקש תמחור מחדש של אותו כיסוי, לא שינוי שלו",
+      ],
+      expectedImpact: `להעמיד ${nis(monthly)} לחודש של הוצאה חוזרת לתמחור מחדש.`,
+    };
+    return {
+      type: "RENEGOTIATE_RECURRING_COMMITMENTS",
+      title: `Reprice ${count} recurring commitment(s) costing ${nis(monthly)}/month`,
+      titleHe: `לתמחר מחדש ${count} התחייבויות חוזרות בעלות ${nis(monthly)} לחודש`,
+      rationale,
+      rationaleHe,
+      subscores: {
+        impact: Math.min(70, Math.round(monthly / 20)),
+        ease: 60,
+        taxBenefit: 0,
+        riskReduction: 10,
+        goalContribution: 40,
+        urgency: 30,
+      },
+      confidence: 60, // the spend is observed; the saving is not, and the score says so
+      evidenceItemIds: f.evidenceItemIds,
+      goalTypesImproved: ["FINANCIAL_INDEPENDENCE"],
+      assumptionKeysUsed: ["opportunity_min_monthly_base"],
+      cadence: "ANNUAL",
+      difficulty: "MODERATE",
+      reversibility: "REVERSIBLE",
+      // Deliberately null: the impact columns feed the Opportunity Center's headline
+      // "proposed savings" total, and putting current SPEND there would claim the whole
+      // bill as a saving. That is the M40a mistake in a different costume.
+      impactMonthlyBase: null,
+      impactAnnualBase: null,
+      impactEoyBase: null,
+      expiresAtISO: null,
+    };
+  },
+
   OPERATIONAL_STATUTORY_DEADLINE_NEAR: (f) => {
     const days = num(f.metrics["nearestDaysAway"]);
     const cash = num(f.metrics["cashImpactBase"]);
@@ -421,6 +514,20 @@ const OPERATIONAL_ACTION_ITEMS: Record<
       `עברו על ${m["subscriptionCount"]} החיובים (${m["merchants"]}) וסמנו כל אחד: להשאיר, להוריד מסלול, או לבטל.`,
       `התחילו מ-${m["largestMerchant"]} בסך ${nis(m["largestMonthlyBase"])} לחודש — זו ההחלטה הגדולה ביותר כאן.`,
       `בטלו מול הספק ישירות, ואז ודאו בחודש הבא שהחיוב אכן פסק; ביטול שלא נקלט נראה זהה עד שמגיע הדף.`,
+    ],
+  }),
+  OPERATIONAL_RENEGOTIABLE_COMMITMENTS: (m) => ({
+    actionItems: [
+      `Get one competing quote for ${m["largestMerchant"]} (${nis(m["largestMonthlyBase"])}/month) — the largest of the ${m["commitmentCount"]} listed.`,
+      `Call your current supplier with that quote and ask them to match it. Say you are comparing; a rolled-over contract is priced for someone who never asks.`,
+      `For insurance, ask to reprice the SAME cover — do not reduce it. Whether your cover is adequate is a separate question the strategy engine tracks.`,
+      `Re-check next month: the charge in Operations → Transactions should be lower, and if it is not, the new price was never applied.`,
+    ],
+    actionItemsHe: [
+      `השיגו הצעה מתחרה אחת ל-${m["largestMerchant"]} (${nis(m["largestMonthlyBase"])} לחודש) — הגדולה מבין ${m["commitmentCount"]} שברשימה.`,
+      `התקשרו לספק הנוכחי עם ההצעה ובקשו שישווה. אמרו שאתם משווים; חוזה שמתגלגל מתומחר למי שלא שואל.`,
+      `בביטוח — בקשו תמחור מחדש של אותו כיסוי, אל תקטינו אותו. השאלה אם הכיסוי מספיק היא שאלה נפרדת שמנוע האסטרטגיה עוקב אחריה.`,
+      `בדקו בחודש הבא: החיוב בתפעול ← תנועות אמור לרדת, ואם לא — המחיר החדש לא יושם.`,
     ],
   }),
   OPERATIONAL_STATUTORY_DEADLINE_NEAR: (m) => ({

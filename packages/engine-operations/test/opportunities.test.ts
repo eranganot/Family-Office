@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeDeadlines,
   analyzeLeakage,
+  analyzeRenegotiation,
   analyzeSubscriptions,
   clusterSubscriptions,
   runOpportunityAnalyzers,
@@ -18,6 +19,7 @@ const A: OpportunityAssumptions = {
   leakageFeeNoticeBase: 40,
   subscriptionDormantDays: 90,
   calendarWindowDays: 60,
+  minMonthlyBase: 25,
 };
 
 function txn(p: Partial<OpportunityTxn> & { bookedAt: Date; amountBase: number | null }): OpportunityTxn {
@@ -26,7 +28,7 @@ function txn(p: Partial<OpportunityTxn> & { bookedAt: Date; amountBase: number |
     status: "BOOKED",
     // A benign, genuinely-subscribable default. It must NOT be null or the suspense
     // bucket: both are now refused outright, which is the point of the second fix.
-    categoryKey: "leisure.subscriptions",
+    categoryKey: "utilities.subscriptions",
     behavioral: "VARIABLE_DISCRETIONARY",
     merchantKey: null,
     isRecurringCandidate: false,
@@ -152,9 +154,19 @@ describe("subscription analyzer", () => {
     expect(stale).toEqual([]);
   });
 
-  it("excludes transfers and savings flows", () => {
-    const rows = monthly("pension", 1000, 6).map((t) => ({ ...t, behavioral: "SAVINGS_FLOW" as const }));
-    expect(analyzeSubscriptions(input({ transactions: rows }))).toEqual([]);
+  it("excludes transfers and savings flows structurally, whatever the category says", () => {
+    // Not a policy question: a movement between the household's own accounts, or a pension
+    // contribution, is not an expense at all (D7). It can be neither cancelled nor repriced.
+    // The category is deliberately a cancellable one here, to prove behaviour still wins.
+    for (const behavioral of ["SAVINGS_FLOW", "TRANSFER"] as const) {
+      const rows = monthly("pension", 1000, 6).map((t) => ({
+        ...t,
+        behavioral,
+        categoryKey: "utilities.subscriptions",
+      }));
+      expect(analyzeSubscriptions(input({ transactions: rows }))).toEqual([]);
+      expect(analyzeRenegotiation(input({ transactions: rows }))).toEqual([]);
+    }
   });
 
   // ------------------------------------------------------------------
@@ -167,8 +179,8 @@ describe("subscription analyzer", () => {
     const mortgage = monthly("פועלים_משכנתא", 15071.52, 6).map((t) => ({
       ...t,
       behavioral: "FIXED_CONTRACTUAL" as const,
+      categoryKey: "housing.mortgage",
     }));
-    expect(clusterSubscriptions(mortgage, ASOF)).toEqual([]);
     expect(analyzeSubscriptions(input({ transactions: mortgage }))).toEqual([]);
   });
 
@@ -176,10 +188,12 @@ describe("subscription analyzer", () => {
     const life = monthly("מגדל_מבטחים_חיים", 510.23, 6).map((t) => ({
       ...t,
       behavioral: "FIXED_CONTRACTUAL" as const,
+      categoryKey: "insurance.life",
     }));
     const dental = monthly("הראל_ביטוח_שיניים", 303.82, 6).map((t) => ({
       ...t,
       behavioral: "FIXED_CONTRACTUAL" as const,
+      categoryKey: "insurance.health",
     }));
     expect(analyzeSubscriptions(input({ transactions: [...life, ...dental] }))).toEqual([]);
   });
@@ -196,14 +210,16 @@ describe("subscription analyzer", () => {
     expect(analyzeSubscriptions(input({ transactions: linked }))).toEqual([]);
   });
 
-  it("refuses to judge an UNCLASSIFIED recurring charge", () => {
+  it("refuses to judge a charge with NO category at all", () => {
     // Silence beats a confident wrong instruction: we cannot tell a streaming service
     // from a tuition payment before it is classified.
     const unknown = monthly("unknown_merchant", 400, 6).map((t) => ({
       ...t,
       behavioral: null,
+      categoryKey: null,
     }));
     expect(analyzeSubscriptions(input({ transactions: unknown }))).toEqual([]);
+    expect(analyzeRenegotiation(input({ transactions: unknown }))).toEqual([]);
   });
 
   // ------------------------------------------------------------------
@@ -262,7 +278,7 @@ describe("subscription analyzer", () => {
     }));
     const streaming = monthly("streaming_svc", 55, 6).map((t) => ({
       ...t,
-      categoryKey: "leisure.subscriptions",
+      categoryKey: "utilities.subscriptions",
     }));
     const f = analyzeSubscriptions(input({ transactions: [...insurance, ...streaming] }));
     expect(f).toHaveLength(1);
@@ -273,29 +289,113 @@ describe("subscription analyzer", () => {
   });
 
   it("still finds the real subscriptions mixed in beside the obligations", () => {
-    // The owner's actual July data: a mortgage and two insurance policies that must be
-    // excluded, plus two genuinely reviewable recurring services that must survive.
+    // The owner's actual July data. Mortgage and insurance must be excluded; Bezeq is
+    // repriceable-not-cancellable so it belongs to the renegotiation analyzer, not here;
+    // only the genuine digital subscription survives.
     const mortgage = monthly("פועלים_משכנתא", 15071.52, 6).map((t) => ({
       ...t,
       behavioral: "FIXED_CONTRACTUAL" as const,
+      categoryKey: "housing.mortgage",
     }));
     const dental = monthly("הראל_ביטוח_שיניים", 303.82, 6).map((t) => ({
       ...t,
       behavioral: "FIXED_CONTRACTUAL" as const,
+      categoryKey: "insurance.health",
     }));
-    const bezeq = monthly("בזק_הוראת_קבע", 198, 6);
-    const service = monthly("ht_waerermore", 380, 6);
+    const bezeq = monthly("בזק_הוראת_קבע", 198, 6).map((t) => ({
+      ...t,
+      categoryKey: "housing.internet_tv",
+    }));
+    const service = monthly("ht_waerermore", 380, 6).map((t) => ({
+      ...t,
+      categoryKey: "utilities.cloud_software",
+    }));
 
     const f = analyzeSubscriptions(
       input({ transactions: [...mortgage, ...dental, ...bezeq, ...service] }),
     );
     expect(f).toHaveLength(1);
-    expect(Number(f[0]!.metrics["subscriptionCount"])).toBe(2);
-    // 578, not 16,794.
-    expect(Number(f[0]!.metrics["monthlyTotalBase"])).toBeCloseTo(578, 2);
+    expect(Number(f[0]!.metrics["subscriptionCount"])).toBe(1);
+    // 380, not 16,794.
+    expect(Number(f[0]!.metrics["monthlyTotalBase"])).toBeCloseTo(380, 2);
     expect(String(f[0]!.metrics["merchants"])).not.toContain("משכנתא");
     // The exclusion is reported, not silent.
     expect(Number(f[0]!.metrics["excludedContractual"])).toBeGreaterThan(0);
+  });
+
+  it("suppresses a card below the registry materiality floor", () => {
+    // M40a shipped a full bilingual card with three action steps for a ₪6/month parking
+    // charge. The reading cost exceeded the saving.
+    const parking = monthly("חניון_גבעתיים", 6, 6);
+    expect(analyzeSubscriptions(input({ transactions: parking }))).toEqual([]);
+    // ...but several small charges that ADD UP still earn one.
+    const many = [
+      ...monthly("svc_a", 10, 6),
+      ...monthly("svc_b", 10, 6),
+      ...monthly("svc_c", 10, 6),
+    ];
+    expect(analyzeSubscriptions(input({ transactions: many }))).toHaveLength(1);
+  });
+});
+
+describe("renegotiation analyzer", () => {
+  const monthly = (merchant: string, amt: number, months: number, categoryKey: string): OpportunityTxn[] =>
+    Array.from({ length: months }, (_, i) =>
+      txn({
+        bookedAt: new Date(Date.UTC(2026, 7 - 1 - (months - 1 - i), 12)),
+        amountBase: -amt,
+        merchantKey: merchant,
+        categoryKey,
+      }),
+    );
+
+  it("picks up the repriceable commitments the subscription analyzer must not touch", () => {
+    const f = analyzeRenegotiation(
+      input({
+        transactions: [
+          ...monthly("מגדל_מבטחים_חיים", 510.23, 6, "insurance.life"),
+          ...monthly("בזק_הוראת_קבע", 198, 6, "housing.internet_tv"),
+        ],
+      }),
+    );
+    expect(f).toHaveLength(1);
+    expect(f[0]!.code).toBe("OPERATIONAL_RENEGOTIABLE_COMMITMENTS");
+    expect(Number(f[0]!.metrics["commitmentCount"])).toBe(2);
+    expect(Number(f[0]!.metrics["monthlyTotalBase"])).toBeCloseTo(708.23, 2);
+    expect(String(f[0]!.metrics["groups"])).toContain("INSURANCE");
+    expect(String(f[0]!.metrics["groups"])).toContain("TELECOM");
+  });
+
+  it("NEVER includes a mortgage, tax or unclassified row", () => {
+    const f = analyzeRenegotiation(
+      input({
+        transactions: [
+          ...monthly("פועלים_משכנתא", 15071.52, 6, "housing.mortgage"),
+          ...monthly("mas", 900, 6, "taxes.bituach_leumi"),
+          ...monthly("unknown", 700, 6, "other.unclassified"),
+        ],
+      }),
+    );
+    expect(f).toEqual([]);
+  });
+
+  it("respects the materiality floor", () => {
+    expect(analyzeRenegotiation(input({ transactions: monthly("tiny", 5, 6, "utilities.mobile") }))).toEqual([]);
+  });
+
+  it("does not share the subscription analyzer's eligibility filter", () => {
+    // The M40b bug this catches: analyzeRenegotiation called clusterSubscriptions, which
+    // re-applies `cancellable` — the exact complement of `renegotiable` — so it could
+    // never return anything. cancellable and renegotiable sets must stay disjoint here.
+    const insuranceOnly = monthly("מגדל_מבטחים_חיים", 510.23, 6, "insurance.life");
+    expect(analyzeSubscriptions(input({ transactions: insuranceOnly }))).toEqual([]);
+    expect(analyzeRenegotiation(input({ transactions: insuranceOnly }))).toHaveLength(1);
+
+    // ...and the two cards are DISJOINT: a cancellable item belongs to subscriptions only,
+    // so the same merchant never appears twice and cannot be actioned twice.
+    const streamingOnly = monthly("streaming", 55, 6, "utilities.subscriptions");
+    expect(analyzeSubscriptions(input({ transactions: streamingOnly }))).toHaveLength(1);
+    expect(analyzeRenegotiation(input({ transactions: streamingOnly }))).toEqual([]);
   });
 });
 

@@ -40,6 +40,8 @@ export {
   flattenCategoryTree,
 } from "./operations/categories";
 export type { SeedCategory, BehavioralClassKey, CategoryAxisKey } from "./operations/categories";
+export { commitmentPolicy, canCancel, canRenegotiate } from "./operations/commitment-policy";
+export type { CommitmentPolicy } from "./operations/commitment-policy";
 export { MERCHANT_RULES, MERCHANT_RULES_VERSION } from "./operations/merchant-rules";
 export type { MerchantRule } from "./operations/merchant-rules";
 export { normalizeMerchantKey, IL_TXN_LEXICON } from "./operations/merchant-key";
