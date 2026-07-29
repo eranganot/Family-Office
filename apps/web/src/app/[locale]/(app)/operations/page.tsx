@@ -20,6 +20,8 @@ import {
   undoImportAction,
   uploadStatementAction,
   upsertCategoryAction,
+  runOpportunitiesAction,
+  setOpportunityStatusAction,
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
 import { CategoryPicker, type PickerCategory } from "../../../../components/operations/category-picker";
@@ -51,6 +53,7 @@ export default async function OperationsPage({
     mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string; reused?: string;
     y?: string; m?: string; cat?: string; beh?: string; dupesRemoved?: string;
     calendarBuilt?: string; calendarUpdated?: string; recurringSaved?: string; suggestApplied?: string; cw?: string;
+    oppsRun?: string; oppsUpdated?: string; oppsUnreviewed?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -97,6 +100,10 @@ export default async function OperationsPage({
     .upcoming({ windowDays: calWindow })
     .catch(() => null);
   const recurring = await trpc.operations.recurring.list().catch(() => []);
+  // M40a — the Opportunity Center. Like the calendar, reading NEVER generates: the
+  // list is whatever the last explicit run produced, so a page refresh cannot
+  // silently supersede the owner's inbox.
+  const opps = await trpc.operations.opportunities.list().catch(() => null);
   const { year, month, row: periodRow, computed } = period;
   const diag = await trpc.operations.diagnostics.month({ year, month }).catch(() => null);
   const flow = computed.flow;
@@ -673,6 +680,146 @@ export default async function OperationsPage({
 
       <div id="suspense" />
       {/* ---------------------------------------------------------- M39 --- */}
+      <div id="opportunities" />
+      <Card title={t("oppsTitle")}>
+        <p className="mb-4 text-xs text-neutral-500">{t("oppsHint")}</p>
+
+        <SuccessBanner message={sp.oppsRun ? t("oppsRun", { n: sp.oppsRun }) : undefined} />
+        <SuccessBanner message={sp.oppsUpdated ? tf("saved") : undefined} />
+        {sp.oppsUnreviewed ? (
+          <p className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            {t("oppsUnreviewedTax")}
+          </p>
+        ) : null}
+
+        <div className="mb-4 flex flex-wrap items-center gap-4">
+          <form action={runOpportunitiesAction}>
+            <input type="hidden" name="locale" value={locale} />
+            <SubmitButton label={t("oppsRecompute")} />
+          </form>
+          {opps && opps.items.length > 0 ? (
+            <span className="text-xs text-neutral-500">
+              {t("oppsTotals", {
+                monthly: formatMoney(opps.totalMonthlyBase, baseCurrency, loc),
+                annual: formatMoney(opps.totalAnnualBase, baseCurrency, loc),
+              })}
+            </span>
+          ) : null}
+        </div>
+
+        {opps && opps.items.length > 0 ? (
+          <ul className="space-y-4">
+            {opps.items.map((o) => {
+              const rat = (loc === "he" ? o.rationaleHe : o.rationale) as {
+                why?: string;
+                risks?: string[];
+                tradeoffs?: string[];
+              } | null;
+              const acts = o.actionItems as { en?: string[]; he?: string[] } | null;
+              const steps = (loc === "he" ? acts?.he : acts?.en) ?? [];
+              // An expiring opportunity is the only kind that gets smaller by waiting,
+              // so proximity is shown on the card rather than buried in the rationale.
+              const expiry =
+                o.daysUntilExpiry === null
+                  ? null
+                  : o.daysUntilExpiry < 0
+                    ? t("oppsExpired")
+                    : o.daysUntilExpiry === 0
+                      ? t("dueToday")
+                      : t("oppsExpiresIn", { n: o.daysUntilExpiry });
+              return (
+                <li key={o.id} className="rounded border border-neutral-200 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <h3 className="text-sm font-semibold">
+                      {loc === "he" ? (o.titleHe ?? o.title) : o.title}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {o.status !== "PROPOSED" ? (
+                        <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                          {t(`oppsStatus.${o.status}`)}
+                        </span>
+                      ) : null}
+                      {expiry ? (
+                        <span
+                          className={`rounded px-2 py-0.5 ${
+                            (o.daysUntilExpiry ?? 99) <= 14
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-neutral-100 text-neutral-500"
+                          }`}
+                        >
+                          {expiry}
+                        </span>
+                      ) : null}
+                      <span className="rounded bg-neutral-100 px-2 py-0.5 text-neutral-500">
+                        {t(`oppsDifficulty.${o.difficulty ?? "MODERATE"}`)}
+                      </span>
+                      <span className="rounded bg-neutral-100 px-2 py-0.5 text-neutral-500">
+                        {t(`oppsCadence.${o.cadence}`)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {o.impactMonthlyBase !== null || o.impactAnnualBase !== null ? (
+                    <p className="mt-2 text-xs tabular-nums text-neutral-600">
+                      {t("oppsImpact", {
+                        monthly: formatMoney(o.impactMonthlyBase ?? 0, baseCurrency, loc),
+                        annual: formatMoney(o.impactAnnualBase ?? 0, baseCurrency, loc),
+                        eoy: formatMoney(o.impactEoyBase ?? 0, baseCurrency, loc),
+                      })}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-neutral-500">{t("oppsNoCashImpact")}</p>
+                  )}
+
+                  {rat?.why ? <p className="mt-2 text-sm text-neutral-700">{rat.why}</p> : null}
+
+                  {steps.length > 0 ? (
+                    <ol className="mt-3 list-inside list-decimal space-y-1 text-sm text-neutral-700">
+                      {steps.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
+                    </ol>
+                  ) : null}
+
+                  <div className="mt-3">
+                    <Explainer
+                      title={t("oppsWhyNot")}
+                      paragraphs={[
+                        ...(rat?.risks ?? []),
+                        ...(rat?.tradeoffs ?? []),
+                        t("oppsConfidence", { n: o.confidenceScore, p: o.priorityScore }),
+                      ]}
+                    />
+                  </div>
+
+                  {o.status === "PROPOSED" ? (
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {(["ACCEPTED", "IMPLEMENTED", "REJECTED"] as const).map((st) => (
+                        <form key={st} action={setOpportunityStatusAction} className="inline">
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="id" value={o.id} />
+                          <input type="hidden" name="status" value={st} />
+                          <button
+                            type="submit"
+                            className={`text-xs underline ${
+                              st === "REJECTED" ? "text-neutral-500" : "text-emerald-700"
+                            }`}
+                          >
+                            {t(`oppsAction.${st}`)}
+                          </button>
+                        </form>
+                      ))}
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm text-neutral-500">{opps ? t("oppsEmpty") : t("oppsNeverRun")}</p>
+        )}
+      </Card>
+
       <div id="calendar" />
       <Card title={t("calendarTitle")}>
         <p className="mb-4 text-xs text-neutral-500">{t("calendarHint")}</p>

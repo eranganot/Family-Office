@@ -14,6 +14,15 @@ export type { DeploymentPlans, DeploymentVariant, DeploymentVariantKey, Deployme
 export type { ActionItems } from "./action-items";
 export { scorePriority } from "./scoring";
 export type { PriorityWeights } from "./scoring";
+// --- M40a: operational cadence ---
+export { generateOperationalRecommendations, operationalActionItemsFor } from "./generators-operational";
+export type {
+  OperationalDraft,
+  OperationalGenerationResult,
+  OperationalCadence,
+  OperationalDifficulty,
+  OperationalReversibility,
+} from "./generators-operational";
 export { evaluateGate } from "./gate";
 export type { GateResult, GateThresholds, DataGapReport } from "./gate";
 export { synthesizeStrategy } from "./synthesis";

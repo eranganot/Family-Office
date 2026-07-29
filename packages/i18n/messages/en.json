@@ -1397,6 +1397,48 @@
     "filterAll": "All",
     "filterApply": "Filter",
     "filterClear": "clear filter",
+    "oppsTitle": "Opportunity Center",
+    "oppsHint": "Operational opportunities computed from your imported transactions and your calendar — separate from the strategy inbox, and on a monthly rather than annual cadence. Nothing is generated when you open this page; press recompute.",
+    "oppsRecompute": "Recompute opportunities",
+    "oppsRun": "Recomputed — {n} opportunity(ies) proposed.",
+    "oppsUnreviewedTax": "Some figures behind these opportunities come from tax matrices you have not yet reviewed. Confirm them in Registry before relying on the amounts.",
+    "oppsTotals": "Proposed savings: {monthly} / month · {annual} / year",
+    "oppsImpact": "Impact: {monthly} per month · {annual} per year · {eoy} by 31 December",
+    "oppsNoCashImpact": "No recurring cash impact — the cost of ignoring this is a missed date, not an outflow.",
+    "oppsExpiresIn": "expires in {n} day(s)",
+    "oppsExpired": "expired",
+    "oppsWhyNot": "Risks and trade-offs",
+    "oppsConfidence": "Confidence {n}/100 · priority {p}",
+    "oppsEmpty": "No open opportunities. Recompute after your next statement import.",
+    "oppsNeverRun": "Not computed yet. Press recompute to analyse your transactions and calendar.",
+    "oppsStatus": {
+      "PROPOSED": "Proposed",
+      "ACCEPTED": "Accepted",
+      "REJECTED": "Rejected",
+      "IMPLEMENTED": "Done",
+      "SUPERSEDED": "Superseded",
+      "INVALIDATED": "Invalidated"
+    },
+    "oppsAction": {
+      "ACCEPTED": "Accept",
+      "IMPLEMENTED": "Mark done",
+      "REJECTED": "Not for us"
+    },
+    "oppsDifficulty": {
+      "TRIVIAL": "Trivial",
+      "EASY": "Easy",
+      "MODERATE": "Moderate",
+      "HARD": "Hard"
+    },
+    "oppsCadence": {
+      "ONE_TIME": "One-time",
+      "WEEKLY": "Weekly",
+      "MONTHLY": "Monthly",
+      "QUARTERLY": "Quarterly",
+      "SEMI_ANNUAL": "Twice a year",
+      "ANNUAL": "Annual",
+      "EVENT_DRIVEN": "Date-driven"
+    },
     "calendarTitle": "Financial calendar",
     "calendarHint": "Statutory deadlines, recurring reviews you have dated, and instalments already committed on your cards. Nothing here is a guess: template reviews stay inactive until you supply the date.",
     "calendarRebuild": "Rebuild calendar",

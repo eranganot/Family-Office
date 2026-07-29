@@ -12,6 +12,48 @@ import { str } from "./form-helpers";
  * the user into the strategic phase gate.
  */
 
+/**
+ * M40a — recompute operational opportunities from the current transactions and
+ * calendar. Reports the count AND whether any figure rests on an unreviewed tax
+ * matrix: a saving derived from unverified 2026 ceilings must say so rather than
+ * look identical to one derived from approved figures.
+ */
+export async function runOpportunitiesAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  let created = 0;
+  let unreviewed = false;
+  try {
+    const r = await trpc.operations.opportunities.run();
+    created = r.created;
+    unreviewed = r.usesUnreviewedTaxFigures;
+  } catch {
+    redirect(`/${locale}/operations?error=opportunities#opportunities`);
+  }
+  redirect(
+    `/${locale}/operations?oppsRun=${created}${unreviewed ? "&oppsUnreviewed=1" : ""}#opportunities`,
+  );
+}
+
+/** M40a — owner decision on one opportunity. Journalled server-side in one transaction. */
+export async function setOpportunityStatusAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const id = str(fd, "id");
+  const status = str(fd, "status") as "ACCEPTED" | "REJECTED" | "IMPLEMENTED";
+  const note = fd.get("note");
+  const trpc = await serverCaller();
+  try {
+    await trpc.operations.opportunities.setStatus({
+      id,
+      status,
+      ...(typeof note === "string" && note.trim().length > 0 ? { note: note.trim() } : {}),
+    });
+  } catch {
+    redirect(`/${locale}/operations?error=opportunity#opportunities`);
+  }
+  redirect(`/${locale}/operations?oppsUpdated=1#opportunities`);
+}
+
 export async function createManualTransactionAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const direction = str(fd, "direction"); // IN | OUT

@@ -25,3 +25,23 @@ export type {
   InstalmentTxn,
   FutureInstalment,
 } from "./settlement";
+
+// --- M40a: opportunity analyzers ---
+export {
+  runOpportunityAnalyzers,
+  OPPORTUNITY_ANALYZERS,
+  analyzeLeakage,
+  analyzeSubscriptions,
+  analyzeDeadlines,
+  bucketDragByMonth,
+  clusterSubscriptions,
+} from "./opportunities/index";
+export type {
+  OpportunityFinding,
+  OpportunitySeverity,
+  OpportunityAssumptions,
+  OpportunityTxn,
+  OpportunityCalendarEvent,
+  OpportunityInput,
+  SubscriptionCluster,
+} from "./opportunities/index";

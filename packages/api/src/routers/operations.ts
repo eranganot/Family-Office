@@ -8,6 +8,7 @@ import { autoClassify, computePeriod, operationsAssumptions } from "../services/
 import { commitStatement, previewStatement } from "../services/statement-import-service";
 import { linkCardSettlements } from "../services/settlement-service";
 import { regenerateCalendar, upcomingEvents } from "../services/calendar-service";
+import { listOpportunities, runOpportunities } from "../services/opportunity-service";
 import { rulesWithSuggestions, suggestedAnchorDate } from "@wealthos/domain";
 import {
   ArchiveCategorySchema,
@@ -609,6 +610,68 @@ export const operationsRouter = router({
         await ctx.db.calendarEvent.update({
           where: { id: input.id },
           data: { status: input.status, completedAt: input.status === "DONE" ? new Date() : null },
+        });
+        return { id: input.id, status: input.status };
+      }),
+  }),
+
+  /**
+   * M40a — the Opportunity Center.
+   *
+   * Deliberately a SEPARATE inbox from `strategy.recommendations`, sharing the same
+   * table and the same generation pipeline but partitioned by `origin`. Running
+   * opportunities never supersedes a strategic recommendation, and running strategy
+   * never supersedes an operational one.
+   */
+  opportunities: router({
+    list: operationsProcedure.query(async ({ ctx }) => listOpportunities(ctx.db, ctx.householdId)),
+
+    /** Recompute from the current transactions + calendar. Idempotent per run. */
+    run: operationsProcedure.mutation(async ({ ctx }) => runOpportunities(ctx.db, ctx.householdId)),
+
+    /**
+     * Owner decision on one opportunity. The journal entry is written in the same
+     * transaction as the status change: a decision whose reasoning was not recorded
+     * is indistinguishable later from one that was never made.
+     */
+    setStatus: operationsProcedure
+      .input(
+        z.object({
+          id: z.uuid(),
+          status: z.enum(["PROPOSED", "ACCEPTED", "REJECTED", "IMPLEMENTED"]),
+          note: z.string().max(2000).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const rec = await ctx.db.recommendation.findUnique({
+          where: { id: input.id },
+          select: { householdId: true, origin: true, status: true },
+        });
+        if (!rec || rec.householdId !== ctx.householdId || rec.origin !== "OPERATIONAL") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "OPPORTUNITY_NOT_FOUND" });
+        }
+        const decision =
+          input.status === "ACCEPTED"
+            ? "ACCEPTED"
+            : input.status === "REJECTED"
+              ? "REJECTED"
+              : input.status === "IMPLEMENTED"
+                ? "ACCEPTED"
+                : null;
+
+        await ctx.db.$transaction(async (tx) => {
+          await tx.recommendation.update({ where: { id: input.id }, data: { status: input.status } });
+          if (decision) {
+            await tx.decisionJournalEntry.create({
+              data: {
+                recommendationId: input.id,
+                decision,
+                decidedBy: "household",
+                implementationDate: input.status === "IMPLEMENTED" ? new Date() : null,
+                notes: input.note ?? null,
+              },
+            });
+          }
         });
         return { id: input.id, status: input.status };
       }),

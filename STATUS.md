@@ -2,6 +2,63 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-29, session 30) — M40a
+
+- **M40a — Opportunity Center: operational findings → Recommendations. `deploy-m40a.ps1`.
+  NO MIGRATION, NO LOCKFILE CHANGE.** Every column M40a writes (`origin`, `cadence`,
+  `difficulty`, `reversibility`, `impact*Base`, `expiresAt`) and the
+  `RecommendationDependency` table already landed in `20260727090000_m36_operations_core`.
+- **Scope decision (owner, this session):** M40 is split. **M40a = the pipeline + 3
+  analyzers + Opportunity Center.** M40b = FX markup, employer benefits, cash-flow timing,
+  the dependency graph and the Action Center.
+- **Architecture decision — which direction the two engines point.** The operational
+  analyzers live in `engine-operations/src/opportunities/`, but generation reuses
+  `engine-strategy`'s `generators` → `rationale` → `validator` pipeline. To avoid a real
+  package cycle, `OpportunityFinding` is **redeclared structurally** in `engine-operations`
+  rather than imported from `engine-strategy`; doc 04 sanctions only the
+  strategy → operations direction. Structural typing means the findings drop into the
+  existing generator with no adapter — and, critically, **one** product-reference validator
+  rather than a copy.
+- **New files:** `engine-operations/src/opportunities/{types,leakage,subscriptions,deadlines,index}.ts`,
+  `engine-strategy/src/generators-operational.ts`,
+  `api/src/services/opportunity-service.ts`, `operations.opportunities.*` router,
+  `runOpportunitiesAction` / `setOpportunityStatusAction`, Opportunity Center section on
+  `/operations`, 40 new i18n keys (parity 1247/1247).
+- **Isolation guarantee:** a run supersedes ONLY `origin=OPERATIONAL` proposals. Importing a
+  bank statement can never wipe the strategy inbox, and running strategy can never wipe the
+  operational one. ACCEPTED/IMPLEMENTED items are not re-proposed (the M25 duplicate-card rule).
+- **Where the analyzers refuse rather than guess:**
+  - Leakage EXCLUDES any month containing a row with no `amountBase`. Counting it as zero
+    would report a *falling* trend on a month that was never measured.
+  - Subscriptions are framed as "confirm you still use this", never "you do not use this" —
+    WealthOS has no usage telemetry, so the stronger claim would be a guess dressed as a fact.
+    A cluster that already stopped charging is NOT flagged; cancelling it would save nothing.
+  - Deadline urgency is **proximity, not amount**: a small ceiling closing this week outranks
+    a large one closing in two months.
+- **B3 handling (owner choice):** the analyzers run against the seeded IL-2026 figures, and
+  `usesUnreviewedTaxFigures` drives a visible amber banner whenever any current-year
+  `TaxRuleSet` is still `ownerReviewed=false`. The opportunity is real; the amount says it is
+  unverified. **Owner action still outstanding: verify IL 2025/2026 at `/registry`.**
+- **29 new tests** (18 analyzer, 11 generator), including a **deliberate product-reference
+  violation that MUST throw** — the M38q lesson that a rule never seen to fail is
+  indistinguishable from one that does nothing.
+
+### ⚠️ This milestone was built without a sandbox verification run
+The sandbox VM died mid-session (after all packages had typechecked clean and 29/29 tests
+had passed, but before the final web `tsc` following one small JSX fix). Files were written
+directly to the mount. **`deploy-m40a.ps1` runs the full gate — typecheck, tests, lint,
+i18n parity, `npm ci --dry-run` — and REFUSES to commit if anything fails.** Do not bypass it.
+
+### Pending QA
+- **M40a** — `qa/QA-2026-07-29-m40a-opportunity-center.md` (13 sections). The load-bearing
+  one is §6: an operations run must leave the strategy inbox untouched. Move to verified
+  once all sections come back ✅.
+
+### Concurrency hazard hit this session
+A second session was working in `/tmp/wealthos` at the same time (the native-binaries
+lockfile fix) and reinstalled `node_modules` underneath this one, emptying `.bin` mid-run.
+**Two sessions must not share `/tmp/wealthos`.** This session used an isolated clone.
+
 ## Current state (2026-07-28, session 29)
 
 - **M38q — the boundary rules actually enforce now. `m38q.patch`.
