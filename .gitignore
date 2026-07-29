@@ -9,3 +9,12 @@ coverage/
 !.env.example
 .DS_Store
 .railway-config-pull-*/
+
+# Deploy scaffolding delivered to the working folder, never part of the repo.
+# Untracked patches were the reason `git am` refused to apply three separate times
+# ("untracked working tree files would be overwritten"), which is why every deploy
+# script carries a pre-flight block to delete them.
+*.patch
+deploy-*.ps1
+finish-*.ps1
+_deploy-archive/
