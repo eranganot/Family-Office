@@ -39,11 +39,34 @@
   `FIXED_CONTRACTUAL`; plus renegotiation analyzer tests, a materiality test, and a generator
   test asserting the word "cancel"/"לבטל" never appears on a renegotiation card.
 
-### Still open for M40c
-FX markup + employer-benefit analyzers (owner chose the **refuse-and-report-coverage** posture:
-state how many rows were unusable and refuse a figure when coverage is thin), cash-flow timing,
-the dependency graph, the Action Center, and an **un-accept** control — M40a's UI only shows
-actions on PROPOSED cards, so accepting is currently one-way even though the API can revert it.
+## Next up — M40c (start of next session)
+
+M40b part 1 is verified live. **M40c is the remainder of M40**, in this order:
+
+1. **Un-accept control** (small, closes a known gap). `operations.opportunities.setStatus`
+   already accepts `PROPOSED`, but the UI only renders actions on PROPOSED cards, so accepting
+   is one-way from the screen. Owner hit this during QA.
+2. **FX markup analyzer** — implied rate (`amountBase / amount`) vs the `FxRate` on `bookedAt`,
+   flagged above `leakage_fx_markup_notice_pct`.
+3. **Employer-benefit analyzer** — contribution vs statutory ceiling **per employed member**
+   (doc 07 §B.4: per-person, not per-household). Owner confirmed 2026-07-29: **no additional
+   income sources beyond the two salaries.** Runs against seeded IL-2026 figures with the
+   existing `usesUnreviewedTaxFigures` banner until B3 is signed off at `/registry`.
+4. Cash-flow timing analyzer, dependency graph, Action Center.
+
+**Owner decision, applies to 2 and 3 (2026-07-29): REFUSE-AND-REPORT-COVERAGE.** Both read
+classifications, and this household's data is largely `FIXED_CONTRACTUAL` or unclassified. They
+must state how many rows they could not use and **refuse to emit a figure when coverage is
+thin**, rather than lowering a confidence score on a number built from a fraction of the data.
+Same posture as the leakage month-exclusion rule.
+
+### ⚠️ Read this before writing either analyzer
+`other.unclassified` carries `defaultBehavioralClass: "VARIABLE_DISCRETIONARY"`, so **an
+unclassified row is indistinguishable from a discretionary one if you only check `behavioral`**.
+That single fact caused two production defects in one day. Any new analyzer must ask whether the
+row was actually classified (`categoryKey` vs the suspense bucket), not just read `behavioral`.
+And for "what can the household DO about it", use `domain/operations/commitment-policy`, never
+`BehavioralClass` — see that file's header for why.
 
 ## Current state (2026-07-29, session 30) — M40a-fix
 
@@ -152,10 +175,20 @@ had passed, but before the final web `tsc` following one small JSX fix). Files w
 directly to the mount. **`deploy-m40a.ps1` runs the full gate — typecheck, tests, lint,
 i18n parity, `npm ci --dry-run` — and REFUSES to commit if anything fails.** Do not bypass it.
 
-### Pending QA
-- **M40a** — `qa/QA-2026-07-29-m40a-opportunity-center.md` (13 sections). The load-bearing
-  one is §6: an operations run must leave the strategy inbox untouched. Move to verified
-  once all sections come back ✅.
+### QA status — M40a/M40a-fix/M40b: VERIFIED LIVE (2026-07-29)
+`qa/QA-2026-07-29-m40a-opportunity-center.md`, 13 sections, all ✅ after two rounds of fixes.
+
+- **§6 strategy isolation confirmed with real data:** 9 strategy recommendations before an
+  operations run, 9 after. The `origin` partition holds.
+- **§3 numbers grounded — FAILED first, and it is the reason both fix rounds exist.** The
+  arithmetic was correct throughout (annual = ×12, EOY = ×6 both verified in the same pass);
+  what was wrong was *which rows were eligible*. The owner caught it by READING the card, not
+  by checking a number. Worth remembering: a correct calculation over a wrong input set is the
+  most convincing kind of wrong, and a numbers-only check sails straight past it.
+- **M40b verified live:** the renegotiation card returns ₪1,215/month over 5 commitments
+  (INSURANCE 1,017.42 + TELECOM 198), shows **no saving figure**, states that the amount is
+  current spend, and its insurance step says reprice-the-same-cover rather than cancel.
+  Mortgage appears on neither card. Materiality floor suppressed the ₪6 parking card.
 
 ### Concurrency hazard hit this session
 A second session was working in `/tmp/wealthos` at the same time (the native-binaries
