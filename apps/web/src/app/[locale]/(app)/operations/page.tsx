@@ -22,12 +22,12 @@ import {
   upsertCategoryAction,
   runOpportunitiesAction,
   setOpportunityStatusAction,
-  setActionStatusAction,
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
 import { CategoryPicker, type PickerCategory } from "../../../../components/operations/category-picker";
 import { SUGGESTED_DATE_RATIONALE, nextOccurrenceForDecision, suggestedAnchorDate } from "@wealthos/domain";
 import { serverCaller } from "../../../../lib/trpc-server";
+import { ActionCenterSection } from "./sections/action-center";
 
 const BEHAVIORAL = ["FIXED_CONTRACTUAL", "VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG", "SAVINGS_FLOW", "TRANSFER"] as const;
 
@@ -147,39 +147,6 @@ export default async function OperationsPage({
       <Explainer title={t("explainer.title")} paragraphs={[t("explainer.p1"), t("explainer.p2")]} />
 
       <ErrorBanner message={errorMsg} />
-
-      {/*
-        M42 STEP 1 — section nav.
-        ---------------------------------------------------------------------
-        This page accreted one Card per milestone until it became a single
-        scrolling wall (owner feedback, M41d QA). The real fix is the section
-        SPLIT that doc 07 section 9.1 already specifies; this nav is the first
-        step of it, not the fix itself. It is deliberately additive: it makes the
-        page navigable today without restructuring ~1,500 lines of nested JSX in
-        one unverifiable pass. See the BACKLOG entry at the top of STATUS.md.
-
-        Ordered by "what needs me today" rather than by build order, which is why
-        Import — the oldest section and the top of the page — is last here.
-      */}
-      <nav className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-x-3 gap-y-1 rounded-lg border border-neutral-200 bg-white/95 px-3 py-2 text-xs backdrop-blur">
-        {(
-          [
-            ["actions", "actionsTitle"],
-            ["opportunities", "oppsTitle"],
-            ["review", "reviewTitle"],
-            ["month", "monthNavLabel"],
-            ["calendar", "calendarTitle"],
-            ["transactions", "transactions"],
-            ["categories", "categories"],
-            ["suspense", "suspenseTitle"],
-            ["import", "importTitle"],
-          ] as const
-        ).map(([anchor, key]) => (
-          <a key={anchor} href={`#${anchor}`} className="text-blue-700 underline-offset-2 hover:underline">
-            {t(key)}
-          </a>
-        ))}
-      </nav>
 
       {/* ---------------------------------------------------------- M38b --- */}
       <div id="import" />
@@ -818,108 +785,18 @@ export default async function OperationsPage({
         first quietly rewards deciding over doing.
       */}
       <div id="actions" />
-      <Card title={t("actionsTitle")}>
-        <p className="mb-4 text-xs text-neutral-500">{t("actionsHint")}</p>
-        <SuccessBanner message={sp.actionUpdated ? tf("saved") : undefined} />
-
-        {actions && actions.items.length > 0 ? (
-          <>
-            <p className="mb-3 text-xs text-neutral-600">
-              {t("actionsSummary", { open: actions.openCount, blocked: actions.blockedCount })}
-            </p>
-            <ul className="divide-y divide-neutral-200">
-              {actions.items.map((a) => (
-                <li key={a.id} className="py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-medium">
-                      {loc === "he" ? (a.titleHe ?? a.title) : a.title}
-                    </h3>
-                    <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
-                      {t(`actionState.${a.actionStatus}`)}
-                    </span>
-                    <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
-                      {t(`actionOrigin.${a.origin}`)}
-                    </span>
-                  </div>
-
-                  {a.isBlocked ? (
-                    /*
-                      Reported, never enforced. The owner may know something the engine
-                      does not, so the API still accepts the change — the lock exists so
-                      that acting out of order is a CHOICE rather than an accident.
-                    */
-                    <p className="mt-1 text-xs text-amber-700">
-                      {t("actionBlockedBy", {
-                        items: (loc === "he" ? a.blockedByHe : a.blockedByEn).join(" · "),
-                      })}
-                    </p>
-                  ) : null}
-
-                  <div className="mt-2 flex flex-wrap gap-3">
-                    {(["IN_PROGRESS", "COMPLETED", "PENDING"] as const)
-                      .filter((s) => s !== a.actionStatus)
-                      .map((s) => (
-                        <form key={s} action={setActionStatusAction} className="inline">
-                          <input type="hidden" name="locale" value={locale} />
-                          <input type="hidden" name="id" value={a.id} />
-                          <input type="hidden" name="status" value={s} />
-                          <button type="submit" className="text-xs text-emerald-700 underline">
-                            {t(`actionAction.${s}`)}
-                          </button>
-                        </form>
-                      ))}
-
-                    {/*
-                      A dismissal must carry a reason — the select is `required`.
-
-                      The button comes FIRST in the DOM so that in RTL it renders on the
-                      leading side and the reason follows it: "dismiss — because…". With
-                      the select first, Hebrew put the dropdown ahead of the verb, which
-                      reads as though the reason were being chosen for no stated action.
-                      Source order drives this in both directions, so LTR reads the same
-                      way round without a direction-specific override.
-                    */}
-                    <form action={setActionStatusAction} className="inline-flex items-center gap-2">
-                      <input type="hidden" name="locale" value={locale} />
-                      <input type="hidden" name="id" value={a.id} />
-                      <input type="hidden" name="status" value="DISMISSED" />
-                      <button type="submit" className="text-xs text-neutral-500 underline">
-                        {t("actionAction.DISMISSED")}
-                      </button>
-                      <select
-                        name="dismissalReason"
-                        required
-                        defaultValue=""
-                        className="rounded border border-neutral-300 px-1 py-0.5 text-xs"
-                      >
-                        <option value="" disabled>
-                          {t("actionDismissReasonPrompt")}
-                        </option>
-                        {(
-                          [
-                            "NOT_RELEVANT",
-                            "TOO_HARD",
-                            "DISAGREE",
-                            "ALREADY_DONE",
-                            "LATER",
-                            "OTHER",
-                          ] as const
-                        ).map((r) => (
-                          <option key={r} value={r}>
-                            {t(`actionDismissReason.${r}`)}
-                          </option>
-                        ))}
-                      </select>
-                    </form>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="text-sm text-neutral-500">{t("actionsEmpty")}</p>
-        )}
-      </Card>
+      {/*
+        M42b — first section extracted to `sections/action-center.tsx`. Behaviour is
+        unchanged; only the location moved. Data is still fetched by this page and
+        passed down — narrowing each route to fetch only what it renders belongs to the
+        routing step, not to the extraction step.
+      */}
+      <ActionCenterSection
+        actions={actions}
+        locale={locale}
+        loc={loc}
+        savedMessage={sp.actionUpdated ? tf("saved") : undefined}
+      />
 
       {/* ---------------------------------------------------------- M39 --- */}
       <div id="opportunities" />

@@ -2,6 +2,16 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## 🔖 BACKLOG — top navigation has 14 entries (15 with Transactions)
+
+**Owner, 2026-07-29:** the top nav has grown to 14 items and M42b adds a 15th. It needs
+grouping, not another entry. **Explicitly deferred — finish M42 end-to-end first.**
+
+Same accretion as `/operations`, one level up: every milestone added a destination and
+none were ever grouped. Worth noting the pattern is now visible in three places (the
+operations page, the top nav, and the analyzer exclusions) — the common cause is that
+adding is always locally reasonable and nobody owns the total.
+
 ## 🔖 BACKLOG — `/operations` needs an information-architecture rebuild
 
 **Owner feedback, 2026-07-29 (M41d QA):** the page is *"overloaded with a lot of
@@ -45,8 +55,14 @@ Grouped by **cadence** — how often the owner is in that mode — not by data t
 |---|---|---|
 | `/operations` (**Today**, default) | Action Center, Opportunity Center, open drift alerts, calendar items due inside the window, **suspense count** | daily / weekly |
 | `/operations/month` | month overview, close/reopen, monthly review, EOY projection | monthly ritual |
-| `/operations/transactions` | transaction list, manual add, suspense queue, category tree | as needed |
 | `/operations/calendar` | forward commitments, recurring decisions | as needed |
+| **`/transactions` (NEW TOP-LEVEL)** | transaction list, manual add, suspense queue, category tree, import | as needed |
+
+**Transactions is top-level, not under Operations** (owner decision). Those four are one
+thing: transactions are the raw rows, the category tree is the scheme that classifies
+them, suspense is the rows the scheme could not classify, and import is what feeds all
+three. You go there for a different reason than running the month. This deviates from
+doc 07 §9.1, which specced them as sections under `operations/` — recorded deliberately.
 
 **Owner decisions:**
 1. **Import is not a section.** It is an action, not a place, and it is the least
@@ -82,6 +98,19 @@ so any breakage is localised and obvious; a single 10-section rewrite is not.
 `-LiteralPath`. PowerShell reads `[...]` as a wildcard character class, so a bare
 `Get-Content` on the page silently returns nothing — this cost a gate run on M42a, where
 the truncation guard read 0 lines and correctly refused to commit.
+
+⚠️ **Every extraction leaves DEAD IMPORTS in `page.tsx`.** A section takes its server
+actions and components with it, so whatever only it used becomes unused. `tsc` does NOT
+catch this; `eslint --max-warnings 0` does, at the END of the gate — after typecheck and
+the full test suite have already run. It cost a gate run on the Action Center extraction
+(`setActionStatusAction`). **After each extraction, grep `page.tsx` for every import the
+moved section used and delete the orphans before running the gate.** Candidates for the
+remaining sections: `setOpportunityStatusAction` / `runOpportunitiesAction`
+(opportunities), `setCalendarStatusAction` / `regenerateCalendarAction` /
+`applySuggestedDateAction` / `upsertRecurringAction` (calendar), `uploadStatementAction`
+/ `commitStatementAction` / `undoImportAction` / `resetAllImportsAction` (import),
+`upsertCategoryAction` / `CategoryPicker` (categories), `BehavioralBars` /
+`SurplusWaterfall` / `CategoryTable` (month).
 
 ## Current state (2026-07-29, session 31) — M41d ⚠️ BUILT, GATE NOT YET RUN
 
