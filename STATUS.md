@@ -2,6 +2,87 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## 🔖 BACKLOG — `/operations` needs an information-architecture rebuild
+
+**Owner feedback, 2026-07-29 (M41d QA):** the page is *"overloaded with a lot of
+information, cards, actions."* It is now one scrolling column carrying: period nav +
+close/reopen, monthly summary, dual-axis breakdown, safe-to-spend, categories,
+transactions, suspense queue, **Monthly review + EOY**, **Action Center**, Opportunity
+Center, calendar, recurring, import. Each section was defensible when added; together
+they are a wall.
+
+This is the same additive drift the analyzers kept hitting, in UI form — nobody ever
+decided to build this page, it accreted one milestone at a time.
+
+Not a restyle. It needs a decision about **what this page is for** before more is added:
+- Doc 07 §9.1 already specifies **separate sections** (`actions/`, `opportunities/`,
+  `projection/`, `calendar/` …) — the current single page never implemented that split.
+- Candidate: tabs or routes per section, with a genuine landing view that answers "what
+  needs me today" rather than showing everything at once.
+- **M42's "dashboard extensions" should not be built on top of this page as-is** —
+  that would add a twelfth section to a page already flagged as unreadable.
+
+⚠️ **Do not add another Card to `/operations` before this is resolved.**
+
+### Step 1 SHIPPED (M42a) — sticky section nav + anchor fix
+Additive only, no restructuring: a sticky nav ordered by *"what needs me today"* (actions
+→ opportunities → review → month → calendar → transactions → categories → suspense →
+import), which is deliberately the reverse of build order. Also fixed a real bug: the
+`#suspense` anchor sat ~500 lines above its own Card, next to the review section, so
+every link to it scrolled to the wrong place.
+
+### Step 2 — DECIDED with the owner (2026-07-29). Build as M42b.
+
+**Real ROUTES, not `?tab=`** (owner decision). Each view then fetches only its own data:
+today `/operations` currently computes the period, opportunities, actions, EOY, drift,
+suspense, calendar, categories AND transactions on every load, so `computePeriod` runs
+even when you only wanted to see action items. Routes also give deep links and a working
+back button.
+
+Grouped by **cadence** — how often the owner is in that mode — not by data type:
+
+| Route | Contains | Cadence |
+|---|---|---|
+| `/operations` (**Today**, default) | Action Center, Opportunity Center, open drift alerts, calendar items due inside the window, **suspense count** | daily / weekly |
+| `/operations/month` | month overview, close/reopen, monthly review, EOY projection | monthly ritual |
+| `/operations/transactions` | transaction list, manual add, suspense queue, category tree | as needed |
+| `/operations/calendar` | forward commitments, recurring decisions | as needed |
+
+**Owner decisions:**
+1. **Import is not a section.** It is an action, not a place, and it is the least
+   frequent thing on the busiest page. Move it to a button on Transactions **and** onto
+   the Mapping page, where it belongs alongside the rest of ingestion.
+2. **Suspense is promoted, and the drift bug is why.** Every closed month is
+   `provisional` because of unverified rows — that is what caveats the surplus, what
+   makes `allocationHandoffReadiness` refuse, and what weakens everything downstream.
+   Clearing suspense is the household's highest-value recurring action. The QUEUE lives
+   under Transactions; the **COUNT is an action item on Today.**
+3. **Today shows COMPACT ROWS with counts** that link into the other routes — not full
+   cards. Full cards mean you never leave Today, and Today re-accretes into exactly the
+   page this rebuild exists to undo. Owner will report anything missing from the rows.
+
+### Step 2 execution notes — do this with a WORKING SANDBOX.
+`page.tsx` is ~1,550 lines of nested JSX with 10 top-level `<Card>` blocks. Splitting it
+means ~20 paired JSX edits, and **the mount silently truncates >250-line writes** while a
+single unbalanced paren breaks the build. Attempting it blind, with no `tsc` and no
+tests, is the highest-risk edit in this codebase — which is exactly why step 1 stopped
+where it did rather than pressing on.
+
+Order — **one section per commit, gate after each.** Extraction is behaviour-preserving,
+so any breakage is localised and obvious; a single 10-section rewrite is not.
+1. Extract each Card into `operations/sections/<name>.tsx` as a server component taking
+   its already-computed props. No moves, no restyling, no data changes.
+2. Create the routes and move each extracted section under the right one, narrowing each
+   route's data fetch to only what it renders.
+3. Build **Today** last, from compact rows over the counts the other routes already
+   expose.
+4. Only then, M42's dashboard extensions and health score.
+
+⚠️ **PowerShell pathing:** every path containing `[locale]` or `(app)` needs
+`-LiteralPath`. PowerShell reads `[...]` as a wildcard character class, so a bare
+`Get-Content` on the page silently returns nothing — this cost a gate run on M42a, where
+the truncation guard read 0 lines and correctly refused to commit.
+
 ## Current state (2026-07-29, session 31) — M41d ⚠️ BUILT, GATE NOT YET RUN
 
 - **M41d — two defects from M41c QA. `deploy-m41d.ps1`. NO MIGRATION, NO NEW KEY.**

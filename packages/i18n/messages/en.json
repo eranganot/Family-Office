@@ -1427,6 +1427,7 @@
       "REVERT": "Undo this decision"
     },
     "oppsRevertHint": "Returns it to open items and to the total.",
+    "monthNavLabel": "This month",
     "reviewTitle": "Monthly review",
     "reviewHint": "What the monthly close recorded, and whether the surplus is still behaving the way the plan was built on.",
     "reviewPinned": "Review snapshot saved",

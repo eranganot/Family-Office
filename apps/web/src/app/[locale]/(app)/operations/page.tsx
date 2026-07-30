@@ -148,6 +148,39 @@ export default async function OperationsPage({
 
       <ErrorBanner message={errorMsg} />
 
+      {/*
+        M42 STEP 1 — section nav.
+        ---------------------------------------------------------------------
+        This page accreted one Card per milestone until it became a single
+        scrolling wall (owner feedback, M41d QA). The real fix is the section
+        SPLIT that doc 07 section 9.1 already specifies; this nav is the first
+        step of it, not the fix itself. It is deliberately additive: it makes the
+        page navigable today without restructuring ~1,500 lines of nested JSX in
+        one unverifiable pass. See the BACKLOG entry at the top of STATUS.md.
+
+        Ordered by "what needs me today" rather than by build order, which is why
+        Import — the oldest section and the top of the page — is last here.
+      */}
+      <nav className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-x-3 gap-y-1 rounded-lg border border-neutral-200 bg-white/95 px-3 py-2 text-xs backdrop-blur">
+        {(
+          [
+            ["actions", "actionsTitle"],
+            ["opportunities", "oppsTitle"],
+            ["review", "reviewTitle"],
+            ["month", "monthNavLabel"],
+            ["calendar", "calendarTitle"],
+            ["transactions", "transactions"],
+            ["categories", "categories"],
+            ["suspense", "suspenseTitle"],
+            ["import", "importTitle"],
+          ] as const
+        ).map(([anchor, key]) => (
+          <a key={anchor} href={`#${anchor}`} className="text-blue-700 underline-offset-2 hover:underline">
+            {t(key)}
+          </a>
+        ))}
+      </nav>
+
       {/* ---------------------------------------------------------- M38b --- */}
       <div id="import" />
       <Card title={t("importTitle")}>
@@ -709,7 +742,6 @@ export default async function OperationsPage({
         )}
       </Card>
 
-      <div id="suspense" />
       {/* ----------------------------------------------------------- M41 --- */}
       <div id="review" />
       <Card title={t("reviewTitle")}>
@@ -1220,6 +1252,12 @@ export default async function OperationsPage({
         </table>
       </Card>
 
+      {/*
+        M42: the #suspense anchor used to sit ~500 lines above, next to the review
+        section, so every link to it scrolled to the wrong card. It moved here, to the
+        section it names.
+      */}
+      <div id="suspense" />
       <Card title={t("suspenseTitle")}>
         <p className="mb-4 text-xs text-neutral-500">{t("suspenseHint", { threshold: Math.round(suspense.minConfidence * 100) })}</p>
         {suspense.rows.length === 0 ? (
