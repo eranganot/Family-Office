@@ -2,6 +2,30 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-29, session 31) — M41d ⚠️ BUILT, GATE NOT YET RUN
+
+- **M41d — two defects from M41c QA. `deploy-m41d.ps1`. NO MIGRATION, NO NEW KEY.**
+- **M41c's drift fix WORKS** — production shows two HIGH `SURPLUS_DRIFT` alerts at
+  171.73%, and the review-pinned chip renders. The DB was right; the UI showed nothing.
+- **Defect 1 — silent failure presented as good news.** The page fetched drift alerts
+  with `.catch(() => [])`, so a failed query rendered "no surplus drift" —
+  indistinguishable from a household that genuinely has none. Now resolves to `null` and
+  says so in red, stating explicitly that it is NOT a clean result. **This is the same
+  mistake the review-pinned chip existed to fix, repeated one layer up.**
+- **Defect 2 — duplicate alerts on re-close.** Closing March twice produced two
+  identical alerts. Closing is repeatable (close → reopen → reclassify → close), so the
+  list grew every time, and an inbox showing one finding four times trains the owner to
+  ignore all four. A close now supersedes its own prior OPEN alert for that year/month —
+  the rule the Opportunity Center already follows. **RESOLVED, not deleted:** it
+  genuinely was raised, so the trail keeps it.
+
+### Pattern worth naming, four occurrences now
+M40a (banned `FIXED_CONTRACTUAL` → banned every real subscription), M40b (exclusions
+left a ₪6 card), M41c (provisional excluded → excluded every month), M41d (empty list
+shown for a failed load). **Every one was a defensible-looking silence.** Before adding
+any exclusion or fallback, ask what it looks like when it fires on THIS household's real
+data — and whether the owner could tell that outcome apart from a working feature.
+
 ## Current state (2026-07-29, session 31) — M41c ⚠️ BUILT, GATE NOT YET RUN
 
 - **M41c — drift baseline fix + the review/projection UI. `deploy-m41c.ps1`.

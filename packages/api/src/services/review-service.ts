@@ -287,6 +287,29 @@ export async function runCloseReview(
     isProvisional: period.surplusIsProvisional || baseline.anyProvisional,
   };
 
+  /*
+   * M41c — supersede any OPEN drift alert for THIS month before writing a new one.
+   *
+   * QA closed March twice and got two identical HIGH alerts. Closing a month is a
+   * repeatable action (close, reopen, reclassify, close again), so without this the
+   * alert list grows by one every time — and an inbox that shows the same finding four
+   * times trains the owner to ignore all four. Same rule the Opportunity Center uses:
+   * a rerun supersedes its own prior output rather than appending to it.
+   *
+   * RESOLVED, not deleted: the alert genuinely was raised and acted on the audit trail
+   * should keep it. Only the newest one stays OPEN.
+   */
+  await db.monitoringAlert.updateMany({
+    where: {
+      householdId,
+      kind: "SURPLUS_DRIFT",
+      status: "OPEN",
+      detail: { path: ["year"], equals: year },
+      AND: [{ detail: { path: ["month"], equals: month } }],
+    },
+    data: { status: "RESOLVED", resolvedAt: new Date() },
+  });
+
   if (!raised) return { snapshotId, drift, alertId: null };
 
   const below = driftPct < 0;

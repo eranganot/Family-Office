@@ -110,7 +110,15 @@ export default async function OperationsPage({
   const actions = await trpc.operations.actions.list().catch(() => null);
   // M41 — EOY trajectory + open surplus-drift alerts. Both read-only.
   const eoy = await trpc.operations.projection.eoy().catch(() => null);
-  const driftAlerts = await trpc.operations.review.driftAlerts().catch(() => []);
+  /*
+   * M41c: a failed fetch is NOT collapsed into an empty list.
+   *
+   * The first version did `.catch(() => [])`, which meant a broken query rendered
+   * "no surplus drift" — identical to a household that genuinely has none. That is the
+   * same class of mistake as the review chip: silence that reads as a clean bill of
+   * health. `null` here means "could not load" and the UI says so.
+   */
+  const driftAlerts = await trpc.operations.review.driftAlerts().catch(() => null);
   const { year, month, row: periodRow, computed } = period;
   const diag = await trpc.operations.diagnostics.month({ year, month }).catch(() => null);
   const flow = computed.flow;
@@ -707,7 +715,11 @@ export default async function OperationsPage({
       <Card title={t("reviewTitle")}>
         <p className="mb-4 text-xs text-neutral-500">{t("reviewHint")}</p>
 
-        {driftAlerts.length > 0 ? (
+        {driftAlerts === null ? (
+          <p className="mb-5 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+            {t("driftLoadFailed")}
+          </p>
+        ) : driftAlerts.length > 0 ? (
           <ul className="mb-5 space-y-2">
             {driftAlerts.map((d) => (
               <li

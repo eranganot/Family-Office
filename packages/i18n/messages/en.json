@@ -1432,6 +1432,7 @@
     "reviewPinned": "Review snapshot saved",
     "reviewNotPinned": "No review snapshot",
     "driftNone": "No surplus drift. Close a month to check.",
+    "driftLoadFailed": "Could not load drift alerts. This is a load failure, not a clean result — do not read it as 'no drift'.",
     "driftDetail": "{month}: {realised} against a {baseline} baseline from the last {months} closed month(s).",
     "driftProvisional": "Both figures still contain unverified transactions, so treat the size as indicative — the direction is what matters here.",
     "eoyTitle": "End of year",
