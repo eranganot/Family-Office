@@ -19,7 +19,16 @@ const num = (v: unknown): number => (v == null ? 0 : Number(v));
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 export type DriftOutcome =
-  | { checked: true; raised: boolean; driftPct: number; baselineBase: number; realisedBase: number; monthsInBaseline: number }
+  | {
+      checked: true;
+      raised: boolean;
+      driftPct: number;
+      baselineBase: number;
+      realisedBase: number;
+      monthsInBaseline: number;
+      /** Either side still contains unverified rows. Reported, never a reason to refuse. */
+      isProvisional: boolean;
+    }
   | { checked: false; reason: "NO_BASELINE_MONTHS" | "SURPLUS_NOT_COMPUTED" };
 
 export interface CloseReviewResult {
@@ -41,35 +50,56 @@ async function driftThresholdPct(db: PrismaClient, householdId: string): Promise
  * assumption" — but no approved-plan monthly-surplus figure exists anywhere in the
  * schema. `committedPlan` carries booleans (deploysIdleCash, investsGrowth, …), not a
  * surplus. Rather than invent a field or read a JSON shape nobody guarantees, the
- * baseline is the mean of PREVIOUSLY CLOSED, non-provisional months. That is a fact the
- * system actually holds, and it answers the question the alert exists to ask: has the
- * household's surplus stopped behaving the way the plan was built on top of?
+ * baseline is the mean of PREVIOUSLY CLOSED months. That is a fact the system actually
+ * holds, and it answers the question the alert exists to ask: has the household's
+ * surplus stopped behaving the way the plan was built on top of?
  *
- * Provisional months are excluded for the same reason the EOY projection excludes
- * them — a month containing unverified rows is not yet a fact, and a baseline built
- * from one would make a real drift look normal or a normal month look like drift.
+ * ---------------------------------------------------------------------------
+ * PROVISIONAL MONTHS ARE INCLUDED — AND THE FIRST VERSION OF THIS WAS WRONG
+ * ---------------------------------------------------------------------------
+ * This function originally required `surplusIsProvisional: false`, by analogy with the
+ * EOY projection. QA killed it: EVERY closed month in the owner's household is
+ * provisional, because closing with unverified rows is explicitly ALLOWED (the
+ * non-blocking rule is a deliberate design decision of this whole module). So the
+ * baseline was always empty, drift always reported NO_BASELINE_MONTHS, and the feature
+ * could never fire for the only household that exists. Individually defensible
+ * exclusion, collectively a disabled feature — the exact M40b failure shape.
+ *
+ * The correct rule is not "provisional is unusable", it is **the standard depends on the
+ * consequence**:
+ *   - DEPLOYING CASH against a provisional surplus moves real money, so
+ *     `allocationHandoffReadiness` still refuses it outright.
+ *   - A DRIFT ALERT prompts a review. Comparing provisional to provisional is sound,
+ *     because the same unverified-row bias sits on both sides of the ratio, and a
+ *     ratio is far more robust to a shared bias than a level is.
+ *
+ * The provisional status of both sides is carried into the alert so the reader can
+ * discount it, rather than silently withheld.
  */
 async function surplusBaseline(
   db: PrismaClient,
   householdId: string,
   year: number,
   month: number,
-): Promise<{ meanBase: number; months: number } | null> {
+): Promise<{ meanBase: number; months: number; anyProvisional: boolean } | null> {
   const priors = await db.operatingPeriod.findMany({
     where: {
       householdId,
       status: "CLOSED",
-      surplusIsProvisional: false,
       surplusBase: { not: null },
       OR: [{ year: { lt: year } }, { year, month: { lt: month } }],
     },
-    select: { surplusBase: true },
+    select: { surplusBase: true, surplusIsProvisional: true },
     orderBy: [{ year: "desc" }, { month: "desc" }],
     take: 6,
   });
   if (priors.length === 0) return null;
   const mean = priors.reduce((s, p) => s + num(p.surplusBase), 0) / priors.length;
-  return { meanBase: round2(mean), months: priors.length };
+  return {
+    meanBase: round2(mean),
+    months: priors.length,
+    anyProvisional: priors.some((p) => p.surplusIsProvisional),
+  };
 }
 
 function severityFor(absDriftPct: number, thresholdPct: number): "LOW" | "MEDIUM" | "HIGH" {
@@ -88,6 +118,59 @@ function severityFor(absDriftPct: number, thresholdPct: number): "LOW" | "MEDIUM
  * money the plan is not deploying), so the sign is carried in the detail and the title
  * rather than only the magnitude.
  */
+export interface SurplusDriftAlertView {
+  id: string;
+  severity: string;
+  title: string;
+  titleHe: string | null;
+  year: number | null;
+  month: number | null;
+  driftPct: number | null;
+  direction: string | null;
+  realisedBase: number | null;
+  baselineBase: number | null;
+  monthsInBaseline: number | null;
+  isProvisional: boolean;
+  createdAt: string;
+}
+
+/**
+ * M41 — open surplus-drift alerts, newest first.
+ *
+ * Read-only and OPEN-only. A resolved alert is history, and showing it alongside a live
+ * one would make a household that has already acted look like one that has not.
+ */
+export async function listSurplusDriftAlerts(
+  db: PrismaClient,
+  householdId: string,
+): Promise<SurplusDriftAlertView[]> {
+  const rows = await db.monitoringAlert.findMany({
+    where: { householdId, kind: "SURPLUS_DRIFT", status: "OPEN" },
+    orderBy: { createdAt: "desc" },
+    take: 12,
+  });
+  const n = (d: Record<string, unknown>, k: string): number | null =>
+    typeof d[k] === "number" ? (d[k] as number) : null;
+  return rows.map((r) => {
+    const d = (r.detail ?? {}) as Record<string, unknown>;
+    return {
+      id: r.id,
+      severity: r.severity,
+      title: r.title,
+      titleHe: r.titleHe,
+      year: n(d, "year"),
+      month: n(d, "month"),
+      driftPct: n(d, "driftPct"),
+      direction: typeof d["direction"] === "string" ? (d["direction"] as string) : null,
+      realisedBase: n(d, "realisedBase"),
+      baselineBase: n(d, "baselineBase"),
+      monthsInBaseline: n(d, "monthsInBaseline"),
+      isProvisional: d["isProvisional"] === true,
+      createdAt: r.createdAt.toISOString(),
+    };
+  });
+}
+
 export interface AllocationHandoffReadiness {
   ready: boolean;
   reason:
@@ -201,6 +284,7 @@ export async function runCloseReview(
     baselineBase: baseline.meanBase,
     realisedBase: round2(realised),
     monthsInBaseline: baseline.months,
+    isProvisional: period.surplusIsProvisional || baseline.anyProvisional,
   };
 
   if (!raised) return { snapshotId, drift, alertId: null };
@@ -222,6 +306,7 @@ export async function runCloseReview(
         driftPct,
         thresholdPct,
         provisional: period.surplusIsProvisional,
+        baselineAnyProvisional: baseline.anyProvisional,
       },
       // This run is a targeted surplus check, not the nightly sweep. Saying "nothing
       // was swept" is honest; leaving the field shaped like a completed sweep would
@@ -255,6 +340,11 @@ export async function runCloseReview(
         // Surplus ABOVE plan is not good news to be ignored: it is money the approved
         // plan is not deploying, and it warrants the same rerun as a shortfall.
         direction: below ? "BELOW" : "ABOVE",
+        // Both sides may contain unverified rows. A ratio survives a bias that sits on
+        // both sides far better than a level does, so this is a caveat on the figure —
+        // not a reason to have withheld it. Withholding is what disabled this feature
+        // in its first version.
+        isProvisional: period.surplusIsProvisional || baseline.anyProvisional,
       },
       recommendedAction: "RERUN_STRATEGY",
     },

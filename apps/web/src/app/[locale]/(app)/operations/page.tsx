@@ -108,6 +108,9 @@ export default async function OperationsPage({
   const opps = await trpc.operations.opportunities.list().catch(() => null);
   // M40c — the Action Center: committed work from BOTH engines. Reading never mutates.
   const actions = await trpc.operations.actions.list().catch(() => null);
+  // M41 — EOY trajectory + open surplus-drift alerts. Both read-only.
+  const eoy = await trpc.operations.projection.eoy().catch(() => null);
+  const driftAlerts = await trpc.operations.review.driftAlerts().catch(() => []);
   const { year, month, row: periodRow, computed } = period;
   const diag = await trpc.operations.diagnostics.month({ year, month }).catch(() => null);
   const flow = computed.flow;
@@ -490,6 +493,22 @@ export default async function OperationsPage({
               <input type="hidden" name="year" value={year} />
               <input type="hidden" name="month" value={month} />
               <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium">{t("periodClosed")}</span>
+              {/*
+                M41 — whether the monthly review actually recorded a snapshot. Shown
+                because the review is deliberately NON-FATAL to the close: a failed
+                snapshot leaves the month closed with reviewSnapshotId null, and without
+                this the difference is invisible. A closed month that says nothing about
+                its review looks identical to one that reviewed successfully.
+              */}
+              <span
+                className={`rounded-full px-3 py-1 text-xs ${
+                  periodRow.reviewSnapshotId
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-amber-50 text-amber-800"
+                }`}
+              >
+                {periodRow.reviewSnapshotId ? t("reviewPinned") : t("reviewNotPinned")}
+              </span>
               <button type="submit" className="text-xs text-blue-600 underline">{t("reopen")}</button>
             </form>
           ) : (
@@ -683,6 +702,71 @@ export default async function OperationsPage({
       </Card>
 
       <div id="suspense" />
+      {/* ----------------------------------------------------------- M41 --- */}
+      <div id="review" />
+      <Card title={t("reviewTitle")}>
+        <p className="mb-4 text-xs text-neutral-500">{t("reviewHint")}</p>
+
+        {driftAlerts.length > 0 ? (
+          <ul className="mb-5 space-y-2">
+            {driftAlerts.map((d) => (
+              <li
+                key={d.id}
+                className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+              >
+                <p className="font-medium">{loc === "he" ? (d.titleHe ?? d.title) : d.title}</p>
+                <p className="mt-1">
+                  {t("driftDetail", {
+                    month: `${d.year}-${String(d.month ?? 0).padStart(2, "0")}`,
+                    realised: formatMoney(d.realisedBase ?? 0, baseCurrency, loc),
+                    baseline: formatMoney(d.baselineBase ?? 0, baseCurrency, loc),
+                    months: d.monthsInBaseline ?? 0,
+                  })}
+                </p>
+                {/* The caveat travels WITH the number, not in a footnote nobody reads. */}
+                {d.isProvisional ? <p className="mt-1">{t("driftProvisional")}</p> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mb-5 text-sm text-neutral-500">{t("driftNone")}</p>
+        )}
+
+        <h3 className="mb-2 text-sm font-medium">{t("eoyTitle")}</h3>
+        {eoy === null ? (
+          <p className="text-sm text-neutral-500">{t("eoyUnavailable")}</p>
+        ) : !eoy.ok ? (
+          /*
+            A refusal, rendered as a refusal. This is the one place the projection could
+            most easily lie: a zero would draw as a flat line indistinguishable from a
+            real forecast of no growth.
+          */
+          <p className="text-sm text-neutral-500">
+            {t("eoyRefused", { observed: eoy.monthsObserved, need: eoy.minMonths })}
+          </p>
+        ) : (
+          <div className="space-y-1 text-sm tabular-nums">
+            <p>{t("eoyRunRate", { amount: formatMoney(eoy.monthlyRunRateBase, baseCurrency, loc) })}</p>
+            <p>{t("eoyCurrent", { amount: formatMoney(eoy.currentEoyBase, baseCurrency, loc) })}</p>
+            <p>{t("eoyOptimised", { amount: formatMoney(eoy.optimisedEoyBase, baseCurrency, loc) })}</p>
+            <p className="font-medium text-emerald-700">
+              {t("eoyDelta", { amount: formatMoney(eoy.deltaBase, baseCurrency, loc) })}
+            </p>
+            {/* Accepted actions that carry no quantified saving are COUNTED, not estimated. */}
+            {eoy.pendingWithoutImpact > 0 ? (
+              <p className="text-xs text-neutral-500">
+                {t("eoyNoImpactCount", { n: eoy.pendingWithoutImpact })}
+              </p>
+            ) : null}
+            {eoy.monthsProvisionalExcluded > 0 ? (
+              <p className="text-xs text-neutral-500">
+                {t("eoyProvisionalExcluded", { n: eoy.monthsProvisionalExcluded })}
+              </p>
+            ) : null}
+          </div>
+        )}
+      </Card>
+
       {/* ---------------------------------------------------------- M40c --- */}
       {/*
         The Action Center sits ABOVE the Opportunity Center on purpose: work already

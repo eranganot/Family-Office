@@ -11,7 +11,11 @@ import { regenerateCalendar, upcomingEvents } from "../services/calendar-service
 import { listOpportunities, runOpportunities } from "../services/opportunity-service";
 import { DISMISSAL_REASONS, listActions, setActionStatus } from "../services/action-service";
 import { eoyProjection } from "../services/projection-service";
-import { allocationHandoffReadiness, runCloseReview } from "../services/review-service";
+import {
+  allocationHandoffReadiness,
+  listSurplusDriftAlerts,
+  runCloseReview,
+} from "../services/review-service";
 import { rulesWithSuggestions, suggestedAnchorDate } from "@wealthos/domain";
 import {
   ArchiveCategorySchema,
@@ -796,6 +800,13 @@ export const operationsRouter = router({
       .query(async ({ ctx, input }) =>
         allocationHandoffReadiness(ctx.db, ctx.householdId, input.year, input.month),
       ),
+  }),
+
+  /** M41 — open surplus-drift alerts raised by a monthly close. */
+  review: router({
+    driftAlerts: operationsProcedure.query(async ({ ctx }) =>
+      listSurplusDriftAlerts(ctx.db, ctx.householdId),
+    ),
   }),
 
   recurring: router({

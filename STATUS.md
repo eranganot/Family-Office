@@ -2,6 +2,45 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## Current state (2026-07-29, session 31) — M41c ⚠️ BUILT, GATE NOT YET RUN
+
+- **M41c — drift baseline fix + the review/projection UI. `deploy-m41c.ps1`.
+  NO MIGRATION, NO LOCKFILE CHANGE, NO NEW ASSUMPTION KEY** (pins intact, no recompute).
+- **THE M40b FAILURE SHAPE, THIRD OCCURRENCE IN THIS MODULE.** `surplusBaseline()`
+  required `surplusIsProvisional: false`. **Every closed month in this household is
+  provisional**, because closing with unverified rows is explicitly ALLOWED — the
+  non-blocking rule is a deliberate design decision of the whole module. So the baseline
+  was always empty, drift always returned `NO_BASELINE_MONTHS`, and the feature **could
+  never fire for the only household that exists.** QA closed Jan (₪25,246) and March
+  (₪68,602) — a 172% gap — and correctly saw zero alerts.
+- **The fix is not "loosen the rule". THE STANDARD DEPENDS ON THE CONSEQUENCE:**
+  - **Deploying cash** against a provisional surplus moves real money →
+    `allocationHandoffReadiness` **still refuses provisional outright. Unchanged.**
+  - **A drift alert** prompts a review → provisional-vs-provisional is sound, because
+    the same unverified-row bias sits on **both sides of the ratio**, and a ratio
+    survives a shared bias far better than a level does.
+  - The provisional status of both sides now travels **with** the number (alert detail +
+    on the card), instead of being a reason to withhold it.
+- **The UI that made M41a/b unverifiable.** `close` returned `reviewSnapshotId` and the
+  drift outcome, and `operations.projection.eoy` existed — but nothing rendered any of
+  it, so M41b's shipped QA steps could only be checked by hand in SQL. **That was a bad
+  handoff on my part.** `/operations#review` now shows: whether a closed month's review
+  snapshot was actually pinned (the review is non-fatal, so success and silent failure
+  looked identical); open `SURPLUS_DRIFT` alerts; and the EOY projection with **its
+  refusal rendered as a refusal** — a zero would have drawn as a flat line
+  indistinguishable from a real forecast of no growth.
+
+### Verified from production during M41b QA
+`reviewSnapshotId` populates correctly on close, and **survives reopen** (March 2026 is
+OPEN yet retains its snapshot id — that is the intended behaviour, not a leak).
+
+### ⚠️ Still outstanding in M41
+1. Feeding verified surplus INTO the deployment engine's deployable amount
+   (`computeDeploymentPlans` takes no surplus parameter → engine signature change).
+2. No tests for `review-service` (DB-bound; those suites need the shared test DB).
+3. `projection_min_closed_months` is 3 and only 2 months are closed, so the EOY
+   trajectory legitimately refuses until a third month closes.
+
 ## Current state (2026-07-29, session 31) — M41b ⚠️ BUILT, GATE NOT YET RUN
 
 - **M41b — monthly review snapshot, surplus drift alerts, allocation hand-off.
