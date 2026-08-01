@@ -472,9 +472,12 @@ export async function regenerateCalendarAction(fd: FormData): Promise<void> {
     const r = await trpc.operations.calendar.regenerate();
     n = r.eventsCreated + r.instalmentEvents;
   } catch {
-    redirect(`/${locale}/operations?error=calendar#calendar`);
+    redirect(`/${locale}/operations/calendar?error=calendar`);
   }
-  redirect(`/${locale}/operations?calendarBuilt=${n}#calendar`);
+  // M42b: the calendar lives at its own route now, so every redirect below lands on the
+  // page that actually shows the result. Redirecting to /operations would drop the owner
+  // on a page where the thing he just changed is no longer rendered.
+  redirect(`/${locale}/operations/calendar?calendarBuilt=${n}`);
 }
 
 /** Mark a calendar event done or skipped. Both are owner decisions, and both are kept. */
@@ -487,9 +490,9 @@ export async function setCalendarStatusAction(fd: FormData): Promise<void> {
       status: str(fd, "status") as "DONE" | "SKIPPED" | "SCHEDULED",
     });
   } catch {
-    redirect(`/${locale}/operations?error=calendar#calendar`);
+    redirect(`/${locale}/operations/calendar?error=calendar`);
   }
-  redirect(`/${locale}/operations?calendarUpdated=1#calendar`);
+  redirect(`/${locale}/operations/calendar?calendarUpdated=1`);
 }
 
 /**
@@ -508,9 +511,9 @@ export async function upsertRecurringAction(fd: FormData): Promise<void> {
       isActive: str(fd, "isActive") === "on",
     });
   } catch {
-    redirect(`/${locale}/operations?error=recurring#calendar`);
+    redirect(`/${locale}/operations/calendar?error=recurring`);
   }
-  redirect(`/${locale}/operations?recurringSaved=1#calendar`);
+  redirect(`/${locale}/operations/calendar?recurringSaved=1`);
 }
 
 /**
@@ -529,7 +532,7 @@ export async function applySuggestedDateAction(fd: FormData): Promise<void> {
     const r = await trpc.operations.recurring.applySuggested(key ? { key } : undefined);
     applied = r.applied;
   } catch {
-    redirect(`/${locale}/operations?error=recurring#calendar`);
+    redirect(`/${locale}/operations/calendar?error=recurring`);
   }
-  redirect(`/${locale}/operations?suggestApplied=${applied}#calendar`);
+  redirect(`/${locale}/operations/calendar?suggestApplied=${applied}`);
 }

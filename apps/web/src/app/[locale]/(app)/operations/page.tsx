@@ -23,7 +23,7 @@ import { ActionCenterSection } from "./sections/action-center";
 import { MonthlyReviewSection } from "./sections/monthly-review";
 import { OpportunityCenterSection } from "./sections/opportunity-center";
 import { SuspenseQueueSection } from "./sections/suspense-queue";
-import { CalendarSection } from "./sections/calendar";
+import { OperationsNav } from "./sections/operations-nav";
 
 const BEHAVIORAL = ["FIXED_CONTRACTUAL", "VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG", "SAVINGS_FLOW", "TRANSFER"] as const;
 
@@ -49,7 +49,8 @@ export default async function OperationsPage({
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
     mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string; reused?: string;
     y?: string; m?: string; cat?: string; beh?: string; dupesRemoved?: string;
-    calendarBuilt?: string; calendarUpdated?: string; recurringSaved?: string; suggestApplied?: string; cw?: string;
+    // M42b: the calendar params (calendarBuilt / recurringSaved / suggestApplied / cw)
+    // moved to /operations/calendar along with the section that reads them.
     oppsRun?: string; oppsUpdated?: string; oppsUnreviewed?: string;
     actionUpdated?: string;
   }>;
@@ -91,14 +92,13 @@ export default async function OperationsPage({
   );
   const availableMonths = await trpc.operations.period.months().catch(() => []);
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
-  // M39 — forward calendar. Empty until the owner presses "build calendar"; nothing is
-  // auto-generated on read, because generating writes rows and a read must not.
-  const calWindow = sp.cw ? Math.min(400, Math.max(30, Number(sp.cw))) : 400;
-  const calendar = await trpc.operations.calendar
-    .upcoming({ windowDays: calWindow })
-    .catch(() => null);
-  const recurring = await trpc.operations.recurring.list().catch(() => []);
-  // M40a — the Opportunity Center. Like the calendar, reading NEVER generates: the
+  /*
+   * M42b — the calendar and recurring fetches MOVED to /operations/calendar with their
+   * section. This is the first place the route split pays for itself: two round-trips
+   * that used to run on every load of this page now only run when the owner actually
+   * asks for the calendar.
+   */
+  // M40a — the Opportunity Center. Reading NEVER generates: the
   // list is whatever the last explicit run produced, so a page refresh cannot
   // silently supersede the owner's inbox.
   const opps = await trpc.operations.opportunities.list().catch(() => null);
@@ -140,6 +140,8 @@ export default async function OperationsPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <OperationsNav locale={locale} active="" />
+
       <Explainer title={t("explainer.title")} paragraphs={[t("explainer.p1"), t("explainer.p2")]} />
 
       <ErrorBanner message={errorMsg} />
@@ -746,22 +748,6 @@ export default async function OperationsPage({
         ranMessage={sp.oppsRun ? t("oppsRun", { n: sp.oppsRun }) : undefined}
         savedMessage={sp.oppsUpdated ? tf("saved") : undefined}
         usesUnreviewedTax={Boolean(sp.oppsUnreviewed)}
-      />
-
-      <div id="calendar" />
-      {/* M42b — extracted to `sections/calendar.tsx`. Destined for /operations/calendar. */}
-      <CalendarSection
-        calendar={calendar}
-        recurring={recurring}
-        calWindow={calWindow}
-        locale={locale}
-        loc={loc}
-        baseCurrency={baseCurrency}
-        builtMessage={sp.calendarBuilt ? t("calendarBuilt", { n: sp.calendarBuilt }) : undefined}
-        savedMessage={sp.calendarUpdated || sp.recurringSaved ? tf("saved") : undefined}
-        suggestionsMessage={
-          sp.suggestApplied ? t("suggestionsApplied", { n: sp.suggestApplied }) : undefined
-        }
       />
 
 
