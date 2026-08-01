@@ -85,19 +85,24 @@ tests, is the highest-risk edit in this codebase — which is exactly why step 1
 where it did rather than pressing on.
 
 **Step 1 of 3 BUILT (`deploy-m42b.ps1`, gate not yet green):** Action Center, Monthly
-review, Opportunity Center and Suspense queue extracted to `operations/sections/*.tsx`.
-**page.tsx: ~1,550 → 1,225 lines.** Behaviour-preserving — QA is "does it look
-identical". Sections fetch their own translations rather than receiving `t`, so each can
-move to its own route without dragging the page's namespace choice along.
+review, Opportunity Center, Suspense queue and Calendar+recurring extracted to
+`operations/sections/*.tsx`. **page.tsx: ~1,550 → 1,072 lines.** Behaviour-preserving —
+QA is "does it look identical". Sections fetch their own translations rather than
+receiving `t`, so each can move to its own route without dragging the page's namespace
+choice along.
 
-**Still to extract:** month overview (largest, ~300 lines), calendar + recurring (~170),
-transaction list (~180), import (~300), categories, manual add.
+**Still to extract:** month overview (largest, ~300 lines), import (~300), transaction
+list (~180), categories, manual add.
 
 **Extraction template** (follow exactly — it has now survived four sections):
 1. Read the block. Create `sections/<name>.tsx`: `getTranslations("operations")` inside,
    data as props, same JSX verbatim.
-2. Replace the inline block with the component in ONE edit. **Do not** wrap the old block
-   in `{false ? (` as an interim step — it leaves the file unbalanced and I did it twice.
+2. Replace the inline block with the component in ONE edit. ⚠️ **Do not** wrap the old
+   block in `{false ? (` as an interim step. It leaves the file syntactically unbalanced
+   until a second edit lands, and if that second edit ever fails you have a broken page
+   with no obvious cause. **I did this three times across five extractions, including
+   once immediately after writing this line** — it is a genuinely sticky habit, so check
+   the diff rather than trusting intent.
 3. Grep `page.tsx` for every import the section used; delete the orphans. Verify shared
    ones (`BEHAVIORAL`, `CategoryPicker`, `Field`, `Select`, `formatMoney`) are still used
    before removing.
