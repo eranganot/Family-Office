@@ -14,12 +14,14 @@ import { getTranslations } from "next-intl/server";
  */
 
 /*
- * Only routes that EXIST are listed. `/operations/month` is next and is deliberately
- * absent until it is real — a tab that 404s is worse than a tab that is missing, because
- * it teaches the owner not to trust the nav.
+ * Only routes that EXIST are listed — a tab that 404s teaches the owner not to trust the
+ * nav. `/transactions` is deliberately absent: it is becoming a TOP-LEVEL destination,
+ * not an Operations tab, because you go there for a different reason than running the
+ * month.
  */
 const TABS = [
   ["", "navToday"],
+  ["/month", "navMonth"],
   ["/calendar", "navCalendar"],
 ] as const;
 
@@ -29,7 +31,7 @@ export async function OperationsNav({
 }: {
   locale: string;
   /** "" = Today. Matches the path suffix so a new route needs no extra wiring. */
-  active: "" | "calendar";
+  active: "" | "month" | "calendar";
 }) {
   const t = await getTranslations("operations");
 

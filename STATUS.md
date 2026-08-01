@@ -84,15 +84,25 @@ single unbalanced paren breaks the build. Attempting it blind, with no `tsc` and
 tests, is the highest-risk edit in this codebase — which is exactly why step 1 stopped
 where it did rather than pressing on.
 
-**Step 1 of 3 BUILT (`deploy-m42b.ps1`, gate not yet green):** Action Center, Monthly
-review, Opportunity Center, Suspense queue and Calendar+recurring extracted to
-`operations/sections/*.tsx`. **page.tsx: ~1,550 → 1,072 lines.** Behaviour-preserving —
-QA is "does it look identical". Sections fetch their own translations rather than
-receiving `t`, so each can move to its own route without dragging the page's namespace
-choice along.
+**Steps 1–2 BUILT (`deploy-m42b.ps1`, gate not yet green).** Six sections extracted to
+`operations/sections/*.tsx`, and **the routes now exist**:
 
-**Still to extract:** month overview (largest, ~300 lines), import (~300), transaction
-list (~180), categories, manual add.
+| Route | Contains |
+|---|---|
+| `/operations` (Today) | Action Center, Opportunity Center, suspense, import, manual add, transaction list, categories |
+| `/operations/month` | month overview + monthly review |
+| `/operations/calendar` | calendar + recurring |
+
+**page.tsx: ~1,550 → 768 lines.** `/operations` no longer runs `period.current`
+(computePeriod — the most expensive call in the module), `diagnostics.month`,
+`period.months`, `projection.eoy`, `review.driftAlerts`, `calendar.upcoming` or
+`recurring.list`. All seven moved to the route that needs them.
+
+Sections are MOVED, not copied, and every affected server action redirects to the route
+that shows its result — landing the owner where his change isn't rendered is its own bug.
+
+**Still to move:** import, transaction list, categories, manual add → the new top-level
+`/transactions`. Then Today becomes compact rows.
 
 **Extraction template** (follow exactly — it has now survived four sections):
 1. Read the block. Create `sections/<name>.tsx`: `getTranslations("operations")` inside,

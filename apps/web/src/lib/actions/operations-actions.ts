@@ -155,7 +155,8 @@ export async function recomputePeriodAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=recompute`);
   }
-  redirect(`/${locale}/operations?recomputed=1#month`);
+  // M42b: the month lives at its own route, so these land where the result is shown.
+  redirect(`/${locale}/operations/month?recomputed=1`);
 }
 
 export async function closePeriodAction(fd: FormData): Promise<void> {
@@ -169,9 +170,9 @@ export async function closePeriodAction(fd: FormData): Promise<void> {
       ...(note ? { reviewNote: note } : {}),
     });
   } catch {
-    redirect(`/${locale}/operations?error=close`);
+    redirect(`/${locale}/operations/month?error=close`);
   }
-  redirect(`/${locale}/operations?closed=1#month`);
+  redirect(`/${locale}/operations/month?closed=1`);
 }
 
 export async function reopenPeriodAction(fd: FormData): Promise<void> {
@@ -185,7 +186,7 @@ export async function reopenPeriodAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=reopen`);
   }
-  redirect(`/${locale}/operations?reopened=1#month`);
+  redirect(`/${locale}/operations/month?reopened=1`);
 }
 
 /**
