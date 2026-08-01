@@ -201,10 +201,30 @@ gate, after typecheck and tests) and gate assertions that contradict each other
 (`MonthlyReviewSection` was in both the must-be-gone and must-be-rendered lists, which no
 code could satisfy).
 
-### Gate 4 — Today as compact rows. After gate 3.
-Open actions + expiring opportunities + drift alerts + **suspense count**, as rows with
-counts that link into the other routes. NOT full cards — full cards mean the owner never
-leaves Today and Today re-accretes into the page this rebuild exists to undo.
+### Gate 4 — Today as compact rows. ✅ BUILT (in `deploy-m42b.ps1`).
+
+Three count rows at the top of Today — **transactions waiting to be classified**, open
+drift alerts, committed work. The first two **link out** rather than rendering the thing;
+embedding them is how this page re-accretes.
+
+- **Suspense leads.** It is the real blocker: every closed month is provisional while
+  unverified rows exist. Counted via a capped probe read (`50+` at the cap) because there
+  is no count endpoint and the lightest page must not do the heaviest read.
+- **A failed count renders "could not load", never 0. A zero renders as 0**, muted, not
+  hidden — the M41c lesson: silence must not read as a clean bill of health.
+- **Opportunity cards collapsed** to title / impact / badges / buttons, with rationale,
+  steps and risks behind a disclosure. Content unchanged and one click away — removing it
+  would mean taking recommendations on trust, the opposite of this engine's posture.
+
+### 🎉 M42b IA REBUILD COMPLETE — all four gates
+`operations/page.tsx`: **~1,550 → ~120 lines**, ten sections extracted, four routes,
+~30 redirects repointed, per-route explainers, eleven round-trips on Today down to four.
+
+### Next: M42 proper
+Health score (`health_score_weights` is seeded and consumed by nothing), telemetry
+projection, dashboard extensions, full bilingual pass, Playwright smoke. **Do the top-nav
+grouping backlog BEFORE dashboard extensions** — it is the same accretion one level up,
+and adding a dashboard to a 14-item nav repeats the mistake this milestone just undid.
 
 **Extraction template** (follow exactly — it has now survived four sections):
 1. Read the block. Create `sections/<name>.tsx`: `getTranslations("operations")` inside,

@@ -153,26 +153,42 @@ export async function OpportunityCenterSection({
                   <p className="mt-2 text-xs text-neutral-500">{t("oppsNoCashImpact")}</p>
                 )}
 
-                {rat?.why ? <p className="mt-2 text-sm text-neutral-700">{rat.why}</p> : null}
+                {/*
+                  M42b gate 4 — the reasoning is COLLAPSED by default.
+                  Each card previously rendered the full rationale, every action step and
+                  a risks/tradeoffs panel, which is most of why Today became a wall. The
+                  content is unchanged and one click away; what changed is that scanning
+                  five opportunities no longer means scrolling past five essays.
+                  Deliberately NOT removed: a recommendation the owner cannot interrogate
+                  is one he has to take on trust, which is the opposite of this engine's
+                  whole posture.
+                */}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs text-blue-700">
+                    {t("oppsWhyThis")}
+                  </summary>
 
-                {steps.length > 0 ? (
-                  <ol className="mt-3 list-inside list-decimal space-y-1 text-sm text-neutral-700">
-                    {steps.map((step, i) => (
-                      <li key={i}>{step}</li>
-                    ))}
-                  </ol>
-                ) : null}
+                  {rat?.why ? <p className="mt-2 text-sm text-neutral-700">{rat.why}</p> : null}
 
-                <div className="mt-3">
-                  <Explainer
-                    title={t("oppsWhyNot")}
-                    paragraphs={[
-                      ...(rat?.risks ?? []),
-                      ...(rat?.tradeoffs ?? []),
-                      t("oppsConfidence", { n: o.confidenceScore, p: o.priorityScore }),
-                    ]}
-                  />
-                </div>
+                  {steps.length > 0 ? (
+                    <ol className="mt-3 list-inside list-decimal space-y-1 text-sm text-neutral-700">
+                      {steps.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
+                    </ol>
+                  ) : null}
+
+                  <div className="mt-3">
+                    <Explainer
+                      title={t("oppsWhyNot")}
+                      paragraphs={[
+                        ...(rat?.risks ?? []),
+                        ...(rat?.tradeoffs ?? []),
+                        t("oppsConfidence", { n: o.confidenceScore, p: o.priorityScore }),
+                      ]}
+                    />
+                  </div>
+                </details>
 
                 {o.status === "PROPOSED" ? (
                   <div className="mt-3 flex flex-wrap gap-3">

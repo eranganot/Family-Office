@@ -5,6 +5,7 @@ import { serverCaller } from "../../../../lib/trpc-server";
 import { ActionCenterSection } from "./sections/action-center";
 import { OpportunityCenterSection } from "./sections/opportunity-center";
 import { OperationsNav } from "./sections/operations-nav";
+import { TodaySummarySection } from "./sections/today-summary";
 
 /**
  * M42b — `/operations`, "Today". What needs the owner's attention.
@@ -52,6 +53,21 @@ export default async function OperationsPage({
   const opps = await trpc.operations.opportunities.list().catch(() => null);
   // M40c — the Action Center: committed work from BOTH engines. Reading never mutates.
   const actions = await trpc.operations.actions.list().catch(() => null);
+
+  /*
+   * Gate 4 — the two counts Today links out to. Both resolve to `null` on failure and
+   * are rendered as "unavailable", never as zero: a broken query that displays 0 is a
+   * clean bill of health nobody earned, which is precisely the M41c defect.
+   *
+   * SUSPENSE_PROBE caps the read. There is no count endpoint, and pulling the whole
+   * queue to render one number would make the lightest page do the heaviest read — so
+   * the row says "50+" at the cap rather than pretending to a total it did not measure.
+   */
+  const SUSPENSE_PROBE = 50;
+  const suspense = await trpc.operations.suspense
+    .queue({ limit: SUSPENSE_PROBE })
+    .catch(() => null);
+  const driftAlerts = await trpc.operations.review.driftAlerts().catch(() => null);
   const baseCurrency = "ILS";
 
   const errorMsg = sp.error
@@ -71,6 +87,15 @@ export default async function OperationsPage({
       <Explainer title={t("explainer.title")} paragraphs={[t("explainer.p1"), t("explainer.p2")]} />
 
       <ErrorBanner message={errorMsg} />
+
+      <TodaySummarySection
+        locale={locale}
+        suspenseCount={suspense === null ? null : suspense.rows.length}
+        suspenseAtLimit={suspense !== null && suspense.rows.length >= SUSPENSE_PROBE}
+        driftCount={driftAlerts === null ? null : driftAlerts.length}
+        openActions={actions?.openCount ?? 0}
+        blockedActions={actions?.blockedCount ?? 0}
+      />
 
       {/*
         The Action Center sits ABOVE the Opportunity Center on purpose: work already
