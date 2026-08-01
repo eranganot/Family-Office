@@ -84,8 +84,16 @@ single unbalanced paren breaks the build. Attempting it blind, with no `tsc` and
 tests, is the highest-risk edit in this codebase — which is exactly why step 1 stopped
 where it did rather than pressing on.
 
-Order — **one section per commit, gate after each.** Extraction is behaviour-preserving,
-so any breakage is localised and obvious; a single 10-section rewrite is not.
+**Step 1 of 3 BUILT (`deploy-m42b.ps1`, gate not yet green):** Action Center, Monthly
+review and Opportunity Center extracted to `operations/sections/*.tsx`.
+**page.tsx: ~1,550 → 1,287 lines.** Behaviour-preserving — QA is "does it look
+identical". Sections fetch their own translations rather than receiving `t`, so each can
+move to its own route without dragging the page's namespace choice along.
+Remaining to extract: month overview, calendar, recurring, transactions, categories,
+manual add, suspense, import.
+
+Order — **extract first, restructure second.** Extraction is behaviour-preserving, so
+any breakage is localised and obvious; a single 10-section rewrite is not.
 1. Extract each Card into `operations/sections/<name>.tsx` as a server component taking
    its already-computed props. No moves, no restyling, no data changes.
 2. Create the routes and move each extracted section under the right one, narrowing each

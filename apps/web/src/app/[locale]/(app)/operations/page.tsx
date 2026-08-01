@@ -20,14 +20,14 @@ import {
   undoImportAction,
   uploadStatementAction,
   upsertCategoryAction,
-  runOpportunitiesAction,
-  setOpportunityStatusAction,
 } from "../../../../lib/actions/operations-actions";
 import { BehavioralBars, CategoryTable, SurplusWaterfall } from "../../../../components/operations/dual-axis";
 import { CategoryPicker, type PickerCategory } from "../../../../components/operations/category-picker";
 import { SUGGESTED_DATE_RATIONALE, nextOccurrenceForDecision, suggestedAnchorDate } from "@wealthos/domain";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { ActionCenterSection } from "./sections/action-center";
+import { MonthlyReviewSection } from "./sections/monthly-review";
+import { OpportunityCenterSection } from "./sections/opportunity-center";
 
 const BEHAVIORAL = ["FIXED_CONTRACTUAL", "VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG", "SAVINGS_FLOW", "TRANSFER"] as const;
 
@@ -711,72 +711,13 @@ export default async function OperationsPage({
 
       {/* ----------------------------------------------------------- M41 --- */}
       <div id="review" />
-      <Card title={t("reviewTitle")}>
-        <p className="mb-4 text-xs text-neutral-500">{t("reviewHint")}</p>
-
-        {driftAlerts === null ? (
-          <p className="mb-5 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-            {t("driftLoadFailed")}
-          </p>
-        ) : driftAlerts.length > 0 ? (
-          <ul className="mb-5 space-y-2">
-            {driftAlerts.map((d) => (
-              <li
-                key={d.id}
-                className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"
-              >
-                <p className="font-medium">{loc === "he" ? (d.titleHe ?? d.title) : d.title}</p>
-                <p className="mt-1">
-                  {t("driftDetail", {
-                    month: `${d.year}-${String(d.month ?? 0).padStart(2, "0")}`,
-                    realised: formatMoney(d.realisedBase ?? 0, baseCurrency, loc),
-                    baseline: formatMoney(d.baselineBase ?? 0, baseCurrency, loc),
-                    months: d.monthsInBaseline ?? 0,
-                  })}
-                </p>
-                {/* The caveat travels WITH the number, not in a footnote nobody reads. */}
-                {d.isProvisional ? <p className="mt-1">{t("driftProvisional")}</p> : null}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mb-5 text-sm text-neutral-500">{t("driftNone")}</p>
-        )}
-
-        <h3 className="mb-2 text-sm font-medium">{t("eoyTitle")}</h3>
-        {eoy === null ? (
-          <p className="text-sm text-neutral-500">{t("eoyUnavailable")}</p>
-        ) : !eoy.ok ? (
-          /*
-            A refusal, rendered as a refusal. This is the one place the projection could
-            most easily lie: a zero would draw as a flat line indistinguishable from a
-            real forecast of no growth.
-          */
-          <p className="text-sm text-neutral-500">
-            {t("eoyRefused", { observed: eoy.monthsObserved, need: eoy.minMonths })}
-          </p>
-        ) : (
-          <div className="space-y-1 text-sm tabular-nums">
-            <p>{t("eoyRunRate", { amount: formatMoney(eoy.monthlyRunRateBase, baseCurrency, loc) })}</p>
-            <p>{t("eoyCurrent", { amount: formatMoney(eoy.currentEoyBase, baseCurrency, loc) })}</p>
-            <p>{t("eoyOptimised", { amount: formatMoney(eoy.optimisedEoyBase, baseCurrency, loc) })}</p>
-            <p className="font-medium text-emerald-700">
-              {t("eoyDelta", { amount: formatMoney(eoy.deltaBase, baseCurrency, loc) })}
-            </p>
-            {/* Accepted actions that carry no quantified saving are COUNTED, not estimated. */}
-            {eoy.pendingWithoutImpact > 0 ? (
-              <p className="text-xs text-neutral-500">
-                {t("eoyNoImpactCount", { n: eoy.pendingWithoutImpact })}
-              </p>
-            ) : null}
-            {eoy.monthsProvisionalExcluded > 0 ? (
-              <p className="text-xs text-neutral-500">
-                {t("eoyProvisionalExcluded", { n: eoy.monthsProvisionalExcluded })}
-              </p>
-            ) : null}
-          </div>
-        )}
-      </Card>
+      {/* M42b — extracted to `sections/monthly-review.tsx`. Belongs to /operations/month. */}
+      <MonthlyReviewSection
+        driftAlerts={driftAlerts}
+        eoy={eoy}
+        loc={loc}
+        baseCurrency={baseCurrency}
+      />
 
       {/* ---------------------------------------------------------- M40c --- */}
       {/*
@@ -800,168 +741,16 @@ export default async function OperationsPage({
 
       {/* ---------------------------------------------------------- M39 --- */}
       <div id="opportunities" />
-      <Card title={t("oppsTitle")}>
-        <p className="mb-4 text-xs text-neutral-500">{t("oppsHint")}</p>
-
-        <SuccessBanner message={sp.oppsRun ? t("oppsRun", { n: sp.oppsRun }) : undefined} />
-        <SuccessBanner message={sp.oppsUpdated ? tf("saved") : undefined} />
-        {sp.oppsUnreviewed ? (
-          <p className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            {t("oppsUnreviewedTax")}
-          </p>
-        ) : null}
-
-        <div className="mb-4 flex flex-wrap items-center gap-4">
-          <form action={runOpportunitiesAction}>
-            <input type="hidden" name="locale" value={locale} />
-            <SubmitButton label={t("oppsRecompute")} />
-          </form>
-          {opps && opps.items.length > 0 ? (
-            <span className="text-xs text-neutral-500">
-              {t("oppsTotals", {
-                monthly: formatMoney(opps.totalMonthlyBase, baseCurrency, loc),
-                annual: formatMoney(opps.totalAnnualBase, baseCurrency, loc),
-              })}
-            </span>
-          ) : null}
-        </div>
-
-        {opps && opps.items.length > 0 ? (
-          <ul className="space-y-4">
-            {opps.items.map((o) => {
-              const rat = (loc === "he" ? o.rationaleHe : o.rationale) as {
-                why?: string;
-                risks?: string[];
-                tradeoffs?: string[];
-              } | null;
-              const acts = o.actionItems as { en?: string[]; he?: string[] } | null;
-              const steps = (loc === "he" ? acts?.he : acts?.en) ?? [];
-              // An expiring opportunity is the only kind that gets smaller by waiting,
-              // so proximity is shown on the card rather than buried in the rationale.
-              const expiry =
-                o.daysUntilExpiry === null
-                  ? null
-                  : o.daysUntilExpiry < 0
-                    ? t("oppsExpired")
-                    : o.daysUntilExpiry === 0
-                      ? t("dueToday")
-                      : t("oppsExpiresIn", { n: o.daysUntilExpiry });
-              return (
-                <li key={o.id} className="rounded border border-neutral-200 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold">
-                      {loc === "he" ? (o.titleHe ?? o.title) : o.title}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      {o.status !== "PROPOSED" ? (
-                        <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700">
-                          {t(`oppsStatus.${o.status}`)}
-                        </span>
-                      ) : null}
-                      {expiry ? (
-                        <span
-                          className={`rounded px-2 py-0.5 ${
-                            (o.daysUntilExpiry ?? 99) <= 14
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-neutral-100 text-neutral-500"
-                          }`}
-                        >
-                          {expiry}
-                        </span>
-                      ) : null}
-                      <span className="rounded bg-neutral-100 px-2 py-0.5 text-neutral-500">
-                        {t(`oppsDifficulty.${o.difficulty ?? "MODERATE"}`)}
-                      </span>
-                      <span className="rounded bg-neutral-100 px-2 py-0.5 text-neutral-500">
-                        {t(`oppsCadence.${o.cadence}`)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {o.impactMonthlyBase !== null || o.impactAnnualBase !== null ? (
-                    <p className="mt-2 text-xs tabular-nums text-neutral-600">
-                      {t("oppsImpact", {
-                        monthly: formatMoney(o.impactMonthlyBase ?? 0, baseCurrency, loc),
-                        annual: formatMoney(o.impactAnnualBase ?? 0, baseCurrency, loc),
-                        eoy: formatMoney(o.impactEoyBase ?? 0, baseCurrency, loc),
-                      })}
-                    </p>
-                  ) : o.type === "RENEGOTIATE_RECURRING_COMMITMENTS" ? (
-                    // Renegotiation knows the SPEND, not the saving. Saying so on the card
-                    // matters: an amount with no label reads as a saving by default.
-                    <p className="mt-2 text-xs text-neutral-500">{t("oppsSpendNotSaving")}</p>
-                  ) : (
-                    <p className="mt-2 text-xs text-neutral-500">{t("oppsNoCashImpact")}</p>
-                  )}
-
-                  {rat?.why ? <p className="mt-2 text-sm text-neutral-700">{rat.why}</p> : null}
-
-                  {steps.length > 0 ? (
-                    <ol className="mt-3 list-inside list-decimal space-y-1 text-sm text-neutral-700">
-                      {steps.map((step, i) => (
-                        <li key={i}>{step}</li>
-                      ))}
-                    </ol>
-                  ) : null}
-
-                  <div className="mt-3">
-                    <Explainer
-                      title={t("oppsWhyNot")}
-                      paragraphs={[
-                        ...(rat?.risks ?? []),
-                        ...(rat?.tradeoffs ?? []),
-                        t("oppsConfidence", { n: o.confidenceScore, p: o.priorityScore }),
-                      ]}
-                    />
-                  </div>
-
-                  {o.status === "PROPOSED" ? (
-                    <div className="mt-3 flex flex-wrap gap-3">
-                      {(["ACCEPTED", "IMPLEMENTED", "REJECTED"] as const).map((st) => (
-                        <form key={st} action={setOpportunityStatusAction} className="inline">
-                          <input type="hidden" name="locale" value={locale} />
-                          <input type="hidden" name="id" value={o.id} />
-                          <input type="hidden" name="status" value={st} />
-                          <button
-                            type="submit"
-                            className={`text-xs underline ${
-                              st === "REJECTED" ? "text-neutral-500" : "text-emerald-700"
-                            }`}
-                          >
-                            {t(`oppsAction.${st}`)}
-                          </button>
-                        </form>
-                      ))}
-                    </div>
-                  ) : (
-                    /*
-                     * M40c — un-accept. `setStatus` has always accepted PROPOSED, but only
-                     * PROPOSED cards rendered actions, so a mis-click was permanent from the
-                     * screen: an ACCEPTED type is never re-proposed by a run, so the card
-                     * could not come back on its own either. Reverting returns the item to
-                     * the normal lifecycle — it counts toward the headline again and the next
-                     * run may supersede or refresh it.
-                     */
-                    <div className="mt-3 flex flex-wrap gap-3">
-                      <form action={setOpportunityStatusAction} className="inline">
-                        <input type="hidden" name="locale" value={locale} />
-                        <input type="hidden" name="id" value={o.id} />
-                        <input type="hidden" name="status" value="PROPOSED" />
-                        <button type="submit" className="text-xs text-neutral-500 underline">
-                          {t("oppsAction.REVERT")}
-                        </button>
-                      </form>
-                      <span className="text-xs text-neutral-400">{t("oppsRevertHint")}</span>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="text-sm text-neutral-500">{opps ? t("oppsEmpty") : t("oppsNeverRun")}</p>
-        )}
-      </Card>
+      {/* M42b — extracted to `sections/opportunity-center.tsx`. */}
+      <OpportunityCenterSection
+        opps={opps}
+        locale={locale}
+        loc={loc}
+        baseCurrency={baseCurrency}
+        ranMessage={sp.oppsRun ? t("oppsRun", { n: sp.oppsRun }) : undefined}
+        savedMessage={sp.oppsUpdated ? tf("saved") : undefined}
+        usesUnreviewedTax={Boolean(sp.oppsUnreviewed)}
+      />
 
       <div id="calendar" />
       <Card title={t("calendarTitle")}>
