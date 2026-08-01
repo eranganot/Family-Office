@@ -101,8 +101,66 @@ where it did rather than pressing on.
 Sections are MOVED, not copied, and every affected server action redirects to the route
 that shows its result — landing the owner where his change isn't rendered is its own bug.
 
-**Still to move:** import, transaction list, categories, manual add → the new top-level
-`/transactions`. Then Today becomes compact rows.
+### Gate 3 — `/transactions` top-level. ✅ BUILT (in `deploy-m42b.ps1`).
+
+Nine sections now live outside `page.tsx`. **Today: ~1,550 → 443 lines**, and down from
+**eleven** round-trips per load to three.
+
+| Route | Contains |
+|---|---|
+| `/operations` (Today) | nav, import, Action Center, Opportunity Center |
+| `/operations/month` | month overview + monthly review |
+| `/operations/calendar` | calendar + recurring |
+| **`/transactions`** (top-level) | suspense queue (first), list, manual add, category tree |
+
+Suspense is placed FIRST on `/transactions` deliberately — every closed month is
+provisional until it is cleared. `/transactions` has its own **main-nav** entry, making
+15 top-nav items: the grouping backlog above is now load-bearing.
+
+**Still on Today and needing a home: IMPORT** (~280 lines). Owner said it can go under
+Mapping, which already owns ingestion. That is the last section move.
+
+### Superseded plan (kept for the block map only)
+
+The largest single move left, and the reason it was not attempted at the end of session
+31: four sections plus a redirect map, where a half-finished state leaves transactions
+rendered in two places with no way to tell which is authoritative.
+
+**Current `operations/page.tsx` (768 lines) block map:**
+
+| Lines | Block | Destination |
+|---|---|---|
+| 128–~405 | Import (`importTitle`) | `/transactions` — **or the Mapping page** (owner said either; Mapping owns the rest of ingestion) |
+| 443–477 | Action Center, Opportunity Center, Suspense | Action + Opportunity **stay** on Today; Suspense → `/transactions` |
+| 478–529 | Manual add (`addTransaction`) | `/transactions` |
+| 531–713 | Transaction list (`transactions`) | `/transactions` |
+| 714–~765 | Category tree (`categories`) | `/transactions` |
+
+**After this gate, Today is only:** `OperationsNav` + error/success banners +
+`ActionCenterSection` + `OpportunityCenterSection`. Roughly 90 lines.
+
+**Redirects that must move** (same trap as the calendar and month actions — landing the
+owner where his change is not rendered is its own bug). Grep
+`operations-actions.ts` for `/operations?` and move these to `/transactions?`:
+`created`, `classified`, `categorySaved`, `updated`, `removed`, `restored`, `undone`,
+`dupesRemoved`, `reset`, `imported`, `uploaded`, `preview`, `failed`, `edit`, `cat`,
+`beh`. The gate already asserts no *moved* action still points at `/operations` — extend
+that list when they move.
+
+**`/transactions` is TOP-LEVEL**, not `/operations/transactions`, and therefore does NOT
+appear in `OperationsNav`. It needs an entry in the app's main navigation instead — which
+runs straight into the 14-item top-nav backlog above, so expect to touch that.
+
+**Follow the extraction template** (below) — it has held for six sections. The two
+recurring costs, both cheap to avoid: dead imports (ESLint catches them at the END of the
+gate, after typecheck and tests) and gate assertions that contradict each other
+(`MonthlyReviewSection` was in both the must-be-gone and must-be-rendered lists, which no
+code could satisfy).
+
+### Gate 4 — Today as compact rows. After gate 3.
+Open actions + expiring opportunities + drift alerts + **suspense count**, as rows with
+counts that link into the other routes. NOT full cards — full cards mean the owner never
+leaves Today and Today re-accretes into the page this rebuild exists to undo.
 
 **Extraction template** (follow exactly — it has now survived four sections):
 1. Read the block. Create `sections/<name>.tsx`: `getTranslations("operations")` inside,

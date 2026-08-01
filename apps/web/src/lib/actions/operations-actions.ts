@@ -122,7 +122,10 @@ export async function createManualTransactionAction(fd: FormData): Promise<void>
   } catch {
     redirect(`/${locale}/operations?error=create`);
   }
-  redirect(`/${locale}/operations?created=1`);
+  // M42b: transactions, categories and the suspense queue live at the top-level
+  // /transactions route now. Redirecting to /operations would land the owner on a page
+  // where the row he just created is not shown.
+  redirect(`/${locale}/transactions?created=1`);
 }
 
 export async function upsertCategoryAction(fd: FormData): Promise<void> {
@@ -141,7 +144,7 @@ export async function upsertCategoryAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=category&tab=categories`);
   }
-  redirect(`/${locale}/operations?categorySaved=1&tab=categories#categories`);
+  redirect(`/${locale}/transactions?categorySaved=1`);
 }
 
 export async function recomputePeriodAction(fd: FormData): Promise<void> {
@@ -207,7 +210,7 @@ export async function bulkClassifyMerchantAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=classify`);
   }
-  redirect(`/${locale}/operations?classified=1#suspense`);
+  redirect(`/${locale}/transactions?classified=1`);
 }
 
 export async function updateTransactionAction(fd: FormData): Promise<void> {
@@ -241,7 +244,7 @@ export async function updateTransactionAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=update&edit=${str(fd, "id")}`);
   }
-  redirect(`/${locale}/operations?updated=1#tx-${str(fd, "id")}`);
+  redirect(`/${locale}/transactions?updated=1#tx-${str(fd, "id")}`);
 }
 
 /** Remove = VOID (reversible, keeps the classification history). Restore = BOOKED. */
@@ -252,9 +255,9 @@ export async function setTransactionStatusAction(fd: FormData): Promise<void> {
   try {
     await trpc.operations.transactions.setStatus({ id: str(fd, "id"), status: status as never });
   } catch {
-    redirect(`/${locale}/operations?error=status`);
+    redirect(`/${locale}/transactions?error=status`);
   }
-  redirect(`/${locale}/operations?${status === "VOID" ? "removed" : "restored"}=1#tx-${str(fd, "id")}`);
+  redirect(`/${locale}/transactions?${status === "VOID" ? "removed" : "restored"}=1#tx-${str(fd, "id")}`);
 }
 
 /**
@@ -459,7 +462,7 @@ export async function removeDuplicatesAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations?error=dupes#transactions`);
   }
-  redirect(`/${locale}/operations?dupesRemoved=${removed}#transactions`);
+  redirect(`/${locale}/transactions?dupesRemoved=${removed}`);
 }
 
 /* ------------------------------------------------------------------ M39 --- */

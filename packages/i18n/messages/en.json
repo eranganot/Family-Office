@@ -30,7 +30,8 @@
     "scenarios": "Scenarios",
     "monitoring": "Monitoring",
     "allocation": "Allocation",
-    "operations": "Operations"
+    "operations": "Operations",
+    "transactions": "Transactions"
   },
   "phase": {
     "label": "Current phase",

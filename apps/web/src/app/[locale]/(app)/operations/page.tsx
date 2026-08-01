@@ -1,36 +1,18 @@
-import { formatMoney, type Locale } from "@wealthos/i18n";
+import { type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
 import { Card, ErrorBanner, Explainer, Field, Select, SubmitButton, SuccessBanner, TextInput } from "../../../../components/fields";
 import {
-  createManualTransactionAction,
   commitAllPendingAction,
   commitStatementAction,
-  setTransactionStatusAction,
-  updateTransactionAction,
-  removeDuplicatesAction,
   resetAllImportsAction,
   undoImportAction,
   uploadStatementAction,
-  upsertCategoryAction,
 } from "../../../../lib/actions/operations-actions";
-import { CategoryPicker, type PickerCategory } from "../../../../components/operations/category-picker";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { ActionCenterSection } from "./sections/action-center";
 import { OpportunityCenterSection } from "./sections/opportunity-center";
-import { SuspenseQueueSection } from "./sections/suspense-queue";
 import { OperationsNav } from "./sections/operations-nav";
 
-const BEHAVIORAL = ["FIXED_CONTRACTUAL", "VARIABLE_DISCRETIONARY", "FINANCIAL_DRAG", "SAVINGS_FLOW", "TRANSFER"] as const;
-
-interface FlatCategory {
-  id: string;
-  key: string;
-  nameEn: string;
-  nameHe: string;
-  axis: "INCOME" | "EXPENSE";
-  parentId: string | null;
-  defaultBehavioralClass: string;
-}
 
 export default async function OperationsPage({
   params,
@@ -38,14 +20,16 @@ export default async function OperationsPage({
 }: {
   params: Promise<{ locale: string }>;
   searchParams: Promise<{
-    error?: string; created?: string; classified?: string; categorySaved?: string;
-    recomputed?: string; closed?: string; reopened?: string; tab?: string;
-    updated?: string; removed?: string; restored?: string; edit?: string;
+    /*
+     * M42b — what Today still reads: import outcomes, and the two inbox sections.
+     * Moved out with their sections: y / m / recomputed / closed / reopened (month),
+     * cw / calendarBuilt / recurringSaved / suggestApplied (calendar), and
+     * cat / beh / edit / created / classified / categorySaved / updated / removed /
+     * restored / dupesRemoved (transactions).
+     */
+    error?: string;
     preview?: string; imported?: string; dupes?: string; uploaded?: string; failed?: string;
     mb?: string; skipped?: string; undone?: string; reset?: string; docs?: string; n?: string; why?: string; reused?: string;
-    y?: string; m?: string; cat?: string; beh?: string; dupesRemoved?: string;
-    // M42b: the calendar params (calendarBuilt / recurringSaved / suggestApplied / cw)
-    // moved to /operations/calendar along with the section that reads them.
     oppsRun?: string; oppsUpdated?: string; oppsUnreviewed?: string;
     actionUpdated?: string;
   }>;
@@ -56,15 +40,8 @@ export default async function OperationsPage({
   const tf = await getTranslations("forms");
   const trpc = await serverCaller();
 
-  // Seeds the default tree on first read — idempotent.
-  const cats = await trpc.operations.categories.tree();
+  // M42b: the category tree seed moved to /transactions with the sections that use it.
   const meta = await trpc.operations.meta();
-  const { rows: txns } = await trpc.operations.transactions.list({
-    limit: 50,
-    ...(sp.cat ? { categoryId: sp.cat } : {}),
-    ...(sp.beh ? { behavioralClass: sp.beh as never } : {}),
-  });
-  const dupes = await trpc.operations.transactions.duplicates().catch(() => null);
   // Preview is a mutation (it does real parsing work) but persists nothing.
   // NEVER swallow this: a silent catch here renders an empty card and looks like the
   // feature simply does not exist. Surface the reason instead.
@@ -79,7 +56,6 @@ export default async function OperationsPage({
   }
   const pending = await trpc.operations.import.pending().catch(() => []);
   const batches = await trpc.operations.import.batches().catch(() => []);
-  const suspense = await trpc.operations.suspense.queue({ limit: 25 });
   /*
    * M42b — what this page NO LONGER fetches, and why that is the point of the split:
    *
@@ -99,10 +75,6 @@ export default async function OperationsPage({
   const actions = await trpc.operations.actions.list().catch(() => null);
   const baseCurrency = "ILS";
 
-  const flat = cats.flat as unknown as FlatCategory[];
-  const byId = new Map(flat.map((c) => [c.id, c]));
-  const pickerCats = flat as unknown as PickerCategory[];
-  const today = new Date().toISOString().slice(0, 10);
   const loc = locale as Locale;
 
   const errorMsg = sp.error
@@ -400,16 +372,13 @@ export default async function OperationsPage({
       </Card>
       <SuccessBanner
         message={
-          sp.created ? t("created")
-          : sp.classified ? t("classified")
-          : sp.categorySaved ? t("categorySaved")
-          // recomputed / closed / reopened moved to /operations/month with the section
-          // whose forms produce them.
-          : sp.updated ? t("updatedOk")
-          : sp.removed ? t("removedOk")
-          : sp.restored ? t("restoredOk")
-          : sp.undone ? t("undoneOk", { n: sp.undone })
-          : sp.dupesRemoved ? t("dupesRemovedOk", { n: sp.dupesRemoved })
+          /*
+           * M42b — only IMPORT outcomes remain here. created / classified /
+           * categorySaved / updated / removed / restored / dupesRemoved moved to
+           * /transactions, and recomputed / closed / reopened to /operations/month,
+           * each with the forms that produce them.
+           */
+          sp.undone ? t("undoneOk", { n: sp.undone })
           : sp.reset ? t("resetOk", { n: sp.reset, docs: sp.docs ?? "0" })
           : sp.imported
             ? sp.skipped && sp.skipped !== "0"
@@ -462,305 +431,11 @@ export default async function OperationsPage({
 
 
       {/*
-        M42: the #suspense anchor used to sit ~500 lines above, next to the review
-        section, so every link to it scrolled to the wrong card. It moved here, to the
-        section it names.
+        M42b — the suspense queue moved to /transactions, next to the list it is about
+        and the tree it assigns from. Its COUNT belongs on Today (gate 4), because every
+        closed month is provisional until this queue is cleared — but the queue itself is
+        classification work, not day-to-day work.
       */}
-      <div id="suspense" />
-      {/* M42b — extracted to `sections/suspense-queue.tsx`. Destined for /transactions. */}
-      <SuspenseQueueSection
-        suspense={suspense}
-        pickerCats={pickerCats}
-        locale={locale}
-        loc={loc}
-      />
-
-      <Card title={t("addTransaction")}>
-        <p className="mb-4 text-xs text-neutral-500">{t("addTransactionHint")}</p>
-        <form action={createManualTransactionAction} className="grid max-w-4xl grid-cols-2 items-end gap-4 md:grid-cols-3">
-          <input type="hidden" name="locale" value={locale} />
-          <Field label={t("date")}>
-            <TextInput name="bookedAt" type="date" defaultValue={today} required />
-          </Field>
-          <Field label={t("direction")}>
-            <Select name="direction" defaultValue="OUT">
-              <option value="OUT">{t("directionOut")}</option>
-              <option value="IN">{t("directionIn")}</option>
-            </Select>
-          </Field>
-          <Field label={t("amount")}>
-            <TextInput name="amount" inputMode="decimal" required placeholder="0.00" />
-          </Field>
-          <Field label={t("currency")}>
-            <Select name="currency" defaultValue="ILS">
-              {["ILS", "USD", "EUR"].map((c) => <option key={c} value={c}>{c}</option>)}
-            </Select>
-          </Field>
-          <Field label={t("description")}>
-            <TextInput name="description" required maxLength={400} />
-          </Field>
-          <Field label={t("category")}>
-            <CategoryPicker
-              name="category"
-              categories={pickerCats}
-              locale={locale}
-              placeholder={t("categoryOrPick")}
-              listId="cats-create"
-            />
-          </Field>
-          <Field label={t("behavioral")}>
-            <Select name="behavioralClass" defaultValue="">
-              <option value="">{t("behavioralFromCategory")}</option>
-              {BEHAVIORAL.map((b) => <option key={b} value={b}>{t(`behavioralClass.${b}`)}</option>)}
-            </Select>
-          </Field>
-          <Field label={t("instalmentNumber")}>
-            <TextInput name="instalmentNumber" inputMode="numeric" placeholder="1" />
-          </Field>
-          <Field label={t("instalmentTotal")}>
-            <TextInput name="instalmentTotal" inputMode="numeric" placeholder="3" />
-          </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="isRecurringCandidate" />
-            <span className="text-neutral-600">{t("recurring")}</span>
-          </label>
-          <SubmitButton label={t("save")} />
-        </form>
-      </Card>
-
-      <div id="transactions" />
-      <Card title={t("transactions")}>
-        <p className="mb-3 text-xs text-neutral-500">{t("transactionsHint")}</p>
-
-        {dupes && dupes.extraRows > 0 ? (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            <span>
-              {t("dupesFound", {
-                n: dupes.extraRows,
-                groups: dupes.groups.length,
-                amount: formatMoney(dupes.extraAmount, baseCurrency, loc),
-              })}
-            </span>
-            <form action={removeDuplicatesAction}>
-              <input type="hidden" name="locale" value={locale} />
-              <button type="submit" className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">
-                {t("dupesRemove")}
-              </button>
-            </form>
-          </div>
-        ) : null}
-
-        {/* Filter by category / behaviour — GET links so a filtered view is linkable. */}
-        <form method="get" action={`/${locale}/operations`} className="mb-4 flex flex-wrap items-end gap-3">
-          {sp.y ? <input type="hidden" name="y" value={sp.y} /> : null}
-          {sp.m ? <input type="hidden" name="m" value={sp.m} /> : null}
-          <Field label={t("filterCategory")}>
-            <Select name="cat" defaultValue={sp.cat ?? ""}>
-              <option value="">{t("filterAll")}</option>
-              {flat.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {locale === "he" ? c.nameHe : c.nameEn}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t("filterBehavioral")}>
-            <Select name="beh" defaultValue={sp.beh ?? ""}>
-              <option value="">{t("filterAll")}</option>
-              {BEHAVIORAL.map((b) => (
-                <option key={b} value={b}>{t(`behavioralClass.${b}`)}</option>
-              ))}
-            </Select>
-          </Field>
-          <SubmitButton label={t("filterApply")} />
-          {sp.cat || sp.beh ? (
-            <a href={`/${locale}/operations#transactions`} className="text-xs text-blue-600 underline">
-              {t("filterClear")}
-            </a>
-          ) : null}
-        </form>
-        {txns.length === 0 ? (
-          <p className="text-sm text-neutral-500">{t("noTransactions")}</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {txns.map((tx) => {
-              const cat = tx.categoryId ? byId.get(tx.categoryId) : undefined;
-              const amount = Number(tx.amount);
-              const cls = tx.classifications[0];
-              const isEditing = sp.edit === tx.id;
-              const voided = tx.status === "VOID";
-              return (
-                <div
-                  id={`tx-${tx.id}`}
-                  key={tx.id}
-                  className={`rounded-xl border p-4 ${voided ? "border-neutral-200 bg-neutral-50 opacity-60" : "border-neutral-200"}`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-2 font-medium">
-                        <span>{tx.descriptionRedacted}</span>
-                        {voided ? (
-                          <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-600">{t("removedBadge")}</span>
-                        ) : null}
-                        {tx.instalmentTotal ? (
-                          <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700">
-                            {t("instalmentBadge", { n: tx.instalmentNumber ?? 1, total: tx.instalmentTotal })}
-                          </span>
-                        ) : null}
-                        {tx.isRecurringCandidate ? (
-                          <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700">{t("recurringBadge")}</span>
-                        ) : null}
-                      </p>
-                      <p className="mt-1 text-xs text-neutral-500">
-                        {new Date(tx.bookedAt).toISOString().slice(0, 10)}
-                        {" · "}
-                        {cat ? (locale === "he" ? cat.nameHe : cat.nameEn) : t("unclassifiedBadge")}
-                        {tx.behavioralClass ? ` · ${t(`behavioralClass.${tx.behavioralClass}`)}` : ""}
-                      </p>
-                      {/* Provenance: why does this row have this category? */}
-                      {cls ? (
-                        <p className="mt-1 text-xs text-neutral-400">
-                          {t("provenance", {
-                            method: t(`method.${cls.method}`),
-                            confidence: Math.round(Number(cls.confidence) * 100),
-                          })}
-                          {cls.decidedBy ? ` · ${cls.decidedBy}` : ""}
-                          {cls.ruleVersion ? ` · ${cls.ruleVersion}` : ""}
-                        </p>
-                      ) : (
-                        <p className="mt-1 text-xs text-neutral-400">{t("provenanceNone")}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`whitespace-nowrap tabular-nums ${amount < 0 ? "text-neutral-800" : "text-green-700"}`}>
-                        {formatMoney(Math.abs(amount), tx.currency, loc)}
-                      </span>
-                      {isEditing ? (
-                        <a href={`/${locale}/operations`} className="text-xs text-neutral-500 underline">{t("cancel")}</a>
-                      ) : (
-                        <a href={`/${locale}/operations?edit=${tx.id}`} className="text-xs text-blue-600 underline">{t("edit")}</a>
-                      )}
-                      <form action={setTransactionStatusAction}>
-                        <input type="hidden" name="locale" value={locale} />
-                        <input type="hidden" name="id" value={tx.id} />
-                        <input type="hidden" name="status" value={voided ? "BOOKED" : "VOID"} />
-                        <button type="submit" className="text-xs text-neutral-500 underline">
-                          {voided ? t("restore") : t("remove")}
-                        </button>
-                      </form>
-                    </div>
-                  </div>
-
-                  {isEditing ? (
-                    <form action={updateTransactionAction} className="mt-4 grid grid-cols-2 items-end gap-3 border-t border-neutral-100 pt-4 md:grid-cols-4">
-                      <input type="hidden" name="locale" value={locale} />
-                      <input type="hidden" name="id" value={tx.id} />
-                      <Field label={t("date")}>
-                        <TextInput name="bookedAt" type="date" defaultValue={new Date(tx.bookedAt).toISOString().slice(0, 10)} required />
-                      </Field>
-                      <Field label={t("direction")}>
-                        <Select name="direction" defaultValue={amount < 0 ? "OUT" : "IN"}>
-                          <option value="OUT">{t("directionOut")}</option>
-                          <option value="IN">{t("directionIn")}</option>
-                        </Select>
-                      </Field>
-                      <Field label={t("amount")}>
-                        <TextInput name="amount" inputMode="decimal" defaultValue={Math.abs(amount)} required />
-                      </Field>
-                      <Field label={t("currency")}>
-                        <Select name="currency" defaultValue={tx.currency}>
-                          {["ILS", "USD", "EUR"].map((c) => <option key={c} value={c}>{c}</option>)}
-                        </Select>
-                      </Field>
-                      <Field label={t("description")}>
-                        <TextInput name="description" defaultValue={tx.descriptionRedacted} required maxLength={400} />
-                      </Field>
-                      <Field label={t("category")}>
-                        <CategoryPicker
-                          name="category"
-                          categories={pickerCats}
-                          locale={locale}
-                          defaultCategoryId={tx.categoryId}
-                          placeholder={t("categoryOrPick")}
-                          listId="cats-all"
-                        />
-                      </Field>
-                      <Field label={t("behavioral")}>
-                        <Select name="behavioralClass" defaultValue={tx.behavioralClass ?? ""}>
-                          <option value="">{t("behavioralFromCategory")}</option>
-                          {BEHAVIORAL.map((b) => <option key={b} value={b}>{t(`behavioralClass.${b}`)}</option>)}
-                        </Select>
-                      </Field>
-                      <Field label={t("instalmentNumber")}>
-                        <TextInput name="instalmentNumber" inputMode="numeric" defaultValue={tx.instalmentNumber ?? ""} />
-                      </Field>
-                      <Field label={t("instalmentTotal")}>
-                        <TextInput name="instalmentTotal" inputMode="numeric" defaultValue={tx.instalmentTotal ?? ""} />
-                      </Field>
-                      <label className="flex items-center gap-2 text-sm">
-                        <input type="checkbox" name="isRecurringCandidate" defaultChecked={tx.isRecurringCandidate} />
-                        <span className="text-neutral-600">{t("recurring")}</span>
-                      </label>
-                      <SubmitButton label={t("saveChanges")} />
-                    </form>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      <div id="categories" />
-      <Card title={t("categories")}>
-        <p className="mb-4 text-xs text-neutral-500">{t("categoriesHint", { count: flat.length })}</p>
-        <div className="mb-6 grid gap-6 md:grid-cols-2">
-          {(["EXPENSE", "INCOME"] as const).map((axis) => (
-            <div key={axis}>
-              <h3 className="mb-2 text-sm font-semibold">{t(`axis.${axis}`)}</h3>
-              <ul className="text-sm">
-                {flat.filter((c) => c.axis === axis).map((c) => (
-                  <li key={c.id} className="flex items-center justify-between border-b border-neutral-100 py-1">
-                    <span style={{ paddingInlineStart: `${(c.key.split(".").length - 1) * 12}px` }}>
-                      {locale === "he" ? c.nameHe : c.nameEn}
-                    </span>
-                    <span className="text-xs text-neutral-400">{t(`behavioralClass.${c.defaultBehavioralClass}`)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <form action={upsertCategoryAction} className="grid max-w-4xl grid-cols-2 items-end gap-4 md:grid-cols-3">
-          <input type="hidden" name="locale" value={locale} />
-          <Field label={t("axisLabel")}>
-            <Select name="axis" defaultValue="EXPENSE">
-              <option value="EXPENSE">{t("axis.EXPENSE")}</option>
-              <option value="INCOME">{t("axis.INCOME")}</option>
-            </Select>
-          </Field>
-          <Field label={t("parent")}>
-            <CategoryPicker
-              name="parent"
-              categories={pickerCats}
-              locale={locale}
-              placeholder={t("noParent")}
-              listId="cats-all"
-            />
-          </Field>
-          <Field label={t("categoryKey")}>
-            <TextInput name="key" required placeholder="food.bakery" />
-          </Field>
-          <Field label={t("nameEn")}><TextInput name="nameEn" required /></Field>
-          <Field label={t("nameHe")}><TextInput name="nameHe" required /></Field>
-          <Field label={t("behavioral")}>
-            <Select name="defaultBehavioralClass" defaultValue="VARIABLE_DISCRETIONARY">
-              {BEHAVIORAL.map((b) => <option key={b} value={b}>{t(`behavioralClass.${b}`)}</option>)}
-            </Select>
-          </Field>
-          <SubmitButton label={t("addCategory")} />
-        </form>
-      </Card>
 
       <p className="text-xs text-neutral-400">{t("engineVersion", { version: meta.engineVersion })}</p>
     </div>

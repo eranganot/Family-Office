@@ -47,6 +47,11 @@ export default async function AppLayout({
           { href: "/verification", label: t("nav.verification") },
           { href: "/allocation", label: t("nav.allocation") },
           { href: "/operations", label: t("nav.operations") },
+          // M42b — top-level, not an Operations tab: the list, the category tree, the
+          // suspense queue and manual entry are one subject, visited for a different
+          // reason than running the month. NOTE this makes 15 top-nav entries; grouping
+          // the nav is a recorded backlog item.
+          { href: "/transactions", label: t("nav.transactions") },
           { href: "/goals", label: t("nav.goals") },
           { href: "/strategy", label: t("nav.strategy") },
           { href: "/scenarios", label: t("nav.scenarios") },

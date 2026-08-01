@@ -30,7 +30,8 @@
     "scenarios": "תרחישים",
     "monitoring": "ניטור",
     "allocation": "הקצאה",
-    "operations": "תפעול"
+    "operations": "תפעול",
+    "transactions": "תנועות"
   },
   "phase": {
     "label": "שלב נוכחי",
