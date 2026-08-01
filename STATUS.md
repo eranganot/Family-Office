@@ -220,6 +220,29 @@ embedding them is how this page re-accretes.
 `operations/page.tsx`: **~1,550 → ~120 lines**, ten sections extracted, four routes,
 ~30 redirects repointed, per-route explainers, eleven round-trips on Today down to four.
 
+### ✅ Duplicate opportunity cards — FIXED (QA, 2026-07-29)
+The same "5 scheduled reviews" card rendered twice. `supersede → create` closed neither
+route: two drafts sharing a type in one run, or two runs racing on a double-click. Both
+guards now sit inside the transaction — open PROPOSED types are re-read **after** the
+supersede, and the type map is authoritative. **Existing duplicates self-heal on the
+next recompute.** Third occurrence of this shape (ACCEPTED-type skip → M41d drift alerts
+→ here): *an inbox that shows one finding twice trains the owner to ignore both.*
+
+### ✅ Health score BUILT (engine + tests + `operations.health.score`)
+`health_score_weights` seeded since M36, consumed by nothing — now consumed. Constraints,
+because a composite out of 100 names nothing and reads as a verdict:
+- **An unmeasured component is REFUSED, not scored 0.** An unmapped household must not
+  read as a reckless one.
+- **The composite refuses below the weight-coverage floor**, and coverage travels with
+  the score — an 88 over 60% of the weight is never shown as just "88".
+- **Nothing downstream may branch on it.**
+- **Goals is deliberately unwired** and reported as unmeasured (costs 15 pts of
+  coverage) rather than approximated; its figures live in engine-goals and need a
+  snapshot this service does not build.
+- Reuses `opportunity_min_coverage_pct` — no new assumption key, so **pins stay valid**.
+- **No UI yet** — it is API-only, and belongs with the dashboard, which should come
+  *after* the top-nav grouping.
+
 ### Next: M42 proper
 Health score (`health_score_weights` is seeded and consumed by nothing), telemetry
 projection, dashboard extensions, full bilingual pass, Playwright smoke. **Do the top-nav
