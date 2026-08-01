@@ -4,6 +4,7 @@ import { SuccessBanner } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { CategoryTreeSection, type FlatCategory } from "../operations/sections/category-tree";
 import { ManualAddSection } from "../operations/sections/manual-add";
+import { OperationsNav } from "../operations/sections/operations-nav";
 import { SuspenseQueueSection } from "../operations/sections/suspense-queue";
 import { TransactionListSection } from "../operations/sections/transaction-list";
 import type { PickerCategory } from "../../../../components/operations/category-picker";
@@ -69,6 +70,13 @@ export default async function TransactionsPage({
 
   return (
     <div className="flex flex-col gap-6">
+      {/*
+        Same sub-nav as the Operations routes: this page is reached from that row, even
+        though its URL is top-level. The owner should not have to know which of these
+        happens to be a sub-route.
+      */}
+      <OperationsNav locale={locale} active="transactions" />
+
       <SuccessBanner
         message={
           sp.created ? t("created")

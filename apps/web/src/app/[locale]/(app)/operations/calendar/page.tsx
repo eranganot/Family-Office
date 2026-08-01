@@ -33,7 +33,11 @@ export default async function OperationsCalendarPage({
 
   // Reading NEVER generates: building the calendar writes rows, and a page load must
   // not. Empty until the owner presses rebuild.
-  const calWindow = sp.cw ? Math.min(400, Math.max(30, Number(sp.cw))) : 400;
+  //
+  // Default 60 days, not 400 (owner, 2026-07-29). 400 showed a year of statutory dates
+  // on arrival, which buries the handful that are actually imminent — the whole point of
+  // this view is proximity. The wider windows stay one click away.
+  const calWindow = sp.cw ? Math.min(400, Math.max(30, Number(sp.cw))) : 60;
   const calendar = await trpc.operations.calendar
     .upcoming({ windowDays: calWindow })
     .catch(() => null);

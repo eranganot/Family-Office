@@ -496,7 +496,19 @@ export async function setCalendarStatusAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations/calendar?error=calendar`);
   }
-  redirect(`/${locale}/operations/calendar?calendarUpdated=1`);
+  /*
+   * Anchor back to the row that was just actioned.
+   *
+   * A server action redirect is a full navigation, so the browser lands at the top of
+   * the page — and marking five events done meant scrolling back down five times. The
+   * fragment restores position without turning this into a client component.
+   *
+   * The window is carried through too: without it, acting on an event inside a 400-day
+   * view silently threw the owner back to the 60-day default.
+   */
+  const cw = fd.get("cw");
+  const win = typeof cw === "string" && cw.length > 0 ? `&cw=${cw}` : "";
+  redirect(`/${locale}/operations/calendar?calendarUpdated=1${win}#ev-${str(fd, "id")}`);
 }
 
 /**

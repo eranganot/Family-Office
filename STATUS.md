@@ -117,8 +117,30 @@ Suspense is placed FIRST on `/transactions` deliberately — every closed month 
 provisional until it is cleared. `/transactions` has its own **main-nav** entry, making
 15 top-nav items: the grouping backlog above is now load-bearing.
 
-**Still on Today and needing a home: IMPORT** (~280 lines). Owner said it can go under
-Mapping, which already owns ingestion. That is the last section move.
+**Owner revisions applied after first QA of gate 3:**
+- **Transactions moved from the MAIN nav to the Operations sub-nav**, alongside
+  Today / Month / Calendar. URL stays top-level `/transactions`; only the entry point
+  changed. Main nav is back to 14 — the 15th entry never shipped.
+- **Calendar defaults to 60 days, not 400.** A year of statutory dates on arrival buries
+  the handful that are imminent, and proximity is the entire point of that view.
+- **Calendar done/skip no longer jumps to the top.** The redirect now carries
+  `#ev-<id>` and the active window, so marking five events done no longer means scrolling
+  back down five times. Rows carry `id` + `scroll-mt-24` so the anchor lands below the
+  heading.
+
+### ⚠️ ONE SECTION LEFT: import (~270 lines, `page.tsx` lines 99–~370)
+Still on Today. Owner wants it under `/transactions` (and earlier said Mapping would also
+be reasonable — Mapping already owns ingestion, so either is defensible; **`/transactions`
+is the current instruction**).
+
+Not attempted at the end of session 31 by choice: it is the largest single remaining
+block, and a half-finished move would leave Today broken rather than merely untidy.
+Follow the extraction template. Its orphans will be `uploadStatementAction`,
+`commitAllPendingAction`, `commitStatementAction`, `undoImportAction`,
+`resetAllImportsAction`, plus `preview` / `pending` / `batches` / `previewError` and the
+`preview` / `imported` / `uploaded` / `failed` / `reset` / `undone` / `docs` search
+params. After it moves, Today is **just** nav + Action Center + Opportunity Center —
+which is exactly the surface gate 4 turns into compact rows.
 
 ### Superseded plan (kept for the block map only)
 

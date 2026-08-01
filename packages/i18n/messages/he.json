@@ -30,8 +30,7 @@
     "scenarios": "תרחישים",
     "monitoring": "ניטור",
     "allocation": "הקצאה",
-    "operations": "תפעול",
-    "transactions": "תנועות"
+    "operations": "תפעול"
   },
   "phase": {
     "label": "שלב נוכחי",
@@ -1431,6 +1430,7 @@
     "navToday": "היום",
     "navMonth": "החודש הזה",
     "navCalendar": "יומן",
+    "navTransactions": "תנועות",
     "reviewTitle": "סקירה חודשית",
     "reviewHint": "מה נרשם בסגירת החודש, והאם העודף עדיין מתנהג כפי שהתוכנית נבנתה עליו.",
     "reviewPinned": "תצלום סקירה נשמר",

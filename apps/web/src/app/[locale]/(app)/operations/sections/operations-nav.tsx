@@ -15,14 +15,19 @@ import { getTranslations } from "next-intl/server";
 
 /*
  * Only routes that EXIST are listed — a tab that 404s teaches the owner not to trust the
- * nav. `/transactions` is deliberately absent: it is becoming a TOP-LEVEL destination,
- * not an Operations tab, because you go there for a different reason than running the
- * month.
+ * nav.
+ *
+ * Transactions sits HERE, alongside Today / Month / Calendar, rather than in the main
+ * nav (owner decision, revised 2026-07-29). Its URL stays top-level `/transactions`
+ * because the page is not an Operations sub-view — but the owner reaches it from the
+ * same row as everything else in this workspace, which is what actually matters. Hence
+ * the absolute `href` rather than a suffix appended to /operations.
  */
 const TABS = [
-  ["", "navToday"],
-  ["/month", "navMonth"],
-  ["/calendar", "navCalendar"],
+  { href: (l: string) => `/${l}/operations`, key: "navToday", id: "" },
+  { href: (l: string) => `/${l}/operations/month`, key: "navMonth", id: "month" },
+  { href: (l: string) => `/${l}/operations/calendar`, key: "navCalendar", id: "calendar" },
+  { href: (l: string) => `/${l}/transactions`, key: "navTransactions", id: "transactions" },
 ] as const;
 
 export async function OperationsNav({
@@ -30,29 +35,26 @@ export async function OperationsNav({
   active,
 }: {
   locale: string;
-  /** "" = Today. Matches the path suffix so a new route needs no extra wiring. */
-  active: "" | "month" | "calendar";
+  /** "" = Today. */
+  active: "" | "month" | "calendar" | "transactions";
 }) {
   const t = await getTranslations("operations");
 
   return (
     <nav className="flex flex-wrap items-center gap-1 border-b border-neutral-200 pb-2 text-sm">
-      {TABS.map(([suffix, key]) => {
-        const isActive = suffix.replace("/", "") === active;
-        return (
-          <a
-            key={key}
-            href={`/${locale}/operations${suffix}`}
-            className={`rounded-lg px-3 py-1.5 ${
-              isActive
-                ? "bg-neutral-900 font-medium text-white"
-                : "text-neutral-600 hover:bg-neutral-100"
-            }`}
-          >
-            {t(key)}
-          </a>
-        );
-      })}
+      {TABS.map((tab) => (
+        <a
+          key={tab.key}
+          href={tab.href(locale)}
+          className={`rounded-lg px-3 py-1.5 ${
+            tab.id === active
+              ? "bg-neutral-900 font-medium text-white"
+              : "text-neutral-600 hover:bg-neutral-100"
+          }`}
+        >
+          {t(tab.key)}
+        </a>
+      ))}
     </nav>
   );
 }

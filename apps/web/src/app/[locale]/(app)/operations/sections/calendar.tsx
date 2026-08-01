@@ -119,7 +119,9 @@ export async function CalendarSection({
             </thead>
             <tbody>
               {calendar.events.map((e) => (
-                <tr key={e.id} className="border-b border-neutral-100">
+                // id + scroll-mt so the post-action anchor lands the row below the
+                // sticky heading rather than flush under it.
+                <tr key={e.id} id={`ev-${e.id}`} className="scroll-mt-24 border-b border-neutral-100">
                   <td className="py-2 tabular-nums" dir="ltr">{e.dueDate}</td>
                   <td className="py-2">
                     {/* Overdue reads red, imminent amber. Proximity is the signal here,
@@ -150,6 +152,7 @@ export async function CalendarSection({
                     <form action={setCalendarStatusAction} className="inline">
                       <input type="hidden" name="locale" value={locale} />
                       <input type="hidden" name="id" value={e.id} />
+                      <input type="hidden" name="cw" value={calWindow} />
                       <input type="hidden" name="status" value="DONE" />
                       <button type="submit" className="text-xs text-emerald-700 underline">
                         {t("markDone")}
@@ -158,6 +161,7 @@ export async function CalendarSection({
                     <form action={setCalendarStatusAction} className="ms-3 inline">
                       <input type="hidden" name="locale" value={locale} />
                       <input type="hidden" name="id" value={e.id} />
+                      <input type="hidden" name="cw" value={calWindow} />
                       <input type="hidden" name="status" value="SKIPPED" />
                       <button type="submit" className="text-xs text-neutral-500 underline">
                         {t("markSkipped")}
