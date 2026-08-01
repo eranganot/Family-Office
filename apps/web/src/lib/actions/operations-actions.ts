@@ -94,7 +94,7 @@ export async function createManualTransactionAction(fd: FormData): Promise<void>
   const rawAmount = str(fd, "amount").trim();
   const magnitude = Math.abs(Number(rawAmount));
   if (!Number.isFinite(magnitude) || magnitude === 0) {
-    redirect(`/${locale}/operations?error=amount`);
+    redirect(`/${locale}/transactions?error=amount`);
   }
   // Signed convention: negative = outflow. The form asks for a direction and a
   // positive number, which is far less error-prone than asking for a signed value.
@@ -120,7 +120,7 @@ export async function createManualTransactionAction(fd: FormData): Promise<void>
       isRecurringCandidate: fd.get("isRecurringCandidate") === "on",
     });
   } catch {
-    redirect(`/${locale}/operations?error=create`);
+    redirect(`/${locale}/transactions?error=create`);
   }
   // M42b: transactions, categories and the suspense queue live at the top-level
   // /transactions route now. Redirecting to /operations would land the owner on a page
@@ -142,7 +142,7 @@ export async function upsertCategoryAction(fd: FormData): Promise<void> {
       ...(parentId ? { parentId } : {}),
     });
   } catch {
-    redirect(`/${locale}/operations?error=category&tab=categories`);
+    redirect(`/${locale}/transactions?error=category`);
   }
   redirect(`/${locale}/transactions?categorySaved=1`);
 }
@@ -156,7 +156,7 @@ export async function recomputePeriodAction(fd: FormData): Promise<void> {
       month: Number(str(fd, "month")),
     });
   } catch {
-    redirect(`/${locale}/operations?error=recompute`);
+    redirect(`/${locale}/operations/month?error=recompute`);
   }
   // M42b: the month lives at its own route, so these land where the result is shown.
   redirect(`/${locale}/operations/month?recomputed=1`);
@@ -187,7 +187,7 @@ export async function reopenPeriodAction(fd: FormData): Promise<void> {
       month: Number(str(fd, "month")),
     });
   } catch {
-    redirect(`/${locale}/operations?error=reopen`);
+    redirect(`/${locale}/operations/month?error=reopen`);
   }
   redirect(`/${locale}/operations/month?reopened=1`);
 }
@@ -201,14 +201,14 @@ export async function bulkClassifyMerchantAction(fd: FormData): Promise<void> {
   const trpc = await serverCaller();
   try {
     const categoryId = await resolveCategoryField(fd, "category", locale);
-    if (!categoryId) redirect(`/${locale}/operations?error=badcategory`);
+    if (!categoryId) redirect(`/${locale}/transactions?error=badcategory`);
     await trpc.operations.transactions.bulkClassifyByMerchant({
       merchantKey: str(fd, "merchantKey"),
       categoryId,
       behavioralClass: str(fd, "behavioralClass") as never,
     });
   } catch {
-    redirect(`/${locale}/operations?error=classify`);
+    redirect(`/${locale}/transactions?error=classify`);
   }
   redirect(`/${locale}/transactions?classified=1`);
 }
@@ -219,7 +219,7 @@ export async function updateTransactionAction(fd: FormData): Promise<void> {
   const rawAmount = str(fd, "amount").trim();
   const magnitude = Math.abs(Number(rawAmount));
   if (!Number.isFinite(magnitude) || magnitude === 0) {
-    redirect(`/${locale}/operations?error=amount`);
+    redirect(`/${locale}/transactions?error=amount`);
   }
   const amount = direction === "IN" ? String(magnitude) : String(-magnitude);
   const categoryId = await resolveCategoryField(fd, "category", locale);
@@ -242,7 +242,7 @@ export async function updateTransactionAction(fd: FormData): Promise<void> {
       isRecurringCandidate: fd.get("isRecurringCandidate") === "on",
     });
   } catch {
-    redirect(`/${locale}/operations?error=update&edit=${str(fd, "id")}`);
+    redirect(`/${locale}/transactions?error=update&edit=${str(fd, "id")}`);
   }
   redirect(`/${locale}/transactions?updated=1#tx-${str(fd, "id")}`);
 }
@@ -268,14 +268,16 @@ export async function setTransactionStatusAction(fd: FormData): Promise<void> {
 export async function uploadStatementAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const files = fd.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) redirect(`/${locale}/operations?error=nofile`);
+  if (files.length === 0) redirect(`/${locale}/transactions?error=nofile`);
 
   // Server Actions cap the request body (next.config sets 25 MB). Base64 inflates
   // files ~34%, so check the real budget here and say so plainly — the platform's
   // own failure mode is an opaque "A server error occurred" with nothing in the logs.
   const totalBytes = files.reduce((n, f) => n + f.size, 0);
   if (totalBytes * 1.34 > 24 * 1024 * 1024) {
-    redirect(`/${locale}/operations?error=toolarge&mb=${Math.round(totalBytes / 1024 / 1024)}`);
+    // M42b: the importer lives on /transactions now, with the list, tree and suspense
+    // queue it feeds. Every import redirect lands there.
+    redirect(`/${locale}/transactions?error=toolarge&mb=${Math.round(totalBytes / 1024 / 1024)}`);
   }
 
   const trpc = await serverCaller();
@@ -310,12 +312,12 @@ export async function uploadStatementAction(fd: FormData): Promise<void> {
   }
   if (ids.length === 0) {
     redirect(
-      `/${locale}/operations?error=allfailed&n=${failed.length}&why=${encodeURIComponent(firstError || "UNKNOWN")}#import`,
+      `/${locale}/transactions?error=allfailed&n=${failed.length}&why=${encodeURIComponent(firstError || "UNKNOWN")}`,
     );
   }
   // Land on the first upload's preview; the rest queue up in the pending list.
   redirect(
-    `/${locale}/operations?preview=${ids[0]}&uploaded=${ids.length}&failed=${failed.length}&reused=${reused}#import`,
+    `/${locale}/transactions?preview=${ids[0]}&uploaded=${ids.length}&failed=${failed.length}&reused=${reused}`,
   );
 }
 
@@ -357,9 +359,9 @@ export async function commitStatementAction(fd: FormData): Promise<void> {
     });
   } catch (e) {
     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 60)) : "IMPORT_FAILED";
-    redirect(`/${locale}/operations?error=${code}&preview=${documentId}`);
+    redirect(`/${locale}/transactions?error=${code}&preview=${documentId}`);
   }
-  redirect(`/${locale}/operations?imported=${result?.inserted ?? 0}&dupes=${result?.duplicates ?? 0}#import`);
+  redirect(`/${locale}/transactions?imported=${result?.inserted ?? 0}&dupes=${result?.duplicates ?? 0}`);
 }
 
 /**
@@ -414,10 +416,10 @@ export async function commitAllPendingAction(fd: FormData): Promise<void> {
     r = await trpc.operations.import.commitAllPending();
   } catch (e) {
     const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "BULK_FAILED";
-    redirect(`/${locale}/operations?error=${code}`);
+    redirect(`/${locale}/transactions?error=${code}`);
   }
   redirect(
-    `/${locale}/operations?imported=${r?.inserted ?? 0}&dupes=${r?.duplicates ?? 0}&skipped=${r?.skipped.length ?? 0}#import`,
+    `/${locale}/transactions?imported=${r?.inserted ?? 0}&dupes=${r?.duplicates ?? 0}&skipped=${r?.skipped.length ?? 0}`,
   );
 }
 
@@ -430,25 +432,25 @@ export async function undoImportAction(fd: FormData): Promise<void> {
     const r = await trpc.operations.import.undo({ batchId: str(fd, "batchId") });
     removed = r.removed;
   } catch {
-    redirect(`/${locale}/operations?error=undo`);
+    redirect(`/${locale}/transactions?error=undo`);
   }
-  redirect(`/${locale}/operations?undone=${removed}#import`);
+  redirect(`/${locale}/transactions?undone=${removed}`);
 }
 
 /** DESTRUCTIVE: wipe every imported transaction, batch and statement document. */
 export async function resetAllImportsAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   if (str(fd, "confirm").trim() !== "DELETE ALL") {
-    redirect(`/${locale}/operations?error=confirm#import`);
+    redirect(`/${locale}/transactions?error=confirm`);
   }
   const trpc = await serverCaller();
   let r: { transactions: number; batches: number; documents: number } | undefined;
   try {
     r = await trpc.operations.import.resetAll({ confirm: "DELETE ALL" });
   } catch {
-    redirect(`/${locale}/operations?error=reset#import`);
+    redirect(`/${locale}/transactions?error=reset`);
   }
-  redirect(`/${locale}/operations?reset=${r?.transactions ?? 0}&docs=${r?.documents ?? 0}#import`);
+  redirect(`/${locale}/transactions?reset=${r?.transactions ?? 0}&docs=${r?.documents ?? 0}`);
 }
 
 /** Void every duplicate copy of a transaction, keeping the earliest of each group. */
@@ -460,7 +462,7 @@ export async function removeDuplicatesAction(fd: FormData): Promise<void> {
     const r = await trpc.operations.transactions.removeDuplicates();
     removed = r.removed;
   } catch {
-    redirect(`/${locale}/operations?error=dupes#transactions`);
+    redirect(`/${locale}/transactions?error=dupes`);
   }
   redirect(`/${locale}/transactions?dupesRemoved=${removed}`);
 }

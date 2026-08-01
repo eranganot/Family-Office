@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import type { Locale } from "@wealthos/i18n";
+import { Explainer } from "../../../../../components/fields";
 import { serverCaller } from "../../../../../lib/trpc-server";
 import { CalendarSection } from "../sections/calendar";
 import { OperationsNav } from "../sections/operations-nav";
@@ -46,6 +47,11 @@ export default async function OperationsCalendarPage({
   return (
     <div className="flex flex-col gap-6">
       <OperationsNav locale={locale} active="calendar" />
+
+      <Explainer
+        title={t("calendarExplainer.title")}
+        paragraphs={[t("calendarExplainer.p1"), t("calendarExplainer.p2")]}
+      />
       <CalendarSection
         calendar={calendar}
         recurring={recurring}

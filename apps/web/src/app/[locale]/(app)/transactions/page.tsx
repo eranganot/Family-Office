@@ -1,8 +1,9 @@
 import { getTranslations } from "next-intl/server";
 import type { Locale } from "@wealthos/i18n";
-import { SuccessBanner } from "../../../../components/fields";
+import { Explainer, SuccessBanner } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 import { CategoryTreeSection, type FlatCategory } from "../operations/sections/category-tree";
+import { ImportSection } from "../operations/sections/import-statements";
 import { ManualAddSection } from "../operations/sections/manual-add";
 import { OperationsNav } from "../operations/sections/operations-nav";
 import { SuspenseQueueSection } from "../operations/sections/suspense-queue";
@@ -44,6 +45,17 @@ export default async function TransactionsPage({
     removed?: string;
     restored?: string;
     dupesRemoved?: string;
+    // Import outcomes, moved here with the importer itself.
+    preview?: string;
+    imported?: string;
+    dupes?: string;
+    uploaded?: string;
+    failed?: string;
+    reused?: string;
+    skipped?: string;
+    undone?: string;
+    reset?: string;
+    docs?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -62,6 +74,23 @@ export default async function TransactionsPage({
   const dupes = await trpc.operations.transactions.duplicates().catch(() => null);
   const suspense = await trpc.operations.suspense.queue({ limit: 25 });
 
+  /*
+   * Preview is a mutation (it does real parsing work) but persists nothing.
+   * NEVER swallow this: a silent catch renders an empty card and looks like the feature
+   * simply does not exist. Surface the reason instead.
+   */
+  let preview: Awaited<ReturnType<typeof trpc.operations.import.preview>> | null = null;
+  let previewError: string | null = null;
+  if (sp.preview) {
+    try {
+      preview = await trpc.operations.import.preview({ documentId: sp.preview });
+    } catch (e) {
+      previewError = e instanceof Error ? e.message : "PREVIEW_FAILED";
+    }
+  }
+  const pending = await trpc.operations.import.pending().catch(() => []);
+  const batches = await trpc.operations.import.batches().catch(() => []);
+
   const flat = cats.flat as unknown as FlatCategory[];
   const byId = new Map(flat.map((c) => [c.id, c]));
   const pickerCats = cats.flat as unknown as PickerCategory[];
@@ -77,6 +106,11 @@ export default async function TransactionsPage({
       */}
       <OperationsNav locale={locale} active="transactions" />
 
+      <Explainer
+        title={t("transactionsExplainer.title")}
+        paragraphs={[t("transactionsExplainer.p1"), t("transactionsExplainer.p2")]}
+      />
+
       <SuccessBanner
         message={
           sp.created ? t("created")
@@ -86,8 +120,31 @@ export default async function TransactionsPage({
           : sp.removed ? t("removedOk")
           : sp.restored ? t("restoredOk")
           : sp.dupesRemoved ? t("dupesRemovedOk", { n: sp.dupesRemoved })
+          : sp.undone ? t("undoneOk", { n: sp.undone })
+          : sp.reset ? t("resetOk", { n: sp.reset, docs: sp.docs ?? "0" })
+          : sp.imported
+            ? sp.skipped && sp.skipped !== "0"
+              ? t("importedSome", { n: sp.imported, dupes: sp.dupes ?? "0", skipped: sp.skipped })
+              : t("importedOk", { n: sp.imported, dupes: sp.dupes ?? "0" })
           : undefined
         }
+      />
+
+      {/*
+        Import leads: it is what FEEDS everything below it. A row it creates lands in the
+        list, under the tree, and possibly in the suspense queue — so importing on one
+        page and discovering the consequences on another was the wrong split.
+      */}
+      <ImportSection
+        locale={locale}
+        pending={pending}
+        batches={batches}
+        preview={preview}
+        previewError={previewError}
+        previewingId={sp.preview}
+        uploadedCount={sp.uploaded}
+        failedCount={sp.failed}
+        reusedCount={sp.reused}
       />
 
       {/*

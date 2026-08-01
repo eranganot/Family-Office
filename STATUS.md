@@ -128,7 +128,29 @@ provisional until it is cleared. `/transactions` has its own **main-nav** entry,
   back down five times. Rows carry `id` + `scroll-mt-24` so the anchor lands below the
   heading.
 
-### ⚠️ ONE SECTION LEFT: import (~270 lines, `page.tsx` lines 99–~370)
+### ✅ Import moved too — gate 3 is COMPLETE
+All ten sections are out. **`operations/page.tsx`: ~1,550 → ~105 lines.** Owner,
+2026-07-29: *"today should include only action center + opportunity center"* — **the
+Explainer stays** (owner corrected this immediately after; it is orientation, not a
+section).
+
+Import leads on `/transactions` because it FEEDS everything below it — a row it creates
+lands in the list, under the tree, and possibly in the suspense queue.
+
+**Per-route explainers** (owner, 2026-07-29): each route now carries its own, describing
+that page's job. One shared paragraph about "the operational workspace" stopped being
+useful the moment the workspace became four pages with four different jobs. Keys:
+`explainer` (Today), `monthExplainer`, `calendarExplainer`, `transactionsExplainer`.
+
+⚠️ **`exactOptionalPropertyTypes: true` is on.** An optional prop typed `string | null`
+will NOT accept an actual `string | undefined` — they are distinct, and tsc rejected
+exactly that on the import section's `unsupportedReason`. When writing props for an
+extracted section, mirror optionals as `?: T | undefined`, not `?: T | null`.
+
+**~30 redirects repointed in total** across the three gates. The rule that keeps costing
+a QA round when missed: *a redirect must land on the page that shows the result.*
+
+### (historical) the import block, before it moved
 Still on Today. Owner wants it under `/transactions` (and earlier said Mapping would also
 be reasonable — Mapping already owns ingestion, so either is defensible; **`/transactions`
 is the current instruction**).

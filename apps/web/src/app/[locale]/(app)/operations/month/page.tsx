@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import type { Locale } from "@wealthos/i18n";
-import { SuccessBanner } from "../../../../../components/fields";
+import { Explainer, SuccessBanner } from "../../../../../components/fields";
 import { serverCaller } from "../../../../../lib/trpc-server";
 import { MonthOverviewSection, type DiagnosticsView } from "../sections/month-overview";
 import { MonthlyReviewSection } from "../sections/monthly-review";
@@ -68,6 +68,17 @@ export default async function OperationsMonthPage({
   return (
     <div className="flex flex-col gap-6">
       <OperationsNav locale={locale} active="month" />
+
+      {/*
+        Each route carries its OWN explainer (owner, 2026-07-29). One shared paragraph
+        about "the operational workspace" stopped being useful the moment that workspace
+        became four pages with four different jobs — a reader arriving here needs to know
+        what closing a month does, not what Operations is in general.
+      */}
+      <Explainer
+        title={t("monthExplainer.title")}
+        paragraphs={[t("monthExplainer.p1"), t("monthExplainer.p2")]}
+      />
 
       <SuccessBanner
         message={
