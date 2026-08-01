@@ -85,12 +85,24 @@ tests, is the highest-risk edit in this codebase — which is exactly why step 1
 where it did rather than pressing on.
 
 **Step 1 of 3 BUILT (`deploy-m42b.ps1`, gate not yet green):** Action Center, Monthly
-review and Opportunity Center extracted to `operations/sections/*.tsx`.
-**page.tsx: ~1,550 → 1,287 lines.** Behaviour-preserving — QA is "does it look
+review, Opportunity Center and Suspense queue extracted to `operations/sections/*.tsx`.
+**page.tsx: ~1,550 → 1,225 lines.** Behaviour-preserving — QA is "does it look
 identical". Sections fetch their own translations rather than receiving `t`, so each can
 move to its own route without dragging the page's namespace choice along.
-Remaining to extract: month overview, calendar, recurring, transactions, categories,
-manual add, suspense, import.
+
+**Still to extract:** month overview (largest, ~300 lines), calendar + recurring (~170),
+transaction list (~180), import (~300), categories, manual add.
+
+**Extraction template** (follow exactly — it has now survived four sections):
+1. Read the block. Create `sections/<name>.tsx`: `getTranslations("operations")` inside,
+   data as props, same JSX verbatim.
+2. Replace the inline block with the component in ONE edit. **Do not** wrap the old block
+   in `{false ? (` as an interim step — it leaves the file unbalanced and I did it twice.
+3. Grep `page.tsx` for every import the section used; delete the orphans. Verify shared
+   ones (`BEHAVIORAL`, `CategoryPicker`, `Field`, `Select`, `formatMoney`) are still used
+   before removing.
+4. Confirm the file still ends with a single `}` at top level, then lower the gate's line
+   floor to match.
 
 Order — **extract first, restructure second.** Extraction is behaviour-preserving, so
 any breakage is localised and obvious; a single 10-section rewrite is not.
