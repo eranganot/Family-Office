@@ -31,10 +31,16 @@ export default async function ScenariosPage({
   const { locale } = await params;
   const { error, view } = await searchParams;
   const t = await getTranslations("scenarios");
+  const tPhase = await getTranslations("phase");
   const trpc = await serverCaller();
   const household = await trpc.household.get();
   if (!household) return null;
   const l = locale as Locale;
+  const PHASE_PAGE = {
+    MAPPING: "/mapping", VERIFICATION: "/verification", ALLOCATION: "/allocation",
+    STRATEGY: "/strategy", MONITORING: "/monitoring",
+  } as const;
+  const currentPhase = household.workflowState as keyof typeof PHASE_PAGE;
 
   if (household.workflowState !== "STRATEGY") {
     return (
@@ -47,9 +53,16 @@ export default async function ScenariosPage({
             <p>{t("explainer3")}</p>
           </div>
         </details>
-        <p className="mb-4 text-sm text-neutral-600">{t("wrongPhase")}</p>
-        <Link href="/verification" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
-          {t("title")} → {t("wrongPhase").split(".")[0]}
+        {/*
+          The label here was `t("wrongPhase").split(".")[0]` - a button captioned by
+          chopping a sentence at its first full stop, which in Hebrew rendered the whole
+          sentence onto the button. It also linked to /verification regardless of where
+          the household actually was. Both replaced by the same pattern the strategy and
+          allocation locks now use: name the current phase, link to it.
+        */}
+        <p className="mb-4 text-sm text-neutral-600">{t("lockedInPhase", { phase: tPhase(currentPhase) })}</p>
+        <Link href={PHASE_PAGE[currentPhase]} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+          {t("goToCurrentPhase", { phase: tPhase(currentPhase) })}
         </Link>
       </Card>
     );

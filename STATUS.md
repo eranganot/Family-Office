@@ -44,6 +44,64 @@ Decisions encoded (do not silently undo any of these):
 DB-bound; those suites need the shared test DB). The engine half is covered; the
 service half is currently guarded only by the deploy script's source assertions.
 
+### 🔴 PHASE-GATE MISALIGNMENT — found in QA 2026-08-02, FIXED, gate not yet run
+`deploy-2026-08-02-phase-gate-alignment.ps1`. No migration, no lockfile, no assumption key.
+
+**Owner report:** allocation plan approved, page says *"מוכן להמשך → המשך לאסטרטגיה"*, but
+`/strategy` answers *"נעולה עד להשלמת האימות"* and links to Verification — a page whose
+queue is empty. A dead end built from three individually correct pieces.
+
+**Root cause, and it is a documentation bug:** M25 inserted **ALLOCATION between
+VERIFICATION and STRATEGY**, making the machine five-phase. `CLAUDE.md` kept saying
+*"four-phase (MAPPING → VERIFICATION → STRATEGY → MONITORING)"* — omitting ALLOCATION
+entirely — and that is the file every session reads first. Four locked pages were written
+against the stale model and all four named VERIFICATION as STRATEGY's prerequisite.
+**`domain/src/workflow/state-machine.ts` is the only authority.** CLAUDE.md now says so.
+
+| Surface | Was | Now |
+|---|---|---|
+| `/strategy` lock | "complete verification" → `/verification` | names the ACTUAL current phase, links there, **renders PhaseGate** so it can be unlocked from the page that refused |
+| `/allocation` "מעבר לאסטרטגיה →" | plain `<Link>` — navigated to a locked page | performs the transition, like PhaseGate's button |
+| `/allocation` lock | → `/verification` (wrong from STRATEGY/MONITORING, both legal origins) | names current phase, links there |
+| `/scenarios` lock | label built by `t("wrongPhase").split(".")[0]` — rendered a whole sentence on a button | proper key, links to current phase |
+| `monitoring.wrongPhase` | "the fourth phase" | "the fifth and final phase" |
+
+**What was already correct and stays untouched:** the state machine, `PhaseGate`, the
+top-nav journey strip, and the dashboard next-step router all encode five phases properly.
+Only static copy and one link were stale — which is why this survived so long: every
+*dynamic* surface was right.
+
+Stale keys `strategy.wrongPhase`, `strategy.goToVerification`, `allocation.wrongPhase`,
+`allocation.goToGate`, `scenarios.wrongPhase` were **deleted, not left orphaned** — a key
+that still states the wrong rule is an invitation to re-wire to it.
+
+**Lesson to keep:** the approved plan does NOT advance the phase, and that is correct
+(approval and transition are separate decisions). But then no button may say "go to
+strategy" unless it performs the transition. *A control that names a destination must be
+able to reach it.*
+
+#### ⚠️ GUARDS THAT MATCH THEIR OWN DOCUMENTATION — second occurrence
+The first run of this script **refused a correct commit**: the assertion *"the allocation
+page must no longer link to /strategy"* matched the **JSX comment explaining what the old
+link was**. The code was right; the prose describing the fix tripped the check.
+
+This is the same failure as the M40c migration guard matching `IS NOT NULL` inside a
+comment (which is why that one now strips `--` lines). **Twice now, a guard has read prose
+as code and blocked the very fix it was written to protect.**
+
+Two fixes applied, deliberately both:
+1. **`Get-CodeOnly`** strips `/* … */` (which covers JSX `{/* … */}`) before every source
+   assertion in section 2. This is the general cure — use it in future deploy scripts.
+   ⚠️ Truncation length is still measured on the **raw** file; a comment is still bytes,
+   and the mount silently truncating a write is what that check exists to catch.
+2. The comment no longer contains the old markup literally, and says why.
+
+Also worth copying: **CLAUDE.md is asserted POSITIVELY** (`**ALLOCATION**` must appear).
+A negative check for the old "four-phase" wording is fragile the moment the file starts
+*discussing* the old error — a naive substring match would flag the correction as the
+mistake. And deploy scripts are ASCII-only, so the arrows in that line can never be
+matched; the bolded phase name can.
+
 ### Tier 3 — remaining, in this order
 
 **2. Wire `goals` into the health score.** Currently unmeasured, costing 15 points of

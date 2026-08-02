@@ -49,13 +49,33 @@ export default async function StrategyPage({
   const basedOnPlan = approvedPlanEarly?.status === "APPROVED" ? approvedPlanEarly : null;
 
   if (household.workflowState !== "STRATEGY") {
+    /**
+     * This lock was written before M25 inserted ALLOCATION between VERIFICATION and
+     * STRATEGY. It hardcoded "complete verification, advance from the Verification page"
+     * and linked to /verification — which, for a household sitting in ALLOCATION with an
+     * approved plan, is two phases BACKWARDS onto a page with an empty queue and nothing
+     * to do. The gate was right; the signpost pointed the wrong way.
+     *
+     * It now names the phase the household is ACTUALLY in and links there, and renders
+     * the PhaseGate so the transition can be made from the page that refused it. A lock
+     * that cannot tell you how to unlock it is only half a gate.
+     */
+    const tp = await getTranslations("phase");
+    const PAGE = {
+      MAPPING: "/mapping", VERIFICATION: "/verification", ALLOCATION: "/allocation",
+      STRATEGY: "/strategy", MONITORING: "/monitoring",
+    } as const;
+    const state = household.workflowState as keyof typeof PAGE;
     return (
-      <Card title={t("title")}>
-        <p className="mb-4 text-sm text-neutral-600">{t("wrongPhase")}</p>
-        <Link href="/verification" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
-          {t("goToVerification")}
-        </Link>
-      </Card>
+      <>
+        <Card title={t("title")}>
+          <p className="mb-4 text-sm text-neutral-600">{t("lockedInPhase", { phase: tp(state) })}</p>
+          <Link href={PAGE[state]} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+            {t("goToCurrentPhase", { phase: tp(state) })}
+          </Link>
+        </Card>
+        <PhaseGate locale={locale} />
+      </>
     );
   }
 

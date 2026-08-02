@@ -1,6 +1,7 @@
 import { formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
 import { applyPresetAction, editAllocationAction, generatePlanAction } from "../../../../lib/actions/allocation-actions";
+import { transitionAction } from "../../../../lib/actions/workflow-actions";
 import { PhaseGate } from "../phase-gate";
 import { AllocationCart, type CartCandidate, type ImpactBase } from "../../../../components/allocation-cart";
 import { Card } from "../../../../components/fields";
@@ -35,12 +36,18 @@ export default async function AllocationPage({
   const { locale } = await params;
   const { error } = await searchParams;
   const t = await getTranslations("allocation");
+  const tPhase = await getTranslations("phase");
   const trpc = await serverCaller();
   const household = await trpc.household.get();
   if (!household) return null;
   const l = locale as Locale;
   const he = locale === "he";
   const nis = (n: number) => formatMoney(String(n), "ILS", l);
+  const PHASE_PAGE = {
+    MAPPING: "/mapping", VERIFICATION: "/verification", ALLOCATION: "/allocation",
+    STRATEGY: "/strategy", MONITORING: "/monitoring",
+  } as const;
+  const currentPhase = household.workflowState as keyof typeof PHASE_PAGE;
 
   if (household.workflowState !== "ALLOCATION") {
     const review = await trpc.allocation.approvedReview();
@@ -75,8 +82,15 @@ export default async function AllocationPage({
             </>
           ) : (
             <>
-              <p className="mb-4 text-sm text-neutral-600">{t("wrongPhase")}</p>
-              <Link href="/verification" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("goToGate")}</Link>
+              {/*
+                Same stale assumption as the strategy page had: this hardcoded
+                /verification as the only place you could be coming from. ALLOCATION is
+                reachable from STRATEGY and MONITORING too (see LEGAL_TRANSITIONS), so
+                for a household in either of those it pointed backwards past the phase
+                it was actually in. It now names the current phase and links there.
+              */}
+              <p className="mb-4 text-sm text-neutral-600">{t("lockedInPhase", { phase: tPhase(currentPhase) })}</p>
+              <Link href={PHASE_PAGE[currentPhase]} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("goToCurrentPhase", { phase: tPhase(currentPhase) })}</Link>
             </>
           )}
         </Card>
@@ -169,7 +183,29 @@ export default async function AllocationPage({
           {latest.status === "APPROVED" ? (
             <Card>
               <p className="mb-3 text-sm text-green-700">{t("approvedAligned")}</p>
-              <Link href="/strategy" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("toStrategy")} →</Link>
+              {/*
+                This was a plain navigation link to the strategy page. Approving a plan
+                does NOT advance the phase - the household stays in ALLOCATION until the
+                transition is made - so it navigated to a page that was still locked,
+                whose lock then sent the owner back to Verification. An approved plan, a
+                button saying "go to strategy", and a locked strategy page is a dead end
+                built out of three individually correct pieces.
+
+                It now performs the transition itself, exactly as the PhaseGate below
+                does. A button that names a destination has to be able to reach it.
+
+                NOTE: do not write the old markup literally in this comment. The deploy
+                script asserts that this file no longer links to the strategy page, and
+                on the first run that assertion matched THIS COMMENT and refused the
+                commit. The script now strips comments before matching; this note is the
+                second guard.
+              */}
+              <form action={transitionAction}>
+                <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="from" value="ALLOCATION" />
+                <input type="hidden" name="to" value="STRATEGY" />
+                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">{t("toStrategy")} →</button>
+              </form>
             </Card>
           ) : null}
 
