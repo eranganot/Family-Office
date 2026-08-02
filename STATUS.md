@@ -232,6 +232,39 @@ difference is the point, not duplication to tidy away.
 required amounts. If it stays at 85%, the goals component is refusing — check whether the
 active goals have both fields, and whether `goal_projection_real_return_pct` is positive.
 
+### ✅ TIER 3 #4 — Hebrew phrasing audit. BUILT 2026-08-02.
+`deploy-2026-08-02-bilingual-audit.ps1`. Key parity always held; the phrasing had never
+been read *as Hebrew*, which catches a different class of fault.
+
+1. **Grammar, ×3.** `בשלב {phase}` interpolates a bare noun into a construct needing the
+   definite article — "בשלב הקצאה" for "בשלב ההקצאה". The names can't carry the article
+   because `מעבר ל{phase}` needs them bare. **Cure: put the interpolated noun after a
+   copula — `השלב הנוכחי הוא {phase}`.** Remember this for any interpolated Hebrew noun.
+2. `אף אחד אינו מיושן` — animate form; items take `אף פריט`.
+3. `מה דורש אותי` — calque of "what needs me". → `מה דורש טיפול`.
+4. `מורכב מ-{idle}` — mem-prefix against an interpolated currency string.
+
+**New gate check: PLACEHOLDER PARITY.** A translation that drops or invents a
+`{placeholder}` throws at render in next-intl, and neither key parity nor tsc sees it.
+Key parity alone was never sufficient.
+
+### ⚠️ CORRECTIONS — three assertions made without tracing, 2026-08-02
+Recorded so the next session doesn't inherit them:
+1. **"54 suspense rows → provisional → surplus refused" was WRONG.** Ingestion
+   `SuspenseItem` (`/documents`) gates `suspenseEmpty` on the VERIFICATION→ALLOCATION
+   transition. `surplusIsProvisional` comes from `computePeriod().surplus.provisional`,
+   documented as *"true when the month still contains unreviewed classifications"* —
+   i.e. unverified TRANSACTIONS on `/transactions`. **Three different queues share the
+   word "suspense".**
+2. **The MISLAKA fix was built on the owner's report that documents were uploaded**,
+   without checking what the DB held. The fix is still correct; it wasn't his bug.
+3. **Owner confirmed allocation works** — approved plan, ₪5.56M free to deploy, four
+   deployment steps, phase advanced to STRATEGY. The surplus refusal is not an allocation
+   defect.
+
+**Process note:** five rounds went into the expected-documents card *after* proving it
+gates nothing. When a surface is confirmed non-blocking, stop working on it and say so.
+
 ### Tier 3 — remaining, in this order
 
 **3. Telemetry projection (M42).** Acceptance %, completion %, time-to-complete,
@@ -373,6 +406,26 @@ not allocation, not operations, not the health score, not `evaluateTransition`. 
 there block nothing. What actually gates: item verification + `suspenseEmpty` (into
 ALLOCATION), `allocationPlanApproved` (into STRATEGY), and `surplusIsProvisional` for the
 deployment hand-off. **Say this before letting an owner re-upload anything.**
+
+### 🔴 WHY SO MANY GATES FAILED THIS SESSION — the real cause
+Four scripts failed on first run: a guard matching its own comment, `trpc.suspenseResolution`
+(wrong mount name), Hebrew in a `.ps1`, and four scripts that couldn't run in sequence.
+
+**Common cause: there was no sandbox.** The Linux VM never started, so nothing was ever
+executed before Eran ran it — the deploy script *was* the first execution. Every one of
+those four would have been caught by running the thing once. This is structural, not
+carelessness, and it changes what a session without a sandbox should do:
+
+- **Prefer checks that run in `node`** over PowerShell regex — node is exercised by the
+  parity checks already, PowerShell string handling is not.
+- **Never put non-ASCII in a `.ps1`.** The bilingual script now self-checks its own bytes
+  and refuses. Hebrew assertions live in node with `\uXXXX` escapes: ASCII **by
+  construction**, not by discipline. (The rule was already in CLAUDE.md and was broken
+  anyway — that is the tell that a rule needs a mechanism.)
+- **Assert against the current form of the code**, not a form remembered from an earlier
+  edit (`d.docType !== null` → `doc.docType === null` broke a gate this way).
+- **Verify router mount names** in `api/src/index.ts` before calling them from the web
+  app — export name and mount name differ (`suspenseResolutionRouter` → `suspense`).
 
 ### Working rules that cost a gate run each when forgotten
 - Deploy scripts: **ASCII only**, comments are `#` not `//`, `-LiteralPath` for any path

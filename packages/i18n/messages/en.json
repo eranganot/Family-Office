@@ -414,7 +414,7 @@
     "confidence": "Confidence",
     "verifiedOf": "verified",
     "queue": "Review queue",
-    "queueEmptyAttested": "Every item has been confirmed by you and none are stale — nothing in this queue needs review.",
+    "queueEmptyAttested": "Every item has been confirmed by you and no item is stale — nothing in this queue needs review.",
     "queueEmptyButDocsMissing": "This queue only checks your confirmations, not the evidence behind them. {count} expected documents are still missing (listed above), so these values rest on your word rather than on a statement.",
     "satisfiedBy": "covered by {docType}",
     "verify": "Verify",
@@ -819,7 +819,7 @@
     "explainer3": "Accepting or rejecting a recommendation is recorded in the journal. Changing an assumption invalidates recommendations pinned to the old version.",
     "title": "Strategy",
     "run": "Run strategy analysis",
-    "lockedInPhase": "Strategy is locked because the household is in the {phase} phase. Complete {phase} and advance from there — the step below shows what is blocking it, and lets you advance if nothing is.",
+    "lockedInPhase": "Strategy is locked. The current phase is {phase} — complete it and advance from there. The step below shows what is blocking, and lets you advance if nothing is.",
     "goToCurrentPhase": "Go to {phase}",
     "ranSummary": "Analysis complete: {created} recommendations proposed ({superseded} previous superseded).",
     "dataGap": "The engine refused to produce recommendations — data quality is insufficient:",
@@ -962,7 +962,7 @@
     "notFunded": "Not funded",
     "notComputable": "Not computable",
     "saved": "Saved scenarios",
-    "lockedInPhase": "Scenarios are locked until the Strategy phase — the household is currently in {phase}.",
+    "lockedInPhase": "Scenarios are locked until the Strategy phase. The current phase is {phase}.",
     "goToCurrentPhase": "Go to {phase}",
     "types": {
       "RETIRE_EARLIER": "Retire earlier (income stops year 6)",
@@ -1058,14 +1058,14 @@
   "journeyLoop": {
     "badge": "Always on",
     "intro": "Runs alongside every phase, not after it — the day-to-day and month-end work never stops:",
-    "today": "Today — what needs me",
+    "today": "Today — what needs attention",
     "month": "Close the month",
     "transactions": "Transactions & suspense"
   },
   "allocation": {
     "title": "Allocation — deploy your free money",
     "intro": "The engine reviews your liquid assets, protects the emergency buffer, and orders every free shekel: expensive debt first (a guaranteed return), then unused tax ceilings, then investing toward your target mix. Approve the plan to unlock the strategy phase.",
-    "lockedInPhase": "Allocation is not the current phase — the household is in {phase}. Complete {phase} first; the step below shows what is blocking it.",
+    "lockedInPhase": "Allocation is not the current phase. The current phase is {phase} — complete it first; the step below shows what is blocking.",
     "goToCurrentPhase": "Go to {phase}",
     "generate": "Build my deployment plan",
     "regenerate": "Rebuild the plan (fresh snapshot)",
@@ -1081,7 +1081,7 @@
     "freeCash": "Free to deploy",
     "monthlyExpenses": "Monthly expenses",
     "expensesUnknown": "Monthly expenses are not mapped, so the engine refuses to declare any cash 'free'. Map your expense flows in Mapping and rebuild.",
-    "surplusIncluded": "Free to deploy is {idle} of cash already banked plus {surplus} of verified surplus from {month}. The surplus is a monthly figure that has to recur — commit it as a monthly amount, not as a lump sum.",
+    "surplusIncluded": "Free to deploy is two parts: {idle} of cash already banked, plus {surplus} of verified surplus from {month}. The surplus is a monthly figure that has to recur — commit it as a monthly amount, not as a lump sum.",
     "surplusNotDeployed": "This plan deploys banked cash only. No monthly surplus was added, because:",
     "surplusHeldBehindBuffer": "A verified surplus exists but was NOT deployed: the emergency buffer is not yet full. The buffer has to be spendable the day a shock lands, and a surplus is money that has not arrived yet.",
     "surplusReason": {
