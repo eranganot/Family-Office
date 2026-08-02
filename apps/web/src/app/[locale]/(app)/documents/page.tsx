@@ -1,6 +1,6 @@
 import { formatDate, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
-import { runImportAction, setDocTypeAction, uploadDocumentAction } from "../../../../lib/actions/import-actions";
+import { discardSuspenseBatchAction, runImportAction, setDocTypeAction, uploadDocumentAction } from "../../../../lib/actions/import-actions";
 import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 
@@ -16,7 +16,7 @@ const DOC_TYPES = [
 ] as const;
 
 /** Error codes this page can explain. Anything else is shown verbatim. */
-const KNOWN_ERRORS = ["NO_ADAPTER_FOUND"];
+const KNOWN_ERRORS = ["NO_ADAPTER_FOUND", "TRANSACTIONS_CSV_NOT_ACCOUNTS"];
 
 export default async function DocumentsPage({
   params,
@@ -163,16 +163,64 @@ export default async function DocumentsPage({
       {suspense.length > 0 ? (
         <Card title={`${t("pendingSuspense")} (${suspense.length})`}>
           <p className="mb-3 text-xs text-neutral-500">{t("suspenseNote")}</p>
-          <ul className="flex flex-col gap-2 text-sm">
-            {suspense.map((s) => (
-              <li key={s.id} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
-                <a href={`/${locale}/verification/suspense/${s.id}`} className="underline">
-                  <span className="font-medium text-amber-800">{t("reason")}: {s.reason}</span>
-                </a>
-                <span className="ms-2 text-xs text-amber-600">{s.batch.document?.filename}</span>
-              </li>
-            ))}
-          </ul>
+          {/*
+            Grouped BY BATCH, with a bulk discard per batch.
+
+            Owner QA: 54 rows, every one reading "Reason: UNKNOWN_ACCOUNT_TYPE" over the
+            same filename, with no way to tell them apart and no way to clear them except
+            54 individual discards. His question was the right one - "what am I even
+            looking at, and where do I map it?" - and the list gave him nothing to answer
+            it with.
+
+            So each row now shows a preview of the raw data it refused to guess about,
+            and each batch can be cleared in one action. Pending suspense is load-bearing:
+            it is what keeps every closed month provisional, which is what makes the
+            surplus hand-off refuse to deploy anything.
+          */}
+          {Object.entries(
+            suspense.reduce<Record<string, typeof suspense>>((acc, s) => {
+              const key = s.batchId;
+              (acc[key] ??= []).push(s);
+              return acc;
+            }, {}),
+          ).map(([batchId, rows]) => (
+            <div key={batchId} className="mb-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium text-neutral-700">
+                  {rows[0]!.batch.document?.filename ?? batchId} · {rows.length}
+                </span>
+                <form action={discardSuspenseBatchAction} className="flex items-end gap-2">
+                  <input type="hidden" name="locale" value={locale} />
+                  <input type="hidden" name="batchId" value={batchId} />
+                  <TextInput name="note" placeholder={t("discardNotePlaceholder")} />
+                  <button type="submit" className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs">
+                    {t("discardBatch", { count: rows.length })}
+                  </button>
+                </form>
+              </div>
+              <ul className="flex flex-col gap-2 text-sm">
+                {rows.slice(0, 10).map((s) => (
+                  <li key={s.id} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                    <a href={`/${locale}/verification/suspense/${s.id}`} className="underline">
+                      <span className="font-medium text-amber-800">{t("reason")}: {s.reason}</span>
+                    </a>
+                    {/* The raw row it refused to guess about. Without this every entry
+                        looks identical and the queue is unreadable. */}
+                    <span className="ms-2 text-xs text-amber-700" dir="auto">
+                      {Object.entries((s.rawData ?? {}) as Record<string, unknown>)
+                        .filter(([, v]) => v !== null && v !== "" && typeof v !== "object")
+                        .slice(0, 4)
+                        .map(([k, v]) => `${k}: ${String(v)}`)
+                        .join(" · ")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {rows.length > 10 ? (
+                <p className="mt-2 text-xs text-neutral-500">{t("suspenseTruncated", { count: rows.length - 10 })}</p>
+              ) : null}
+            </div>
+          ))}
         </Card>
       ) : null}
     </div>

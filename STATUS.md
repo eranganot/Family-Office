@@ -283,6 +283,68 @@ worked.
   `DocTypeSchema`, so a card statement could only be typed from the Operations form.
   Same one-word omission that once rejected every card upload outright. Now asserted.
 
+### 🔴 54 ORPHANED SUSPENSE ROWS — one misrouted file was blocking M41 #6
+**`OZ_Movements_ILS ….csv` (a One Zero MOVEMENTS export) was run through the ACCOUNTS
+adapter.** Each transaction was treated as an account, none had a recognisable product
+type, so all 54 rows landed in suspense as `UNKNOWN_ACCOUNT_TYPE`.
+
+**The chain that made this expensive:** 54 pending suspense rows → every closed month
+stays `provisional` → `allocationHandoffReadiness` refuses → the verified surplus never
+reaches the deployment engine. **One misrouted file silently disabled a feature three
+layers away.** The provisional refusal the owner has been seeing on `/allocation` all
+session traces back to this import.
+
+**Root cause, and it is the purest instance of this codebase's recurring pattern:**
+`il-accounts-csv`'s module comment has said *"Transaction-level statements are NOT in
+scope here"* since v1, and `accepts()` asked only **"is it a CSV?"**. *A boundary
+documented in a comment and not enforced in code is not a boundary.*
+
+- `accepts()` now refuses `BANK_STATEMENT` / `CARD_STATEMENT` — they have their own
+  pipeline (`statement-import-service`, via Operations → Transactions).
+- `parse()` refuses a movements file by header signature (`זכות`, `חובה`, `אסמכתא`, …)
+  with `TRANSACTIONS_CSV_NOT_ACCOUNTS`, which the UI renders as a sentence pointing at
+  the right importer. ⚠️ It cannot live in `accepts()` — that only receives
+  `DocumentMeta`, never the bytes.
+- **`suspenseResolution.discardBatch`** — the queue could only be cleared 54 times by
+  hand. *A queue that cannot be cleared in proportion to how it filled is one the owner
+  learns to ignore.* Scoped to ONE batch deliberately: a global "discard all pending"
+  would sweep away genuine suspense from unrelated imports.
+- Suspense is **grouped by file** and each row **previews its raw data**. Fifty-four rows
+  reading `Reason: UNKNOWN_ACCOUNT_TYPE` over one filename told the owner nothing — his
+  question was *"what am I looking at, and where do I map it?"*, and the list could not
+  answer it.
+
+**Discarding these 54 is correct, not data loss** — they were never accounts, and the CSV
+is still stored for a proper transactions re-import.
+
+### 🔵 NEXT — form 106 + mortgage-schedule parsers. ⚠️ BLOCKED ON THE LEDGER FACTORY.
+Owner asked for both (2026-08-02). **Neither is "just write an adapter."**
+
+`domain/ingestion/ledger-factory.buildFromPayload` handles **`ACCOUNT` and nothing else**:
+```ts
+if (item.suggestedKind !== "ACCOUNT") { suspense.push(toSuspense(item, "UNSUPPORTED_KIND")); continue; }
+```
+- A **mortgage schedule** yields a `MORTGAGE` item with **tracks** (type, rate, principal
+  remaining, end date, CPI-linked).
+- A **106** yields `CASH_FLOW` items (salary, pension/hishtalmut deductions).
+
+Both are non-ACCOUNT, so a naive adapter would send **every row to suspense** — recreating
+the exact 54-orphan bug this gate just fixed, with a friendlier filename. **Do not ship
+the adapters before the factory supports the kinds.**
+
+Order (each its own gate):
+1. **`ledger-factory` accepts `MORTGAGE`** + a `mortgageTracks` field shape, with its own
+   suspense reasons (`UNPARSEABLE_RATE`, `UNKNOWN_TRACK_TYPE`). Persist `MortgageTrack`
+   rows in `import-service`. Fixture-tested, no adapter yet.
+2. **`il-mortgage-schedule-pdf`** adapter against a real לוח סילוקין. Highest value: track
+   rate + principal drive every repayment candidate and the debt analyzers.
+3. **`ledger-factory` accepts `CASH_FLOW`**, then **`il-tax-106-pdf`**. Feeds the
+   tax-ceiling candidates and lets `TAX_VERIFY_PAYROLL` resolve itself.
+
+⚠️ Same trap as `il-accounts-csv`: `accepts()` must gate on `docType`
+(`MORTGAGE_SCHEDULE`, `TAX_106`) **and** the parse must refuse a file whose headers say
+otherwise. A boundary in a comment is not a boundary.
+
 ### Working rules that cost a gate run each when forgotten
 - Deploy scripts: **ASCII only**, comments are `#` not `//`, `-LiteralPath` for any path
   containing `[locale]` or `(app)`.

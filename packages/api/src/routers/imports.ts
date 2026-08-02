@@ -107,6 +107,31 @@ export const suspenseResolutionRouter = router({
       }),
     ),
 
+  /**
+   * Discard every PENDING suspense row from one import batch, with a reason.
+   *
+   * Owner QA 2026-08-02: a movements CSV run through the accounts adapter produced 54
+   * identical `UNKNOWN_ACCOUNT_TYPE` rows, and the only way to clear them was 54 separate
+   * discards. A queue that cannot be cleared in proportion to how it filled is a queue
+   * the owner learns to ignore — and this one is load-bearing: pending suspense is what
+   * keeps every closed month provisional, which is what makes the surplus hand-off
+   * refuse to deploy anything.
+   *
+   * Scoped to ONE batch on purpose. A "discard everything pending" button would also
+   * sweep away genuine, individually-meaningful suspense from unrelated imports; the
+   * misrouted-file case is per-file, so the remedy is per-file. The note is required —
+   * a discarded row keeps its trail, exactly like a superseded drift alert.
+   */
+  discardBatch: protectedProcedure
+    .input(z.object({ batchId: z.uuid(), note: z.string().min(1).max(500) }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await ctx.db.suspenseItem.updateMany({
+        where: { batchId: input.batchId, status: "PENDING" },
+        data: { status: "DISCARDED", resolutionNote: input.note, resolvedAt: new Date() },
+      });
+      return { discarded: result.count };
+    }),
+
   /** The raw data belongs to an item that already exists in the ledger. */
   linkToExisting: protectedProcedure
     .input(z.object({ id: z.uuid(), ledgerItemId: z.uuid() }))

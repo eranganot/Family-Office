@@ -40,6 +40,25 @@ export async function runImportAction(fd: FormData): Promise<void> {
   redirect(`/${locale}/documents?report=${batchId}`);
 }
 
+export async function discardSuspenseBatchAction(fd: FormData): Promise<void> {
+  const locale = str(fd, "locale");
+  const trpc = await serverCaller();
+  try {
+    // Mounted at the ROOT as `suspense` (index.ts), despite being exported as
+    // `suspenseResolutionRouter`. `imports.suspense` is a different thing again - the
+    // LIST query. Two similar names, two different routers.
+    await trpc.suspense.discardBatch({
+      batchId: str(fd, "batchId"),
+      // A discarded row keeps its trail, so the reason is required rather than blank.
+      note: opt(fd, "note") ?? "DISCARDED_IN_BULK",
+    });
+  } catch (e) {
+    const code = e instanceof Error ? encodeURIComponent(e.message.slice(0, 80)) : "UNKNOWN";
+    redirect(`/${locale}/documents?error=${code}`);
+  }
+  redirect(`/${locale}/documents`);
+}
+
 export async function setDocTypeAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const trpc = await serverCaller();

@@ -38,12 +38,48 @@ function buildHeaderIndex(headers: string[]): Map<string, string> {
   return index;
 }
 
+/**
+ * Headers that only ever appear in a TRANSACTIONS/movements export, never in an account
+ * summary. One of these is enough to know the file is in the wrong pipeline.
+ *
+ * Owner QA 2026-08-02: `OZ_Movements_ILS ….csv` — a One Zero movements export — was run
+ * through this adapter, which treated each TRANSACTION as an ACCOUNT. None had a
+ * recognisable product type, so all 54 rows landed in suspense as UNKNOWN_ACCOUNT_TYPE.
+ *
+ * The module comment above has said "transaction-level statements are NOT in scope here"
+ * since v1, and `accepts()` asked only "is it a CSV?". **A boundary documented in a
+ * comment and not enforced in code is not a boundary** — it is the same failure this
+ * codebase keeps shipping, in its purest form: a rule that is correct on paper and
+ * absent at runtime.
+ *
+ * Note this cannot live in `accepts()`: that receives only `DocumentMeta` (filename,
+ * mime, docType) and never the bytes, so header inspection has to happen in `parse()`.
+ */
+const MOVEMENT_ONLY_HEADERS = [
+  "זכות", "חובה", "אסמכתא", "סכום חיוב", "סכום זיכוי", "תנועה", "סוג תנועה",
+  "תאריך ביצוע", "פירוט", "תיאור פעולה", "יתרה לאחר", "מספר שובר",
+];
+
+export function looksLikeMovementsCsv(headers: string[]): boolean {
+  const clean = headers.map((h) => cleanHebrew(h));
+  return MOVEMENT_ONLY_HEADERS.some((m) => clean.includes(m));
+}
+
 export const ilAccountsCsvAdapter: IngestionAdapter = {
   id: "il-accounts-csv",
   version: "1.0.0",
 
   accepts(meta: DocumentMeta): boolean {
-    return meta.mimeType === "text/csv" || meta.filename.toLowerCase().endsWith(".csv");
+    const isCsv = meta.mimeType === "text/csv" || meta.filename.toLowerCase().endsWith(".csv");
+    if (!isCsv) return false;
+    /*
+     * Bank and card statements have their OWN pipeline (`statement-import-service`,
+     * reached from Operations → Transactions). Accepting them here sends a transaction
+     * file down the accounts path, which is exactly how 54 movements became 54 orphaned
+     * "accounts". Declared type is the cheapest signal available and it was ignored.
+     */
+    if (meta.docType === "BANK_STATEMENT" || meta.docType === "CARD_STATEMENT") return false;
+    return true;
   },
 
   async parse(bytes: Uint8Array, meta: DocumentMeta): Promise<RawDataPayload> {
@@ -56,6 +92,21 @@ export const ilAccountsCsvAdapter: IngestionAdapter = {
 
     const warnings: string[] = parsed.errors.slice(0, 5).map((e) => `CSV_ROW_${e.row}: ${e.code}`);
     const headers = parsed.meta.fields ?? [];
+
+    /*
+     * REFUSE a movements file rather than turning every transaction into an orphaned
+     * "account". Throwing here is the whole point: this adapter cannot produce anything
+     * useful from a movements export, and its previous behaviour — emitting one
+     * unclassifiable RawItem per transaction — produced 54 suspense rows that then made
+     * every closed month provisional, which in turn made the surplus hand-off refuse.
+     *
+     * One misrouted file, silently absorbed, disabled a feature three layers away. A
+     * refusal at the door would have cost one clear error message instead.
+     */
+    if (looksLikeMovementsCsv(headers)) {
+      throw new Error("TRANSACTIONS_CSV_NOT_ACCOUNTS");
+    }
+
     const index = buildHeaderIndex(headers);
     if (!index.has("name")) warnings.push("NO_NAME_COLUMN_RECOGNIZED");
 
