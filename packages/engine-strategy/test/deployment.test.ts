@@ -155,3 +155,99 @@ describe("computeDeploymentPlans (M26 variants)", () => {
   });
 
 });
+
+/**
+ * M41 #6 — verified monthly surplus feeding the deployable amount.
+ *
+ * The engine takes a NUMBER and trusts it. Whether that number was allowed to exist is
+ * `allocationHandoffReadiness`'s job (it refuses a PROVISIONAL surplus), which is why
+ * these tests assert on "no surplus passed" rather than on provisionality: a provisional
+ * surplus never reaches this function at all, and a test pretending otherwise would be
+ * testing a path the service makes unreachable.
+ */
+describe("computeDeploymentPlans — surplus hand-off (M41 #6)", () => {
+  const withCash = (cash: number) => snapshot([item({ accountType: "BANK_CHECKING", valueBase: cash }), expense(10_000)]);
+  const ctxSurplus = (surplus: number | undefined, over: Record<string, unknown> = {}) => ({
+    assumptions: { ...CTX.assumptions, ...over },
+    taxRules: {},
+    ...(surplus === undefined ? {} : { deployableSurplusBase: surplus }),
+  });
+
+  it("REGRESSION PIN: a caller passing no surplus gets exactly today's behaviour", () => {
+    // buffer = 10,000 x 6 = 60,000; cash 200,000 => 140,000 idle
+    const before = computeDeploymentPlans(withCash(200_000), noTax());
+    const after = computeDeploymentPlans(withCash(200_000), ctxSurplus(undefined));
+    expect(after.freeCashBase).toBe(before.freeCashBase);
+    expect(after.freeCashBase).toBe(140_000);
+    expect(after.surplusBase).toBe(0);
+    expect(after.idleCashBase).toBe(140_000);
+  });
+
+  it("a verified surplus is ADDED to the deployable amount", () => {
+    const p = computeDeploymentPlans(withCash(200_000), ctxSurplus(12_000));
+    expect(p.idleCashBase).toBe(140_000);
+    expect(p.surplusBase).toBe(12_000);
+    expect(p.freeCashBase).toBe(152_000);
+    expect(p.notes).toContain("SURPLUS_INCLUDED");
+  });
+
+  it("NAMES the surplus separately from cash — one merged figure hides which half recurs", () => {
+    const p = computeDeploymentPlans(withCash(200_000), ctxSurplus(12_000));
+    // the two components must reconstruct the total, and be individually recoverable
+    expect(p.idleCashBase + p.surplusBase).toBe(p.freeCashBase);
+    const growth = p.candidates.find((c) => c.kind === "INVEST_GROWTH")!;
+    expect(growth.detail).toContain("already banked");
+    expect(growth.detail).toContain("surplus");
+    expect(growth.detailHe).toContain("עודף");
+  });
+
+  it("a NEGATIVE surplus contributes ZERO — it never shrinks the deployable amount", () => {
+    const p = computeDeploymentPlans(withCash(200_000), ctxSurplus(-8_000));
+    expect(p.surplusBase).toBe(0);
+    expect(p.freeCashBase).toBe(140_000);
+    expect(p.notes).toContain("SURPLUS_NOT_DEPLOYED");
+    expect(p.notes).not.toContain("SURPLUS_INCLUDED");
+  });
+
+  it("a zero surplus contributes zero and says so — silence must not read as inclusion", () => {
+    const p = computeDeploymentPlans(withCash(200_000), ctxSurplus(0));
+    expect(p.surplusBase).toBe(0);
+    expect(p.notes).toContain("SURPLUS_NOT_DEPLOYED");
+  });
+
+  it("surplus does NOT jump the emergency buffer, and is not netted off the shortfall", () => {
+    // cash 30,000 vs a 60,000 buffer: the shortfall is 30,000 with or without surplus
+    const p = computeDeploymentPlans(withCash(30_000), ctxSurplus(12_000));
+    expect(p.freeCashBase).toBe(0);
+    expect(p.surplusBase).toBe(0);
+    expect(p.notes).toContain("BUFFER_BELOW_TARGET");
+    expect(p.notes).toContain("SURPLUS_HELD_BEHIND_BUFFER");
+    const topUp = p.variants[0]!.steps.find((s) => s.kind === "BUFFER_TOP_UP")!;
+    expect(topUp.amountBase).toBe(30_000);
+  });
+
+  it("unknown expenses still refuse everything — a surplus cannot be freed before the buffer can be sized", () => {
+    const p = computeDeploymentPlans(snapshot([item({ accountType: "BANK_CHECKING", valueBase: 500_000 })]), ctxSurplus(12_000));
+    expect(p.notes).toContain("EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED");
+    expect(p.notes).toContain("SURPLUS_HELD_BEHIND_BUFFER");
+    expect(p.freeCashBase).toBe(0);
+    expect(p.surplusBase).toBe(0);
+  });
+
+  it("presets and variants reconcile against the surplus-inclusive free cash", () => {
+    const p = computeDeploymentPlans(withCash(200_000), ctxSurplus(12_000));
+    for (const v of p.variants) {
+      const total = v.steps.reduce((t, x) => t + x.amountBase, 0);
+      expect(total + v.leftoverBase, v.key).toBe(p.freeCashBase);
+    }
+  });
+
+  it("a surplus alone can make an otherwise-idle-free household deployable", () => {
+    // cash exactly equals the buffer: zero idle cash, so only the surplus is deployable
+    const p = computeDeploymentPlans(withCash(60_000), ctxSurplus(9_000));
+    expect(p.idleCashBase).toBe(0);
+    expect(p.surplusBase).toBe(9_000);
+    expect(p.freeCashBase).toBe(9_000);
+    expect(p.notes).not.toContain("NO_FREE_CASH");
+  });
+});

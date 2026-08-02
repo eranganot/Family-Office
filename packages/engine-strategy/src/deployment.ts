@@ -83,13 +83,57 @@ export type DeploymentNote =
   | "EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED"
   | "BUFFER_BELOW_TARGET"
   | "MIX_UNKNOWN_INVEST_UNSPLIT"
-  | "NO_FREE_CASH";
+  | "NO_FREE_CASH"
+  /** M41 #6: a verified monthly surplus was added to the deployable amount. */
+  | "SURPLUS_INCLUDED"
+  /** M41 #6: a surplus was offered but the buffer is not yet full, so it was NOT deployed. */
+  | "SURPLUS_HELD_BEHIND_BUFFER"
+  /** M41 #6: no surplus reached the engine. The REASON lives in `surplusHandoff`. */
+  | "SURPLUS_NOT_DEPLOYED";
+
+/**
+ * M41 #6 — why a surplus did or did not reach `freeCashBase`.
+ *
+ * Populated by the API service (`runAllocation`), NOT by this engine: the reasons are
+ * operations-module facts (is the period closed, is the figure provisional) that a pure
+ * strategy engine has no business knowing. It is carried on the PLAN anyway, because the
+ * plan is the single artifact the UI renders and the audit trail keeps — and a refusal
+ * recorded somewhere other than the number it changed is a refusal nobody will ever see.
+ *
+ * This module has now shipped the same defect six times: an individually correct
+ * exclusion that silently disables a feature. Every closed month in this household is
+ * provisional today, so `SURPLUS_PROVISIONAL` is the EXPECTED outcome on real data — and
+ * must read as a stated refusal, never as "there was no surplus".
+ */
+export interface DeploymentSurplusHandoff {
+  ready: boolean;
+  reason:
+    | "READY"
+    | "NO_CLOSED_PERIOD"
+    | "PERIOD_NOT_CLOSED"
+    | "SURPLUS_NOT_COMPUTED"
+    | "SURPLUS_PROVISIONAL"
+    | "SURPLUS_NOT_POSITIVE"
+    | "WRONG_PHASE";
+  /** The figure as computed, even when refused — a refused number is still evidence. */
+  verifiedSurplusBase: number | null;
+  year: number | null;
+  month: number | null;
+}
 
 export interface DeploymentPlans {
   engineNote: "STRATEGY_LEVEL_ONLY_NEVER_PRODUCTS";
   monthlyExpensesBase: number | null;
   bufferTargetBase: number | null;
   cashBase: number;
+  /** Cash already banked, above the buffer. Deployable today. */
+  idleCashBase: number;
+  /** This month's verified surplus, as ACTUALLY applied to `freeCashBase` (0 if none). */
+  surplusBase: number;
+  /** Set by the service, not the engine. See `DeploymentSurplusHandoff`. */
+  surplusHandoff?: DeploymentSurplusHandoff | undefined;
+  /** idleCashBase + surplusBase. The two are kept apart above because they are
+   *  different kinds of money: idle cash is banked, surplus is a recurring forecast. */
   freeCashBase: number;
   /** The editable action menu the household mixes freely. */
   candidates: DeploymentCandidate[];
@@ -128,8 +172,17 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
   const emptyPresets = { GROWTH: [], DEBT_FREE: [], BALANCED: [] } as Record<DeploymentVariantKey, PresetEntry[]>;
   const base = { engineNote: "STRATEGY_LEVEL_ONLY_NEVER_PRODUCTS" as const, cashBase: round(cashBase) };
 
+  // M41 #6 — a NEGATIVE surplus contributes ZERO, it does not shrink the deployable
+  // amount. An overspent month is a fact about spending, not a claim on the balance
+  // sheet; netting it against banked cash would silently reduce what the household is
+  // told it can deploy, with no line item ever saying why.
+  const offeredSurplus = ctx.deployableSurplusBase ?? 0;
+  const surplusBase = Number.isFinite(offeredSurplus) && offeredSurplus > 0 ? round(offeredSurplus) : 0;
+
   if (monthlyExpenses <= 0) {
-    return { ...base, monthlyExpensesBase: null, bufferTargetBase: null, freeCashBase: 0, candidates: [], presets: emptyPresets, variants: [], notes: ["EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED"] };
+    // Expenses unknown ⇒ the buffer cannot be sized ⇒ NOTHING is free, surplus included.
+    // A surplus is only deployable once we know what the household must keep in reserve.
+    return { ...base, monthlyExpensesBase: null, bufferTargetBase: null, idleCashBase: 0, surplusBase: 0, freeCashBase: 0, candidates: [], presets: emptyPresets, variants: [], notes: surplusBase > 0 ? ["EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED", "SURPLUS_HELD_BEHIND_BUFFER"] : ["EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED"] };
   }
 
   const targetMonths = Number(ctx.assumptions["emergency_fund_months"] ?? 6);
@@ -147,13 +200,21 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
       evidenceItemIds: cashIds,
     };
     notes.push("BUFFER_BELOW_TARGET");
+    // M41 #6 — surplus does NOT jump the buffer. It is a forecast of money that has not
+    // arrived; the buffer exists to be spendable the day a shock lands. Counting an
+    // unarrived flow as reserve would report a buffer the household does not have.
+    // It is also NOT netted off the shortfall for the same reason. Reported, not hidden.
+    if (surplusBase > 0) notes.push("SURPLUS_HELD_BEHIND_BUFFER");
     const preset = [{ candidateId: "buffer", amount: shortfall }];
     const presets = { GROWTH: preset, DEBT_FREE: preset, BALANCED: preset };
     const variant: DeploymentVariant = { key: "BALANCED", steps: [{ id: "buffer", kind: "BUFFER_TOP_UP", amountBase: shortfall, detail: c.detail, detailHe: c.detailHe, goalImpact: c.goalImpact, goalImpactHe: c.goalImpactHe, evidenceItemIds: cashIds }], leftoverBase: 0, summary: { investedBase: 0, debtRepaidBase: 0, interestSavedYearBase: 0, ceilingDepositsBase: 0 }, pros: [], prosHe: [], cons: [], consHe: [], risks: [], risksHe: [] };
-    return { ...base, monthlyExpensesBase: round(monthlyExpenses), bufferTargetBase: round(bufferTarget), freeCashBase: 0, candidates: [c], presets, variants: [variant], notes };
+    return { ...base, monthlyExpensesBase: round(monthlyExpenses), bufferTargetBase: round(bufferTarget), idleCashBase: 0, surplusBase: 0, freeCashBase: 0, candidates: [c], presets, variants: [variant], notes };
   }
 
-  const freeCash = cashBase - bufferTarget;
+  const idleCash = cashBase - bufferTarget;
+  const freeCash = idleCash + surplusBase;
+  if (surplusBase > 0) notes.push("SURPLUS_INCLUDED");
+  else notes.push("SURPLUS_NOT_DEPLOYED");
   if (freeCash <= 0) notes.push("NO_FREE_CASH");
 
   const expensiveRate = Number(ctx.assumptions["expensive_debt_rate_pct"] ?? 8);
@@ -249,6 +310,16 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
   const unknownSharePct = known + unknown > 0 ? (unknown / (known + unknown)) * 100 : 0;
   const mixUnknown = unknownSharePct > unknownMaxPct;
   if (mixUnknown) notes.push("MIX_UNKNOWN_INVEST_UNSPLIT");
+  // M41 #6 — when part of the deployable amount is a recurring forecast rather than
+  // banked cash, the candidate that spends it says so. The household is being asked to
+  // commit money, and "₪X is free" reads very differently from "₪Y is in the bank and
+  // ₪Z is last month's surplus, which has to repeat".
+  const surplusClause = surplusBase > 0
+    ? ` Of this, ${nis(idleCash)} is cash already banked and ${nis(surplusBase)} is last closed month's verified surplus — a figure that has to recur, so treat it as a monthly commitment rather than a lump sum.`
+    : "";
+  const surplusClauseHe = surplusBase > 0
+    ? ` מתוך זה, ${nis(idleCash)} מזומן שכבר בבנק ו-${nis(surplusBase)} העודף המאומת של החודש הסגור האחרון — סכום שצריך לחזור על עצמו, ולכן התייחסו אליו כמחויבות חודשית ולא כסכום חד-פעמי.`
+    : "";
   const goalNames = snapshot.goals.filter((g) => g.requiredFundingBase !== null).sort((a, b) => a.priority - b.priority).slice(0, 2).map((g) => g.name);
   const goalsLabel = goalNames.length > 0 ? goalNames.join(", ") : null;
   const investGI = (amt: number) => ({
@@ -259,8 +330,8 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
     id: "invest:growth", kind: "INVEST_GROWTH",
     title: `Invest · growth channels (target ${targetGrowthPct}%)`, titleHe: `השקעה · אפיקי צמיחה (יעד ${targetGrowthPct}%)`,
     editable: true, minAmount: 0, maxAmount: round(freeCash), suggestedAmount: 0, ratePct: null,
-    detail: `Invest in growth channels (equity-type tracks in existing wrappers or a taxable investment account) — moves the mix toward your ${targetGrowthPct}% target.${mixUnknown ? " Record your accounts' growth share first for a responsible split." : ""}`,
-    detailHe: `השקיעו באפיקי צמיחה (מסלולים מוטי-צמיחה בעטיפות הקיימות או חשבון השקעות חייב) — מקרב את התמהיל ליעד ${targetGrowthPct}%.${mixUnknown ? " הזינו קודם רכיב צמיחה לחשבונות לפיצול אחראי." : ""}`,
+    detail: `Invest in growth channels (equity-type tracks in existing wrappers or a taxable investment account) — moves the mix toward your ${targetGrowthPct}% target.${mixUnknown ? " Record your accounts' growth share first for a responsible split." : ""}${surplusClause}`,
+    detailHe: `השקיעו באפיקי צמיחה (מסלולים מוטי-צמיחה בעטיפות הקיימות או חשבון השקעות חייב) — מקרב את התמהיל ליעד ${targetGrowthPct}%.${mixUnknown ? " הזינו קודם רכיב צמיחה לחשבונות לפיצול אחראי." : ""}${surplusClauseHe}`,
     ...investGI(freeCash), evidenceItemIds: [],
   });
   candidates.push({
@@ -337,7 +408,7 @@ export function computeDeploymentPlans(snapshot: SnapshotPayload, ctx: AnalyzerC
   const validation = validateStrategyText(texts);
   if (!validation.valid) throw new Error(`PRODUCT_REFERENCE_IN_DEPLOYMENT:${validation.pattern}`);
 
-  return { ...base, monthlyExpensesBase: round(monthlyExpenses), bufferTargetBase: round(bufferTarget), freeCashBase: round(freeCash), candidates, presets, variants, notes };
+  return { ...base, monthlyExpensesBase: round(monthlyExpenses), bufferTargetBase: round(bufferTarget), idleCashBase: round(idleCash), surplusBase, freeCashBase: round(freeCash), candidates, presets, variants, notes };
 }
 
 function buildNarrative(key: DeploymentVariantKey, s: VariantSummary, expectedReturn: number, volatility: number, hasExpensiveDebt: boolean): Pick<DeploymentVariant, "pros" | "prosHe" | "cons" | "consHe" | "risks" | "risksHe"> {

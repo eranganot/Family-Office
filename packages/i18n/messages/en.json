@@ -1059,6 +1059,18 @@
     "freeCash": "Free to deploy",
     "monthlyExpenses": "Monthly expenses",
     "expensesUnknown": "Monthly expenses are not mapped, so the engine refuses to declare any cash 'free'. Map your expense flows in Mapping and rebuild.",
+    "surplusIncluded": "Free to deploy is {idle} of cash already banked plus {surplus} of verified surplus from {month}. The surplus is a monthly figure that has to recur — commit it as a monthly amount, not as a lump sum.",
+    "surplusNotDeployed": "This plan deploys banked cash only. No monthly surplus was added, because:",
+    "surplusHeldBehindBuffer": "A verified surplus exists but was NOT deployed: the emergency buffer is not yet full. The buffer has to be spendable the day a shock lands, and a surplus is money that has not arrived yet.",
+    "surplusReason": {
+      "READY": "the hand-off was ready (report this — the plan should have included it).",
+      "NO_CLOSED_PERIOD": "no month has been closed yet. Close a month in Operations first.",
+      "PERIOD_NOT_CLOSED": "the latest month is not closed.",
+      "SURPLUS_NOT_COMPUTED": "the closed month has no computed surplus.",
+      "SURPLUS_PROVISIONAL": "the surplus is provisional — it still contains unverified transactions. Clear the suspense queue and reclose the month. This is a refusal, not a zero: the figure exists, it just is not verified enough to move money against.",
+      "SURPLUS_NOT_POSITIVE": "the closed month did not end in surplus.",
+      "WRONG_PHASE": "the household is not in the Allocation or Strategy phase."
+    },
     "noSteps": "No deployment steps — the buffer consumes all available cash.",
     "kinds": {
       "BUFFER_TOP_UP": "Buffer top-up",

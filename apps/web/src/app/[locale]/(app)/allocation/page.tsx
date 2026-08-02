@@ -16,9 +16,16 @@ interface Variant {
   summary: { investedBase: number; debtRepaidBase: number; interestSavedYearBase: number; ceilingDepositsBase: number };
   pros: string[]; prosHe: string[]; cons: string[]; consHe: string[]; risks: string[]; risksHe: string[];
 }
+interface SurplusHandoff {
+  ready: boolean; reason: string; verifiedSurplusBase: number | null;
+  year: number | null; month: number | null;
+}
 interface Plans {
   monthlyExpensesBase: number | null; bufferTargetBase: number | null;
   cashBase: number; freeCashBase: number; candidates: Candidate[]; variants: Variant[]; notes: string[];
+  // M41 #6. OPTIONAL on purpose: plans persisted before this shipped have no such keys,
+  // and an older plan must still render rather than crash on a field it predates.
+  idleCashBase?: number; surplusBase?: number; surplusHandoff?: SurplusHandoff;
 }
 type WP = Record<string, { enabled: boolean; amount: number }>;
 
@@ -132,6 +139,31 @@ export default async function AllocationPage({
               <Stat label={t("monthlyExpenses")} value={plan.monthlyExpensesBase !== null ? nis(plan.monthlyExpensesBase) : "—"} />
             </div>
             {plan.notes.includes("EXPENSES_UNKNOWN_DEPLOYMENT_REFUSED") ? <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{t("expensesUnknown")}</p> : null}
+            {/* M41 #6 — the composition of "free to deploy", stated. A single number
+                merging banked cash with a recurring forecast hides which half repeats.
+                A refusal is rendered as a stated refusal, never as an absent line:
+                this module has shipped "correct silence that reads as good news" six
+                times, and the provisional refusal is the EXPECTED case on real data. */}
+            {plan.surplusHandoff ? (
+              plan.surplusHandoff.ready && (plan.surplusBase ?? 0) > 0 ? (
+                <p className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                  {t("surplusIncluded", {
+                    idle: nis(plan.idleCashBase ?? 0),
+                    surplus: nis(plan.surplusBase ?? 0),
+                    month: `${String(plan.surplusHandoff.month).padStart(2, "0")}/${plan.surplusHandoff.year}`,
+                  })}
+                </p>
+              ) : (
+                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {t("surplusNotDeployed")}{" "}
+                  {t(`surplusReason.${plan.surplusHandoff.reason}`)}
+                  {plan.surplusHandoff.verifiedSurplusBase !== null
+                    ? ` (${nis(plan.surplusHandoff.verifiedSurplusBase)})`
+                    : ""}
+                </p>
+              )
+            ) : null}
+            {plan.notes.includes("SURPLUS_HELD_BEHIND_BUFFER") ? <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{t("surplusHeldBehindBuffer")}</p> : null}
           </Card>
 
           {latest.status === "APPROVED" ? (

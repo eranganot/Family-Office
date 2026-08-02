@@ -2,6 +2,87 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+---
+
+# 🚀 START HERE — Tier 3 #1 is BUILT, GATE NOT YET RUN
+
+**Run `session-kickoff` first.** Then run `.\deploy-2026-08-02-surplus-deployment.ps1`
+(session 32 built it with **no sandbox** — the Linux VM would not start, so nothing was
+typechecked, tested or linted here. The script is the first real gate this code has met).
+
+### ⚠️ M41 #6 — surplus → deployment engine. BUILT 2026-08-02, UNVERIFIED.
+The last genuinely unfinished M41 item, and the only one that changes how much money the
+app proposes deploying. Nine files, no migration, no lockfile change, **no new assumption
+key** (pins stay valid, no recompute).
+
+| File | Change |
+|---|---|
+| `engine-strategy/src/findings.ts` | `AnalyzerContext.deployableSurplusBase?: number \| undefined` |
+| `engine-strategy/src/deployment.ts` | `idleCashBase` + `surplusBase` on `DeploymentPlans`; 3 new notes; `DeploymentSurplusHandoff` |
+| `engine-strategy/src/index.ts` | exports the new type |
+| `engine-strategy/test/deployment.test.ts` | 9 new tests incl. a regression pin |
+| `api/services/allocation-service.ts` | resolves latest CLOSED month → readiness → passes surplus only if `ready` |
+| `allocation/page.tsx` + `en/he.json` | renders the inclusion **or the refusal reason** |
+
+**The expected QA result today is a REFUSAL, not a bigger number.** Every closed month in
+this household is provisional, so `allocationHandoffReadiness` returns
+`SURPLUS_PROVISIONAL` and **zero surplus is deployed**. That is correct. If "Free to
+deploy" grows on the first regenerate, **the ready gate leaked** — `verifiedSurplusBase`
+is populated on refusals too, so the number's presence must never be the gate.
+
+Decisions encoded (do not silently undo any of these):
+- **ONE month, never annualised.** Twelve times a forecast is not cash.
+- **Negative surplus contributes ZERO**, never shrinks the deployable amount.
+- **Surplus does NOT jump the buffer** and is not netted off the shortfall — a buffer must
+  be spendable the day a shock lands; a surplus has not arrived.
+- **`idleCashBase` and `surplusBase` reported separately**, reconciling to `freeCashBase`.
+- **The refusal is rendered, with its reason and the refused figure.** This is the
+  seventh instance of the six-times pattern below, and the first one designed against it
+  up front rather than after QA found it.
+
+**Not done:** no test covers `runAllocation`'s month-selection or the ready gate (it is
+DB-bound; those suites need the shared test DB). The engine half is covered; the
+service half is currently guarded only by the deploy script's source assertions.
+
+### Tier 3 — remaining, in this order
+
+**2. Wire `goals` into the health score.** Currently unmeasured, costing 15 points of
+   coverage. Needs `engine-goals` funding-gap output, which needs a snapshot
+   `health-service` does not build. Self-contained.
+
+**3. Telemetry projection (M42).** Acceptance %, completion %, time-to-complete,
+   dismissal histogram — `ActionEvent` already records every transition, so the data
+   exists. **Owner deferred the dashboard**, so build the endpoint, not the charts.
+
+**4. Bilingual audit.** ~60 keys added in session 31; parity holds, phrasing unaudited.
+   Safe, low-risk, good for a short session.
+
+### Working rules that cost a gate run each when forgotten
+- Deploy scripts: **ASCII only**, comments are `#` not `//`, `-LiteralPath` for any path
+  containing `[locale]` or `(app)`.
+- `$Files` must **cover everything changed** — the unstaged guard catches it, keep it.
+- `typecheck -- --force`: turbo cached a stale pass and let a broken commit through.
+- Optional props: `?: T | undefined`, never `?: T | null` (`exactOptionalPropertyTypes`).
+- After extracting anything, **grep for dead imports** — ESLint only catches them at the
+  very end of the gate.
+- Name scripts `deploy-<yyyy-mm-dd>-<subject>.ps1`. Milestone names go stale.
+
+### The pattern to watch for — it recurred SIX times
+A refusal that is individually correct and collectively disables the feature:
+M40a (banned `FIXED_CONTRACTUAL` → banned every subscription), M40b (₪6 card), M41c
+(provisional excluded → excluded every month), M41d (empty list for a failed load), EOY
+(same provisional bug again), health score (measured the empty in-progress month).
+**Before adding any exclusion, ask what it looks like against THIS household's real
+data** — every month is provisional, most of the ledger is unmapped, and the tax matrices
+were only signed off on 2026-07-29.
+
+### Owner preferences learned
+Wants **visible change per gate** — three invisible refactor commits in a row was a
+complaint. Wants the **QA doc updated whenever the thing it tests changes**. Reviews
+carefully and finds real defects, so ship QA-able increments rather than big batches.
+
+---
+
 ## 📌 CONVENTION — deploy script naming (owner, 2026-07-29)
 
 **`deploy-<yyyy-mm-dd>-<subject>.ps1`**, not `deploy-m<N><letter>.ps1`.
@@ -409,6 +490,49 @@ point at. That is the next piece.
 Added after a commit silently dropped the duplicate-card fix; on its very first run it
 caught `package.json` + `package-lock.json` left out of `$Files` after the Playwright
 install. Keep it in every future deploy script.
+
+### ✅ E2E wired into CI (`.github/workflows/e2e.yml`)
+Separate workflow, because it runs against the DEPLOYED app — `ci.yml` runs before
+anything is deployed and has nothing to point at. Triggers: after CI succeeds on main
+(and **only** if it succeeded — smoke-testing a failed build reports routing failures for
+an upstream cause), daily on a schedule (catches breakage arriving *without* a deploy:
+expired session, out-of-band migration, lost env var), and manually. Polls
+`/api/health` for up to 5 minutes rather than guessing a sleep. Chromium only.
+
+### ✅ M41 #6 — surplus → deployment engine. BUILT 2026-08-02 (design below, followed).
+> Built exactly as designed, with two additions the design did not spell out:
+> the **buffer precedence** (surplus does not jump or offset the emergency buffer) and
+> the **rendered refusal** (`DeploymentSurplusHandoff` on the plan + the allocation-page
+> line), because a silent zero here is the six-times pattern in its seventh costume.
+> The original design is kept below verbatim — it is what the code implements.
+
+### 🔴 (original design) M41 #6 — surplus → deployment engine.
+**Deliberately not started at the end of session 31.** It is the only remaining item that
+changes how much money the app proposes deploying, and a half-finished signature change
+there yields a *plausible wrong number* rather than a visible break. It also sits on the
+advice/execution boundary, where this project's rules are strictest.
+
+**The problem:** `computeDeploymentPlans(snapshot, ctx)` derives deployable cash from
+snapshot CASH minus the emergency buffer. It has no notion of monthly surplus, so the
+verified surplus M37 computes never reaches the allocation engine — which is the entire
+point of M41's hand-off.
+
+**Design:**
+1. Add `deployableSurplusBase?: number` to `AnalyzerContext` (optional, so every existing
+   caller keeps working and the change is additive).
+2. In `computeDeploymentPlans`, add it to `freeCashBase` — and **carry it separately in
+   the returned notes**, so a plan can say "₪X of this is this month's surplus, ₪Y is idle
+   cash". Those are different kinds of money: idle cash is already banked, surplus is a
+   forecast that recurs. Merging them into one figure loses that.
+3. `allocation-service` reads it from `allocationHandoffReadiness`, which **already
+   refuses a PROVISIONAL surplus** — that refusal must stay, and is why the readiness
+   query was built first.
+4. Test that a provisional or negative surplus contributes ZERO, and that a plan built
+   with surplus names it separately from cash.
+
+⚠️ Do not let surplus flow in without the provisional check. Every closed month in this
+household is currently provisional, so a naive wiring would deploy against unverified
+figures on day one.
 
 ### Next: M42 proper
 Health score (`health_score_weights` is seeded and consumed by nothing), telemetry
