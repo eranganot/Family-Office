@@ -53,6 +53,11 @@ export default async function VerificationPage({
               <li key={i} className="flex justify-between">
                 <span>
                   {e.expectedDocType} <span className="text-neutral-400">{t("forItem")} {e.itemName}</span>
+                  {/* A Mislaka answering a PENSION_REPORT row looks like a mistake unless
+                      the row says which document satisfied it. */}
+                  {e.satisfiedByDocType && e.satisfiedByDocType !== e.expectedDocType ? (
+                    <span className="text-neutral-400"> · {t("satisfiedBy", { docType: e.satisfiedByDocType })}</span>
+                  ) : null}
                 </span>
                 <span
                   className={
@@ -69,7 +74,27 @@ export default async function VerificationPage({
 
       <Card title={`${t("queue")} (${needsReview.length})`}>
         {needsReview.length === 0 ? (
-          <p className="text-sm text-neutral-500">{t("queueEmpty")}</p>
+          /*
+            "All items verified. Nothing to check." was an unqualified clean bill of
+            health rendered directly BELOW a list of missing documents — two cards on one
+            page contradicting each other, and the owner reasonably read the red list as
+            the broken one.
+
+            Neither is broken; they measure different things. This queue asks whether the
+            OWNER has attested to each item (verification === VERIFIED, no staleness or
+            confidence issues), which manual confirmation alone satisfies. The card above
+            asks whether a PRIMARY SOURCE backs it. An item can be attested with no
+            document behind it, and that is exactly this household's position.
+
+            So the queue no longer claims completeness it cannot see. It states what it
+            actually checked, and names what it did not.
+          */
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-neutral-500">{t("queueEmptyAttested")}</p>
+            {missingDocs.missingCount > 0 ? (
+              <p className="text-sm text-amber-700">{t("queueEmptyButDocsMissing", { count: missingDocs.missingCount })}</p>
+            ) : null}
+          </div>
         ) : (
           <ul className="flex flex-col gap-4">
             {needsReview.map((a) => {

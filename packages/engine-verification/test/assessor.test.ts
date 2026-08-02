@@ -80,4 +80,36 @@ describe("missing-docs report", () => {
     expect(report.missingCount).toBe(1);
     expect(report.staleCount).toBe(1);
   });
+
+  /**
+   * The defect this pins: a Mislaka clearinghouse pull is ONE document covering every
+   * pension, gemel and hishtalmut product a person holds. It is a selectable docType,
+   * and no rule accepted it — so the owner uploaded the document that answers the
+   * question and watched every retirement row stay red.
+   */
+  it("a MISLAKA satisfies pension and hishtalmut expectations — it covers both", () => {
+    const report = buildMissingDocsReport(items, [{ docType: "MISLAKA", uploadedAt: days(30) }], NOW);
+    expect(report.expectations.find((e) => e.itemId === "p")!.status).toBe("PRESENT");
+    expect(report.expectations.find((e) => e.itemId === "h")!.status).toBe("PRESENT");
+    // ...but it says nothing about a mortgage, and must not pretend otherwise.
+    expect(report.expectations.find((e) => e.itemId === "m")!.status).toBe("MISSING");
+    expect(report.missingCount).toBe(1);
+  });
+
+  it("reports WHICH document type satisfied the row, so a Mislaka green is explicable", () => {
+    const report = buildMissingDocsReport(items, [{ docType: "MISLAKA", uploadedAt: days(30) }], NOW);
+    const pension = report.expectations.find((e) => e.itemId === "p")!;
+    expect(pension.expectedDocType).toBe("PENSION_REPORT");
+    expect(pension.satisfiedByDocType).toBe("MISLAKA");
+  });
+
+  it("an untyped (null docType) document satisfies NOTHING — it is not evidence of anything", () => {
+    const report = buildMissingDocsReport(items, [{ docType: null, uploadedAt: days(1) }], NOW);
+    expect(report.missingCount).toBe(3);
+  });
+
+  it("a MISLAKA ages out on the same clock as the report it stands in for", () => {
+    const report = buildMissingDocsReport(items, [{ docType: "MISLAKA", uploadedAt: days(600) }], NOW);
+    expect(report.expectations.find((e) => e.itemId === "p")!.status).toBe("STALE");
+  });
 });

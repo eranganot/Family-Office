@@ -404,7 +404,9 @@
     "confidence": "Confidence",
     "verifiedOf": "verified",
     "queue": "Review queue",
-    "queueEmpty": "Every item is verified. Nothing to review.",
+    "queueEmptyAttested": "Every item has been confirmed by you and none are stale — nothing in this queue needs review.",
+    "queueEmptyButDocsMissing": "This queue only checks your confirmations, not the evidence behind them. {count} expected documents are still missing (listed above), so these values rest on your word rather than on a statement.",
+    "satisfiedBy": "covered by {docType}",
     "verify": "Verify",
     "reject": "Reject",
     "rejectNote": "What's wrong?",
@@ -1036,10 +1038,17 @@
   },
   "journey": {
     "MAPPING": "Now: map every account, property, mortgage, flow and policy. When the picture is complete — move to verification.",
-    "VERIFICATION": "Now: confirm each item's value and resolve suspense. When everything is verified — the gate to strategy opens.",
-    "STRATEGY": "Now: answer the risk questionnaire, set goals, run the engine, accept/reject recommendations — then move to monitoring.",
+    "VERIFICATION": "Now: confirm each item's value and resolve suspense. When everything is verified — the gate to allocation opens.",
+    "STRATEGY": "Now: answer the risk questionnaire, set goals, run the engine, accept/reject recommendations. Nothing blocks the move to monitoring — advance when you have decided on the recommendations you intend to act on.",
     "MONITORING": "Now: the system watches drift daily. Handle alerts; re-enter strategy when something material changes.",
     "ALLOCATION": "Now: review the deployment plan for free cash — approve it (or adjust and rebuild) to open the strategy gate."
+  },
+  "journeyLoop": {
+    "badge": "Always on",
+    "intro": "Runs alongside every phase, not after it — the day-to-day and month-end work never stops:",
+    "today": "Today — what needs me",
+    "month": "Close the month",
+    "transactions": "Transactions & suspense"
   },
   "allocation": {
     "title": "Allocation — deploy your free money",

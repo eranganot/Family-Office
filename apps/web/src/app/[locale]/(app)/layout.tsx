@@ -117,6 +117,45 @@ export default async function AppLayout({
           </span>
         </div>
       ) : null}
+      {/*
+        M43 — Operations as an ALWAYS-ON LOOP, deliberately OUTSIDE the numbered strip.
+
+        Owner, 2026-08-02: mapping / verification / allocation are one-time, strategy is
+        quarterly, operations is daily-to-monthly — "so I would expect to see operations
+        after the strategy phase". The observation is right; the placement is not, and
+        the difference matters.
+
+        Phases are GATED — that is their whole purpose (`workflowGuard`, `evaluateTransition`).
+        Operations is deliberately CROSS-PHASE (owner decision D2): you close months and
+        clear suspense no matter which phase the household is in. Making it phase six
+        would gate the daily work behind a state machine, and would let a MAPPING-phase
+        household reach allocation through the back door - precisely what the guard
+        exists to prevent.
+
+        So it is rendered as a separate, permanently available band: a loop that runs
+        alongside the sequence rather than a step inside it. The numbered strip answers
+        "how far through setup am I"; this answers "what does this household need from me
+        this week", which is the question that never stops being asked.
+      */}
+      {household ? (
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/40 px-4 py-3 text-xs">
+          <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-blue-700 ring-1 ring-blue-200">
+            {t("journeyLoop.badge")}
+          </span>
+          <span className="text-neutral-600">{t("journeyLoop.intro")}</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/operations" className="rounded-full bg-white px-3 py-1 text-neutral-600 ring-1 ring-neutral-200 hover:text-neutral-900">
+              {t("journeyLoop.today")}
+            </Link>
+            <Link href="/operations/month" className="rounded-full bg-white px-3 py-1 text-neutral-600 ring-1 ring-neutral-200 hover:text-neutral-900">
+              {t("journeyLoop.month")}
+            </Link>
+            <Link href="/transactions" className="rounded-full bg-white px-3 py-1 text-neutral-600 ring-1 ring-neutral-200 hover:text-neutral-900">
+              {t("journeyLoop.transactions")}
+            </Link>
+          </span>
+        </div>
+      ) : null}
       {children}
     </div>
   );

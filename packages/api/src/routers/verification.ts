@@ -27,6 +27,21 @@ export const verificationRouter = router({
       lastConfirmedAt: i.lastConfirmedAt,
       latestValuationAsOf: i.latestValuation?.asOf ?? null,
     }));
+    /**
+     * ⚠️ Deliberately NOT household-scoped, unlike the document query below.
+     *
+     * SuspenseItem has no householdId. It reaches one only through
+     * `batch.document.householdId`, and `ImportBatch.documentId` is NULLABLE — manual
+     * imports have no document. So the obvious scoping, `batch: { document: { householdId } }`,
+     * would silently DROP every manually-created suspense row from the count.
+     *
+     * An under-counted suspense queue reads as a clean one, which unblocks the
+     * VERIFICATION gate and makes every closed month look less provisional than it is.
+     * That is this module's recurring failure exactly: a correct-looking narrowing that
+     * disables the thing it filters. One household exists, so the unscoped count is
+     * currently right; scoping it properly needs householdId denormalised onto
+     * ImportBatch, which is a migration and its own decision.
+     */
     const pendingSuspense = await ctx.db.suspenseItem.count({ where: { status: "PENDING" } });
     // Thresholds come from the AssumptionRegistry (household overrides respected).
     const reg = assumptionRegistry(ctx.db);
@@ -46,7 +61,13 @@ export const verificationRouter = router({
       accountType: i.accountDetail?.accountType,
       hasSalaryFlow: i.cashFlowDetail?.flowType === "SALARY",
     }));
-    const docs = await ctx.db.document.findMany({ select: { docType: true, uploadedAt: true } });
+    // Scoped to the household. Both this and the suspense count above were unscoped —
+    // harmless while exactly one household exists, wrong the moment a second one does,
+    // and the kind of latent fault that is far cheaper to fix before it has data.
+    const docs = await ctx.db.document.findMany({
+      where: { householdId },
+      select: { docType: true, uploadedAt: true },
+    });
     const missingDocs = buildMissingDocsReport(docItems, docs, now);
 
     return { assessment, missingDocs };

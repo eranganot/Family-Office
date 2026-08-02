@@ -102,6 +102,75 @@ A negative check for the old "four-phase" wording is fragile the moment the file
 mistake. And deploy scripts are ASCII-only, so the arrows in that line can never be
 matched; the bolded phase name can.
 
+### 🔴 VERIFICATION HONESTY + OPERATIONS VISIBILITY — QA 2026-08-02, FIXED, gate not run
+`deploy-2026-08-02-verification-honesty.ps1`. No migration, no lockfile, no assumption key.
+Run AFTER the phase-gate script.
+
+**Owner report:** *"if you have all the relevant files you need, mark them present"* — 18
+red rows while the review queue said *"כל הפריטים מאומתים. אין מה לבדוק"*. Owner confirmed
+he HAD uploaded some of those documents.
+
+**Root cause — `MISLAKA` was unsatisfiable.** The Israeli pension clearinghouse returns
+**ONE** report covering every pension / gemel / hishtalmut product a person holds. It is a
+valid, selectable `docType` (`DocTypeSchema` line 17) and **no rule in
+`EXPECTED_DOC_RULES` ever accepted it.** So uploading the one document that actually
+answers the question left thirteen rows red forever. Rules now carry `alsoAccepts`, and
+the row reports **which** docType satisfied it — a MISLAKA answering a `PENSION_REPORT`
+row looks like a bug unless it says so.
+
+⚠️ **If a document still shows red, check its `docType` on `/documents`.** `docType` is
+nullable and the selector defaults to `OTHER`; an untyped or `OTHER`-typed file matches
+nothing. `documents.setDocType` fixes it in place. **A null docType is deliberately still
+evidence of nothing** — pinned by a test.
+
+**Second fix — the queue stopped claiming completeness it cannot see.** `queueEmpty` was
+an unqualified clean bill of health rendered directly *below* the missing-documents list.
+Neither card was broken; they measure different things (owner attestation vs primary
+source), and the queue never said so. It now states what it checked and names what it did
+not. Same shape as the review-pinned chip and the drift load-failure.
+
+**Third — Operations is now an ALWAYS-ON LOOP band, deliberately outside the numbered strip.**
+Owner: *"mapping/verification/allocation are one-time, strategy is quarterly, operations
+is daily/monthly — I'd expect operations after strategy."* The observation is right, the
+placement isn't: **phases are gated, and daily work must never be.** Operations is
+cross-phase by owner decision D2; making it phase six would gate month-close behind a
+state machine and give a MAPPING household a back door into allocation. It renders as a
+parallel band — the numbered strip answers *"how far through setup am I"*, the band
+answers *"what does this household need from me this week"*.
+
+**Also fixed:** `journey.VERIFICATION` said verification opens "the gate to strategy" —
+it opens the gate to **allocation**. Same pre-M25 stale-copy family as the phase locks.
+
+### 🟡 KNOWN, RECORDED, NOT FIXED — document matching is global, not per-item
+`docs.filter(d => accepted.includes(d.docType))` matches by TYPE across the household. One
+bank statement therefore marks **every** bank account present, including institutions it
+says nothing about. `Valuation` carries both `documentId` and `ledgerItemId`, so per-item
+attribution is buildable.
+
+**Deliberately not shipped in the same gate as the MISLAKA fix:** per-item attribution
+turns many currently-green rows red at once (a statement imported for transactions often
+has no Valuation), and a mass-reddening shipped alongside a mass-greening is unreviewable.
+Own it as its own QA-able increment. Until then **a PRESENT means "the household holds a
+document of this type", not "this item is evidenced"** — recorded in the source.
+
+### 🟡 NOT SCOPED ON PURPOSE — `suspenseItem.count` is household-wide
+`SuspenseItem` has no `householdId`; it reaches one only via `batch.document.householdId`,
+and `ImportBatch.documentId` is **nullable** (manual imports). The obvious scoping would
+silently drop every manually-created suspense row — and an under-counted suspense queue
+reads as a clean one, unblocking the VERIFICATION gate and making closed months look less
+provisional than they are. Proper fix needs `householdId` denormalised onto `ImportBatch`
+(a migration). The document query beside it **was** scoped; only this one was left, with
+the reason in source.
+
+### ❓ STRATEGY → MONITORING IS UNGATED — is that intended?
+`evaluateTransition` imposes **no facts** on `STRATEGY → MONITORING` (only
+VERIFICATION→ALLOCATION and ALLOCATION→STRATEGY carry conditions). So the answer to
+*"what do I need to do to reach monitoring"* is: run the analysis, decide on the
+recommendations, press the button — nothing blocks it. But the monitoring copy claims you
+reach it *"once recommendations are in place"*, and nothing enforces that; a household can
+enter monitoring with zero recommendations and nothing to monitor. Copy now matches the
+behaviour. **Whether the behaviour should change is an owner decision, not taken here.**
+
 ### Tier 3 — remaining, in this order
 
 **2. Wire `goals` into the health score.** Currently unmeasured, costing 15 points of
