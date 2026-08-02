@@ -41,11 +41,30 @@ export async function householdHealthScore(
     ? (map["opportunity_min_coverage_pct"] as number)
     : 70;
 
+  /*
+   * Score the most recent CLOSED month, not the one in progress.
+   *
+   * QA: the score reported "not enough measured" on a household with five closed months
+   * and a fully mapped ledger. Cause: it measured the CURRENT month, which in early
+   * August has almost no transactions — so cashflow (30) and leakage (15) both refused
+   * for want of income and expenses, goals (15) is unwired, and 60 of 100 weight
+   * vanished. The engine was right to refuse; it was pointed at the wrong month.
+   *
+   * A closed month is also the only honest thing to score: a month in progress is
+   * half-observed by construction, so its surplus would read as a collapse for the first
+   * three weeks of every month and recover on the last day. Falling back to the current
+   * month when nothing is closed keeps a brand-new household from seeing nothing at all.
+   */
+  const latestClosed = await db.operatingPeriod.findFirst({
+    where: { householdId, status: "CLOSED" },
+    orderBy: [{ year: "desc" }, { month: "desc" }],
+    select: { year: true, month: true },
+  });
   const period = await computePeriod(
     db,
     householdId,
-    asOf.getUTCFullYear(),
-    asOf.getUTCMonth() + 1,
+    latestClosed?.year ?? asOf.getUTCFullYear(),
+    latestClosed?.month ?? asOf.getUTCMonth() + 1,
   );
   const flow = period.flow;
   const surplus = period.surplus;
