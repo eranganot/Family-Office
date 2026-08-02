@@ -423,8 +423,10 @@
     "docStatus": {
       "PRESENT": "Present",
       "STALE": "Stale",
-      "MISSING": "Missing"
+      "MISSING": "Missing",
+      "UNATTRIBUTED": "Not linked"
     },
+    "unattributedHint": "{count} rows show a document of the right type that is not linked to that specific account. The file exists — nothing connects it to this item, so it is not counted as evidence for it. Re-import it against the account, or record a value from it.",
     "forItem": "for",
     "advance": "Advance to {state}",
     "backTo": "Back to {state}",

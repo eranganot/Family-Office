@@ -61,7 +61,11 @@ export default async function VerificationPage({
                 </span>
                 <span
                   className={
-                    e.status === "PRESENT" ? "text-green-600" : e.status === "STALE" ? "text-amber-600" : "text-red-600"
+                    e.status === "PRESENT"
+                      ? "text-green-600"
+                      : e.status === "STALE" || e.status === "UNATTRIBUTED"
+                        ? "text-amber-600"
+                        : "text-red-600"
                   }
                 >
                   {t(`docStatus.${e.status}`)}
@@ -69,6 +73,13 @@ export default async function VerificationPage({
               </li>
             ))}
           </ul>
+          {/* "Not linked" is a new and genuinely confusing state on first sight — it has
+              to explain itself and say what to do, or it just reads as a broken green. */}
+          {missingDocs.unattributedCount > 0 ? (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {t("unattributedHint", { count: missingDocs.unattributedCount })}
+            </p>
+          ) : null}
         </Card>
       ) : null}
 

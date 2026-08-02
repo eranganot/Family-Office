@@ -141,17 +141,38 @@ answers *"what does this household need from me this week"*.
 **Also fixed:** `journey.VERIFICATION` said verification opens "the gate to strategy" —
 it opens the gate to **allocation**. Same pre-M25 stale-copy family as the phase locks.
 
-### 🟡 KNOWN, RECORDED, NOT FIXED — document matching is global, not per-item
-`docs.filter(d => accepted.includes(d.docType))` matches by TYPE across the household. One
-bank statement therefore marks **every** bank account present, including institutions it
-says nothing about. `Valuation` carries both `documentId` and `ledgerItemId`, so per-item
-attribution is buildable.
+### ✅ PER-ITEM DOCUMENT ATTRIBUTION — BUILT 2026-08-02, gate not run
+`deploy-2026-08-02-doc-attribution.ps1`. No migration, no lockfile, no assumption key.
 
-**Deliberately not shipped in the same gate as the MISLAKA fix:** per-item attribution
-turns many currently-green rows red at once (a statement imported for transactions often
-has no Valuation), and a mass-reddening shipped alongside a mass-greening is unreviewable.
-Own it as its own QA-able increment. Until then **a PRESENT means "the household holds a
-document of this type", not "this item is evidenced"** — recorded in the source.
+Matching was by TYPE across the household, so **one bank statement marked every bank
+account present** — including institutions it says nothing about.
+
+**The naive fix would have been the opposite error.** Demanding a per-item link flips
+those rows to MISSING and claims a document the household demonstrably holds does not
+exist. Both are false, in opposite directions. Hence a **fourth state, `UNATTRIBUTED`**
+("לא משויך", amber): the evidence is real and nothing connects it to this account. That
+is the true position, it is nameable, and the owner can act on it.
+
+**Three link paths, all counted** — using only the first one that came to mind is how a
+correct-looking fix creates the opposite bug:
+
+| Path | Why it counts |
+|---|---|
+| `Valuation.documentId` | the document produced a value for the item |
+| `ImportedField` → `batch.documentId` | it populated a field on the item |
+| `Transaction.importBatchId` → `documentId` | transactions booked from it are evidence |
+
+⚠️ **Path 3 is what prevents a mass-reddening.** A bank statement imported for its
+transactions usually produces **no Valuation at all**, so attributing via Valuation alone
+would have declared every such account undocumented.
+
+**`HOUSEHOLD_SCOPED_DOC_TYPES = { MISLAKA, TAX_106 }` need no link.** A Mislaka covers
+every retirement product a *person* holds; a 106 covers a person's employment. Requiring
+per-item attribution for either would recreate the unsatisfiable-MISLAKA bug in a subtler
+form.
+
+**Absent attribution is treated as unattributed, never as "covers everything"** — pinned
+by a test, because that default *is* the original bug.
 
 ### 🟡 NOT SCOPED ON PURPOSE — `suspenseItem.count` is household-wide
 `SuspenseItem` has no `householdId`; it reaches one only via `batch.document.householdId`,

@@ -64,10 +64,61 @@ export const verificationRouter = router({
     // Scoped to the household. Both this and the suspense count above were unscoped —
     // harmless while exactly one household exists, wrong the moment a second one does,
     // and the kind of latent fault that is far cheaper to fix before it has data.
-    const docs = await ctx.db.document.findMany({
+    const docRows = await ctx.db.document.findMany({
       where: { householdId },
-      select: { docType: true, uploadedAt: true },
+      select: { id: true, docType: true, uploadedAt: true },
     });
+
+    /*
+     * M43 — document-to-item attribution.
+     *
+     * The report used to match by TYPE alone, so one uploaded bank statement marked
+     * EVERY bank account present, including institutions it says nothing about. The
+     * schema offers three independent ways a document reaches a ledger item, and all
+     * three are real evidence, so all three count:
+     *
+     *   1. Valuation      — the document produced a value for the item.
+     *   2. ImportedField  — the document populated a field on the item.
+     *   3. Transaction    — a transaction booked from the document is evidence for it.
+     *
+     * Path 3 is what keeps this from being a mass-reddening: a bank statement imported
+     * for its transactions usually produces no Valuation at all, so attribution via
+     * Valuation alone would have declared those accounts undocumented. Using only the
+     * link that happened to come to mind first is how a correct-looking fix creates the
+     * opposite error.
+     */
+    const linkedItemIds = new Map<string, Set<string>>();
+    const link = (documentId: string | null, ledgerItemId: string | null) => {
+      if (!documentId || !ledgerItemId) return;
+      const set = linkedItemIds.get(documentId) ?? new Set<string>();
+      set.add(ledgerItemId);
+      linkedItemIds.set(documentId, set);
+    };
+
+    const [valuations, importedFields, transactions] = await Promise.all([
+      ctx.db.valuation.findMany({
+        where: { documentId: { not: null }, ledgerItem: { householdId } },
+        select: { documentId: true, ledgerItemId: true },
+      }),
+      ctx.db.importedField.findMany({
+        where: { ledgerItemId: { not: null }, ledgerItem: { householdId } },
+        select: { ledgerItemId: true, batch: { select: { documentId: true } } },
+      }),
+      ctx.db.transaction.findMany({
+        where: { householdId, ledgerItemId: { not: null }, importBatchId: { not: null } },
+        select: { ledgerItemId: true, importBatch: { select: { documentId: true } } },
+        distinct: ["ledgerItemId", "importBatchId"],
+      }),
+    ]);
+    for (const v of valuations) link(v.documentId, v.ledgerItemId);
+    for (const f of importedFields) link(f.batch?.documentId ?? null, f.ledgerItemId);
+    for (const t of transactions) link(t.importBatch?.documentId ?? null, t.ledgerItemId);
+
+    const docs = docRows.map((d) => ({
+      docType: d.docType,
+      uploadedAt: d.uploadedAt,
+      linkedItemIds: [...(linkedItemIds.get(d.id) ?? [])],
+    }));
     const missingDocs = buildMissingDocsReport(docItems, docs, now);
 
     return { assessment, missingDocs };

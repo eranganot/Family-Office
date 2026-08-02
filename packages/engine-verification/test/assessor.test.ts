@@ -64,12 +64,18 @@ describe("missing-docs report", () => {
     { id: "h", name: "השתלמות", kind: "ACCOUNT", accountType: "KEREN_HISHTALMUT" },
     { id: "m", name: "משכנתא", kind: "MORTGAGE" },
   ];
+  /**
+   * M43: PENSION_REPORT and HISHTALMUT_STATEMENT are ITEM-scoped, so they now need a
+   * link to count as present. Before attribution existed this test passed with no links
+   * at all — which is precisely the bug, in miniature: a document floating free of any
+   * account was evidence for every account of that shape.
+   */
   it("derives expectations from ledger composition and classifies present/stale/missing", () => {
     const report = buildMissingDocsReport(
       items,
       [
-        { docType: "PENSION_REPORT", uploadedAt: days(100) },
-        { docType: "HISHTALMUT_STATEMENT", uploadedAt: days(600) },
+        { docType: "PENSION_REPORT", uploadedAt: days(100), linkedItemIds: ["p"] },
+        { docType: "HISHTALMUT_STATEMENT", uploadedAt: days(600), linkedItemIds: ["h"] },
       ],
       NOW,
     );
@@ -111,5 +117,82 @@ describe("missing-docs report", () => {
   it("a MISLAKA ages out on the same clock as the report it stands in for", () => {
     const report = buildMissingDocsReport(items, [{ docType: "MISLAKA", uploadedAt: days(600) }], NOW);
     expect(report.expectations.find((e) => e.itemId === "p")!.status).toBe("STALE");
+  });
+});
+
+/**
+ * M43 — per-item attribution.
+ *
+ * The report matched by TYPE across the whole household, so ONE bank statement marked
+ * EVERY bank account present. The naive fix — demanding a per-item link — would have
+ * flipped those rows to MISSING and claimed a document the household demonstrably holds
+ * does not exist. Both are false, in opposite directions, which is why UNATTRIBUTED
+ * exists: the evidence is real, and nothing connects it to this account.
+ */
+describe("missing-docs attribution", () => {
+  const banks = [
+    { id: "b1", name: "בנק א", kind: "ACCOUNT", accountType: "BANK_CHECKING" },
+    { id: "b2", name: "בנק ב", kind: "ACCOUNT", accountType: "BANK_CHECKING" },
+  ];
+
+  it("THE BUG: one statement no longer marks a DIFFERENT bank account present", () => {
+    const report = buildMissingDocsReport(
+      banks,
+      [{ docType: "BANK_STATEMENT", uploadedAt: days(10), linkedItemIds: ["b1"] }],
+      NOW,
+    );
+    expect(report.expectations.find((e) => e.itemId === "b1")!.status).toBe("PRESENT");
+    expect(report.expectations.find((e) => e.itemId === "b2")!.status).toBe("UNATTRIBUTED");
+  });
+
+  it("an unlinked document is NOT reported as missing — the household holds it", () => {
+    const report = buildMissingDocsReport(
+      banks,
+      [{ docType: "BANK_STATEMENT", uploadedAt: days(10), linkedItemIds: ["b1"] }],
+      NOW,
+    );
+    expect(report.missingCount).toBe(0);
+    expect(report.unattributedCount).toBe(1);
+    // ...and it still names what exists, so the row is actionable rather than mysterious.
+    expect(report.expectations.find((e) => e.itemId === "b2")!.satisfiedByDocType).toBe("BANK_STATEMENT");
+  });
+
+  it("no document of the type at all is still MISSING, not merely unlinked", () => {
+    const report = buildMissingDocsReport(banks, [], NOW);
+    expect(report.missingCount).toBe(2);
+    expect(report.unattributedCount).toBe(0);
+  });
+
+  it("HOUSEHOLD-scoped documents need no per-item link — a Mislaka covers the person", () => {
+    const retirement = [
+      { id: "p1", name: "פנסיה", kind: "ACCOUNT", accountType: "PENSION_COMPREHENSIVE" },
+      { id: "g1", name: "גמל", kind: "ACCOUNT", accountType: "KUPAT_GEMEL" },
+    ];
+    // No linkedItemIds at all, and both rows are still satisfied.
+    const report = buildMissingDocsReport(retirement, [{ docType: "MISLAKA", uploadedAt: days(10) }], NOW);
+    expect(report.expectations.every((e) => e.status === "PRESENT")).toBe(true);
+    expect(report.unattributedCount).toBe(0);
+  });
+
+  it("a 106 is household-scoped too — it covers a person, not an account", () => {
+    const salary = [{ id: "s1", name: "משכורת", kind: "CASH_FLOW", hasSalaryFlow: true }];
+    const report = buildMissingDocsReport(salary, [{ docType: "TAX_106", uploadedAt: days(10) }], NOW);
+    expect(report.expectations[0]!.status).toBe("PRESENT");
+  });
+
+  it("a missing linkedItemIds is treated as unattributed, never as covering everything", () => {
+    // The old behaviour in one assertion: absent attribution must not mean "matches all".
+    const report = buildMissingDocsReport(banks, [{ docType: "BANK_STATEMENT", uploadedAt: days(5) }], NOW);
+    expect(report.unattributedCount).toBe(2);
+    expect(report.expectations.every((e) => e.status === "UNATTRIBUTED")).toBe(true);
+  });
+
+  it("an item-scoped document linked to BOTH accounts marks both present", () => {
+    const report = buildMissingDocsReport(
+      banks,
+      [{ docType: "BANK_STATEMENT", uploadedAt: days(10), linkedItemIds: ["b1", "b2"] }],
+      NOW,
+    );
+    expect(report.expectations.every((e) => e.status === "PRESENT")).toBe(true);
   });
 });
