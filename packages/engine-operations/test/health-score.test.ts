@@ -111,6 +111,54 @@ describe("health score", () => {
     if (r.ok) expect(r.unmeasured).toContain("cashflow");
   });
 
+  /**
+   * M43 — goals is measured now, and the detail has to survive a PARTIAL denominator.
+   * "80% funded" over three of five goals is a different claim from "80% funded".
+   */
+  it("names how many goals the percentage covers when some were not computable", () => {
+    const r = computeHealthScore(input({ goalsRequiredBase: 1000, goalsFundedBase: 800, goalsComputable: 3, goalsTotal: 5 }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const goals = r.components.find((c) => c.key === "goals")!;
+      expect(goals.ok && goals.detail).toBe("80% (3/5 goals)");
+    }
+  });
+
+  it("does NOT clutter the detail when every goal was computable", () => {
+    const r = computeHealthScore(input({ goalsRequiredBase: 1000, goalsFundedBase: 800, goalsComputable: 4, goalsTotal: 4 }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const goals = r.components.find((c) => c.key === "goals")!;
+      expect(goals.ok && goals.detail).toBe("80%");
+    }
+  });
+
+  it("still works for callers that pass no goal counts at all", () => {
+    const r = computeHealthScore(input({ goalsRequiredBase: 1000, goalsFundedBase: 500 }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const goals = r.components.find((c) => c.key === "goals")!;
+      expect(goals.ok && goals.detail).toBe("50%");
+      expect(goals.ok && goals.score).toBe(50);
+    }
+  });
+
+  it("distinguishes NO_ACTIVE_GOALS from GOALS_NOT_MEASURED — they are different facts", () => {
+    const none = computeHealthScore(input({ goalsRequiredBase: 0, goalsFundedBase: 0 }));
+    const unknown = computeHealthScore(input({ goalsRequiredBase: null, goalsFundedBase: null }));
+    expect(none.ok && unknown.ok).toBe(true);
+    if (none.ok && unknown.ok) {
+      const a = none.components.find((c) => c.key === "goals")!;
+      const b = unknown.components.find((c) => c.key === "goals")!;
+      expect(!a.ok && a.reason).toBe("NO_ACTIVE_GOALS");
+      expect(!b.ok && b.reason).toBe("GOALS_NOT_MEASURED");
+      // Both refuse rather than scoring zero: a household with no goals is not failing
+      // at goals, and neither is one whose goals could not be read.
+      expect(none.unmeasured).toContain("goals");
+      expect(unknown.unmeasured).toContain("goals");
+    }
+  });
+
   it("weights components by the registry, not equally", () => {
     // Zeroing cashflow (weight 30) must cost more than zeroing leakage (weight 15).
     const noCashflow = computeHealthScore(input({ monthlySurplusBase: 0 }));

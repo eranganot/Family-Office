@@ -171,11 +171,47 @@ reach it *"once recommendations are in place"*, and nothing enforces that; a hou
 enter monitoring with zero recommendations and nothing to monitor. Copy now matches the
 behaviour. **Whether the behaviour should change is an owner decision, not taken here.**
 
-### Tier 3 — remaining, in this order
+### ✅ TIER 3 #2 — goals wired into the health score. BUILT 2026-08-02, gate not run
+`deploy-2026-08-02-goals-health.ps1`. No migration, no lockfile, **no new assumption key**.
 
-**2. Wire `goals` into the health score.** Currently unmeasured, costing 15 points of
-   coverage. Needs `engine-goals` funding-gap output, which needs a snapshot
-   `health-service` does not build. Self-contained.
+**⚠️ THE RECORDED BLOCKER WAS FALSE.** M42 left goals unmeasured and wrote down the
+reason: *"the funding figures live in engine-goals and need a snapshot `health-service`
+does not build."* They do not. `goals.fundingGap` has always computed the report from the
+**LIVE ledger with no snapshot at all**. Fifteen points of coverage were lost for a
+milestone to a belief that cost less to check than to write down.
+
+**Worth generalising:** a note explaining why something is hard is itself an assumption,
+and it never gets re-tested because it reads like a conclusion. This is the second
+false-blocker this session — the other was CLAUDE.md's four-phase model.
+
+| Change | |
+|---|---|
+| `services/goals-service.ts` (NEW) | `householdFundingGaps` extracted from the router; `goalFundingTotals` collapses it to two numbers |
+| `routers/goals.ts` | `fundingGap` is now a pass-through — two callers producing two disagreeing funding figures is worse than either being slightly wrong |
+| `engine-operations/health-score.ts` | optional `goalsComputable` / `goalsTotal`, reported in the component detail |
+| `services/health-service.ts` | goals actually measured; failure degrades to a REFUSAL, not a zero and not an error page |
+
+**Two rules that carry the risk here, both pinned by tests:**
+1. **Funding is CAPPED PER GOAL** (`min(projected, required)`). An uncapped sum lets an
+   over-funded retirement lend its excess to an unfunded education goal and report 100%
+   while a child's education has nothing behind it. *Aggregation is where a per-item
+   finding goes to die.*
+2. **Non-computable goals are EXCLUDED, not scored unfunded** — a missing target date is a
+   data gap, not a financial failure — **but the count travels with the percentage**.
+   "80% (3/5 goals)" and "80%" are different claims. Same rule the composite already
+   applies to itself by publishing weight coverage beside the score.
+
+**Deliberately NOT deduplicated:** `strategy-service.buildFundingSummary` still runs the
+same engine against the **pinned snapshot**. A recommendation must be reproducible from
+the snapshot it cites; reading live values there would let a pinned recommendation change
+meaning silently. Live for a dashboard reading, pinned for a recommendation — the
+difference is the point, not duplication to tidy away.
+
+**Expected effect:** weight coverage rises 85% → 100% once goals have target dates and
+required amounts. If it stays at 85%, the goals component is refusing — check whether the
+active goals have both fields, and whether `goal_projection_real_return_pct` is positive.
+
+### Tier 3 — remaining, in this order
 
 **3. Telemetry projection (M42).** Acceptance %, completion %, time-to-complete,
    dismissal histogram — `ActionEvent` already records every transition, so the data

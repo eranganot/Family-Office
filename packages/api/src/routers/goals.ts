@@ -1,10 +1,8 @@
 import { TRPCError } from "@trpc/server";
-import { ledgerRepo } from "@wealthos/db";
-import { computeFundingGaps, type AssetInput, type GoalInput } from "@wealthos/engine-goals";
-import { assumptionRegistry } from "@wealthos/registry";
 import { validateGoalDependencies } from "@wealthos/domain";
 import { z } from "zod";
 import { DecimalString } from "../schemas/ledger";
+import { householdFundingGaps } from "../services/goals-service";
 import { protectedProcedure, router } from "../trpc";
 import { requireHouseholdId } from "./ledger";
 
@@ -27,7 +25,16 @@ const GoalInputSchema = z.object({
   dependsOnGoalIds: z.array(z.uuid()).default([]),
 });
 
-/** requiredFunding derived from monthly income at the CURRENT real-return assumption (perpetuity). */
+/**
+ * requiredFunding derived from monthly income at the CURRENT real-return assumption
+ * (perpetuity). Kept HERE, throwing, for interactive edits: a household setting a goal
+ * against a non-positive real return should be stopped and told, not quietly given a
+ * meaningless capital target.
+ *
+ * `goals-service.derivedRequiredFundingILS` is the same formula returning null instead.
+ * That difference is deliberate: a background health-score reading must degrade one goal
+ * to "not computable" rather than fail the whole score over one assumption.
+ */
 export function derivedRequiredFunding(targetMonthlyIncome: string, realReturnPct: number): string {
   const rate = realReturnPct / 100;
   if (rate <= 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "REAL_RETURN_NOT_POSITIVE" });
@@ -117,57 +124,17 @@ export const goalsRouter = router({
       });
     }),
 
-  /** Funding-gap report: verified assets only, ILS-converted, assumption-driven return. */
+  /**
+   * Funding-gap report: verified assets only, ILS-converted, assumption-driven return.
+   *
+   * The body moved to `services/goals-service.householdFundingGaps` in M43 so the health
+   * score could consume the same computation instead of re-deriving it. This is a
+   * pass-through on purpose: two callers producing two funding figures that disagree is
+   * worse than either one being slightly wrong.
+   */
   fundingGap: protectedProcedure.query(async ({ ctx }) => {
     const householdId = await requireHouseholdId(ctx.db);
-    const goals = await ctx.db.goal.findMany({ where: { householdId, status: "ACTIVE" } });
-    const items = await ledgerRepo.list(ctx.db, householdId);
-
-    // Latest manual FX per pair for ILS conversion (same policy as net worth: no rate → excluded).
-    const allRates = await ctx.db.fxRate.findMany({ orderBy: { asOf: "desc" } });
-    const seen = new Set<string>();
-    const rate = new Map<string, number>();
-    for (const r of allRates) {
-      const key = `${r.from}->${r.to}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      rate.set(key, Number(r.rate));
-    }
-    const toILS = (value: string, currency: string): string | null => {
-      if (currency === "ILS") return value;
-      const direct = rate.get(`${currency}->ILS`);
-      if (direct) return String(Number(value) * direct);
-      const inverse = rate.get(`ILS->${currency}`);
-      if (inverse) return String(Number(value) / inverse);
-      return null;
-    };
-
-    const assets: AssetInput[] = items.map((i) => ({
-      id: i.id,
-      kind: i.kind,
-      accountType: i.accountDetail?.accountType,
-      valueILS: i.latestValuation ? toILS(i.latestValuation.value.toString(), i.latestValuation.currency) : null,
-      verified: i.verification === "VERIFIED",
-      earmarkedGoalId: i.earmarkedGoalId ?? null,
-    }));
-
-    const realReturn = await assumptionRegistry(ctx.db).current("goal_projection_real_return_pct", householdId);
-
-    // Income-mode goals derive their capital target from the CURRENT assumption (perpetuity at real return).
-    const goalInputs: GoalInput[] = goals.map((g) => ({
-      id: g.id,
-      name: g.name,
-      type: g.type,
-      priority: g.priority,
-      targetDate: g.targetDate,
-      requiredFundingILS: g.targetMonthlyIncome
-        ? derivedRequiredFunding(g.targetMonthlyIncome.toString(), realReturn.value as number)
-        : g.requiredFunding
-          ? g.requiredFunding.toString()
-          : null,
-    }));
-
-    return computeFundingGaps(goalInputs, assets, realReturn.value as number, new Date());
+    return householdFundingGaps(ctx.db, householdId);
   }),
 
   setStatus: protectedProcedure

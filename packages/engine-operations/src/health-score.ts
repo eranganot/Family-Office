@@ -55,9 +55,20 @@ export interface HealthScoreInput {
   actionsCommitted: number | null;
   actionsCompleted: number | null;
 
-  /** Goal funding: required vs actually funded, in base currency. */
+  /**
+   * Goal funding: required vs actually funded, in base currency.
+   *
+   * ⚠️ `goalsFundedBase` must be CAPPED PER GOAL by the caller. An uncapped sum of
+   * projections lets an over-funded retirement lend its excess to an unfunded education
+   * goal, and the household reads 100% while a goal has nothing behind it.
+   */
   goalsRequiredBase: number | null;
   goalsFundedBase: number | null;
+
+  /** M43 — optional: how many goals the two figures above actually cover. Reported in
+   *  the component detail so a partial denominator cannot pass as a complete one. */
+  goalsComputable?: number | undefined;
+  goalsTotal?: number | undefined;
 }
 
 export type HealthScore =
@@ -164,12 +175,30 @@ function goalsComponent(input: HealthScoreInput, weight: number): HealthComponen
     return { key: "goals", ok: false, weight, reason: "GOALS_NOT_MEASURED" };
   }
   if (req <= 0) return { key: "goals", ok: false, weight, reason: "NO_ACTIVE_GOALS" };
+  /*
+   * M43 — the detail carries HOW MANY goals the percentage covers, when the caller knows.
+   *
+   * Goals lacking a target date or a required amount are not computable, and the caller
+   * excludes them rather than scoring them as unfunded (an empty form field is a data
+   * gap, not a financial failure). But "80% funded" over three of five goals is a
+   * different claim from "80% funded", and only one of them is honest.
+   *
+   * This is the same rule the composite already applies to itself by publishing its
+   * weight coverage beside the score. A ratio whose denominator is partial has to say so.
+   */
+  const pct = round2((funded / req) * 100);
+  const counted = input.goalsComputable;
+  const total = input.goalsTotal;
+  const coverage =
+    typeof counted === "number" && typeof total === "number" && total > counted
+      ? ` (${counted}/${total} goals)`
+      : "";
   return {
     key: "goals",
     ok: true,
     weight,
     score: clamp((funded / req) * 100),
-    detail: `${round2((funded / req) * 100)}%`,
+    detail: `${pct}%${coverage}`,
   };
 }
 

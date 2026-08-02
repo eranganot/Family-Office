@@ -2,6 +2,7 @@ import type { PrismaClient } from "@wealthos/db";
 import { computeHealthScore, type HealthComponentKey, type HealthScore } from "@wealthos/engine-operations";
 import { assumptionRegistry } from "@wealthos/registry";
 import { computePeriod } from "./operations-service";
+import { goalFundingTotals, householdFundingGaps } from "./goals-service";
 
 /**
  * M42 — the Household Financial Health Score service.
@@ -80,6 +81,31 @@ export async function householdHealthScore(
     db.recommendation.count({ where: { householdId, status: "IMPLEMENTED" } }),
   ]);
 
+  /*
+   * M43 — goals, finally measured.
+   *
+   * M42 left this null and recorded the reason as "the funding figures live in
+   * engine-goals and need a snapshot this service does not build". That was WRONG, and
+   * checking it cost less than the note did: `goals.fundingGap` has always computed the
+   * report from the LIVE ledger with no snapshot at all. The 15 points of coverage were
+   * lost to a belief, not a constraint.
+   *
+   * ⚠️ A FAILURE HERE MUST NOT TAKE THE WHOLE SCORE DOWN. Goals is one component of
+   * five; if this query throws, the correct outcome is a score that refuses the goals
+   * component and says so — exactly what passing null does — not an error page where a
+   * health score used to be. Every other input on this call is already resilient in the
+   * same way (`flow.ok`, `surplus.ok`).
+   *
+   * The catch is narrow on purpose: it converts a failure into the module's existing
+   * REFUSAL vocabulary rather than into a zero. This module has shipped a
+   * defensible-looking silence six times, and the difference between the two is the
+   * whole lesson: 0/100 funded reads as a household in trouble, GOALS_NOT_MEASURED reads
+   * as a household not yet measured.
+   */
+  const goalTotals = await householdFundingGaps(db, householdId, asOf)
+    .then(goalFundingTotals)
+    .catch(() => ({ requiredBase: null, fundedBase: null, computableGoals: 0, totalGoals: 0 }));
+
   return computeHealthScore({
     weights,
     minWeightCoveragePct: minCoverage,
@@ -91,15 +117,10 @@ export async function householdHealthScore(
     monthlyExpensesBase: flow.ok ? flow.expensesBase : null,
     actionsCommitted: accepted + implemented,
     actionsCompleted: implemented,
-    /*
-     * Goals are NOT wired yet, and are passed as null rather than approximated. The
-     * funding figures live in engine-goals' funding-gap output, which needs a snapshot
-     * this service does not build. The component refuses, is named in `unmeasured`, and
-     * costs 15 points of coverage — which is the honest state of affairs rather than a
-     * guess dressed as a score.
-     */
-    goalsRequiredBase: null,
-    goalsFundedBase: null,
+    goalsRequiredBase: goalTotals.requiredBase,
+    goalsFundedBase: goalTotals.fundedBase,
+    goalsComputable: goalTotals.computableGoals,
+    goalsTotal: goalTotals.totalGoals,
   });
 }
 
