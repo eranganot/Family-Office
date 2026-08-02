@@ -255,6 +255,34 @@ work happens first, fold it into the pending script rather than stacking a new o
 Consolidated into `deploy-2026-08-02-session32.ps1`; the five superseded scripts are
 deleted by step 7 of that script.
 
+### 🔴 `NO_ADAPTER_FOUND` on every document — owner QA 2026-08-02, FIXED
+Owner tried to assign ownership and every document failed with a bare
+`NO_ADAPTER_FOUND`, rendered under the **upload** heading — so it read as *"your file was
+not saved"*. **The file had been saved every time.** Upload and import are separate
+actions; only the import threw.
+
+**Cause:** exactly **two** adapters exist — `il-pension-pdf` (PDF + PENSION_REPORT /
+HISHTALMUT_STATEMENT / GEMEL_STATEMENT / MISLAKA / OTHER) and `il-accounts-csv`. A PDF
+typed `MORTGAGE_SCHEDULE`, `TAX_106`, `BANK_STATEMENT`, `CARD_STATEMENT` or
+`BROKERAGE_STATEMENT` matches neither, so the import correctly refused. (Bank/card
+statements go through `statement-import-service`, a **different** pipeline this page does
+not use.)
+
+**Why it matters more now than it did before:** since per-item attribution landed, a
+document is **evidence whether or not anything can parse it** — a mortgage schedule
+nobody can read still proves the mortgage. Offering "import" as the action, and
+hard-failing it, told the owner his filing had failed when the filing was the part that
+worked.
+
+- `imports.importableIds` — one query; the UI offers the ownership/import form **only**
+  where an adapter can succeed, and otherwise says the document is stored and counts.
+- `NO_ADAPTER_FOUND` now renders as a sentence stating the file **was** saved and which
+  formats have parsers. Unknown codes still show verbatim — a code I cannot explain beats
+  a generic apology.
+- **`CARD_STATEMENT` was missing from the documents page `DOC_TYPES`** while present in
+  `DocTypeSchema`, so a card statement could only be typed from the Operations form.
+  Same one-word omission that once rejected every card upload outright. Now asserted.
+
 ### Working rules that cost a gate run each when forgotten
 - Deploy scripts: **ASCII only**, comments are `#` not `//`, `-LiteralPath` for any path
   containing `[locale]` or `(app)`.

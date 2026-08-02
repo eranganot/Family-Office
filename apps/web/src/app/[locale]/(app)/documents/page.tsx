@@ -4,10 +4,19 @@ import { runImportAction, setDocTypeAction, uploadDocumentAction } from "../../.
 import { Card, ErrorBanner, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
 import { serverCaller } from "../../../../lib/trpc-server";
 
+/**
+ * ⚠️ Must stay in step with `DocTypeSchema` in the API. CARD_STATEMENT was in the schema
+ * and missing HERE, so a credit-card statement could only be typed from the Operations
+ * upload form and not from this page — the same one-word omission that once rejected
+ * every card upload outright.
+ */
 const DOC_TYPES = [
   "PENSION_REPORT", "HISHTALMUT_STATEMENT", "GEMEL_STATEMENT", "BANK_STATEMENT",
-  "BROKERAGE_STATEMENT", "MISLAKA", "MORTGAGE_SCHEDULE", "TAX_106", "OTHER",
+  "CARD_STATEMENT", "BROKERAGE_STATEMENT", "MISLAKA", "MORTGAGE_SCHEDULE", "TAX_106", "OTHER",
 ] as const;
+
+/** Error codes this page can explain. Anything else is shown verbatim. */
+const KNOWN_ERRORS = ["NO_ADAPTER_FOUND"];
 
 export default async function DocumentsPage({
   params,
@@ -24,6 +33,8 @@ export default async function DocumentsPage({
   const household = await trpc.household.get();
   const documents = household ? await trpc.documents.list() : [];
   const suspense = household ? await trpc.imports.suspense() : [];
+  // Which documents an adapter can actually parse. One query for the whole list.
+  const importableIds = household ? await trpc.imports.importableIds() : [];
   const members = household?.members ?? [];
 
   const reportBatch = report
@@ -33,7 +44,24 @@ export default async function DocumentsPage({
   return (
     <div className="flex flex-col gap-6">
       <Card title={t("upload")}>
-        <ErrorBanner message={error ? `${tf("error")}: ${decodeURIComponent(error)}` : undefined} />
+        {/*
+          The banner used to render the raw code — the owner saw "השמירה נכשלה:
+          NO_ADAPTER_FOUND" under the UPLOAD heading for an error raised by IMPORT, and
+          reasonably concluded his file had not been saved. It had been.
+
+          Known codes are translated into what actually happened and what it means for
+          the document. An unknown code still shows verbatim rather than being swallowed:
+          a code I cannot explain is more useful than a generic apology.
+        */}
+        <ErrorBanner
+          message={
+            error
+              ? KNOWN_ERRORS.includes(decodeURIComponent(error))
+                ? t(`error${decodeURIComponent(error)}`)
+                : `${tf("error")}: ${decodeURIComponent(error)}`
+              : undefined
+          }
+        />
         <form action={uploadDocumentAction} className="grid max-w-2xl grid-cols-2 items-end gap-4">
           <input type="hidden" name="locale" value={locale} />
           <Field label={t("file")}>
@@ -87,25 +115,45 @@ export default async function DocumentsPage({
                   </Field>
                   <button type="submit" className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm">{t("updateDocType")}</button>
                 </form>
-                <form action={runImportAction} className="mt-2 flex flex-wrap items-end gap-3">
-                  <input type="hidden" name="locale" value={locale} />
-                  <input type="hidden" name="documentId" value={doc.id} />
-                  <fieldset className="flex items-end gap-2">
-                    <legend className="mb-1 text-xs text-neutral-500">{t("importOwnership")}</legend>
-                    {members.map((m, i) => (
-                      <label key={m.id} className="flex flex-col gap-1 text-xs">
-                        {m.name}
-                        <TextInput
-                          name={`own_${m.id}`}
-                          inputMode="decimal"
-                          defaultValue={members.length === 1 && i === 0 ? "100" : ""}
-                          placeholder="0"
-                        />
-                      </label>
-                    ))}
-                  </fieldset>
-                  <SubmitButton label={t("runImport")} />
-                </form>
+                {/*
+                  Only offer the import form where an adapter can actually parse the file.
+
+                  Owner QA: assigning ownership failed on EVERY document with a bare
+                  NO_ADAPTER_FOUND. Only two adapters exist, so a PDF typed
+                  MORTGAGE_SCHEDULE, TAX_106 or BANK_STATEMENT matches none of them. The
+                  document had been stored correctly all along - only the parse was
+                  impossible - but a red "save failed" says the filing failed.
+
+                  Since per-item attribution landed, a document is EVIDENCE whether or not
+                  anything can read it: a mortgage schedule nobody can parse still proves
+                  the mortgage. So an unparseable document is a normal, complete state,
+                  and it says so instead of offering a button that cannot work.
+                */}
+                {importableIds.includes(doc.id) ? (
+                  <form action={runImportAction} className="mt-2 flex flex-wrap items-end gap-3">
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="documentId" value={doc.id} />
+                    <fieldset className="flex items-end gap-2">
+                      <legend className="mb-1 text-xs text-neutral-500">{t("importOwnership")}</legend>
+                      {members.map((m, i) => (
+                        <label key={m.id} className="flex flex-col gap-1 text-xs">
+                          {m.name}
+                          <TextInput
+                            name={`own_${m.id}`}
+                            inputMode="decimal"
+                            defaultValue={members.length === 1 && i === 0 ? "100" : ""}
+                            placeholder="0"
+                          />
+                        </label>
+                      ))}
+                    </fieldset>
+                    <SubmitButton label={t("runImport")} />
+                  </form>
+                ) : (
+                  <p className="mt-2 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+                    {t("noParserStored")}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

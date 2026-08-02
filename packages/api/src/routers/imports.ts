@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { listAdapters } from "@wealthos/ingestion";
+import { findAdapter, listAdapters } from "@wealthos/ingestion";
 import { z } from "zod";
 import { ImportError, runImport } from "../services/import-service";
 import { OwnershipSchema } from "../schemas/ledger";
@@ -10,6 +10,41 @@ export const importsRouter = router({
   adapters: protectedProcedure.query(() =>
     listAdapters().map((a) => ({ id: a.id, version: a.version })),
   ),
+
+  /**
+   * Which stored documents an adapter can actually parse.
+   *
+   * Owner QA 2026-08-02: assigning ownership failed on every document with a bare
+   * `NO_ADAPTER_FOUND`. Only two adapters exist — Israeli pension PDFs and an accounts
+   * CSV — so a PDF typed MORTGAGE_SCHEDULE, TAX_106, BANK_STATEMENT or
+   * BROKERAGE_STATEMENT matches nothing and the import throws. The document was stored
+   * correctly the whole time; only the parse was impossible.
+   *
+   * That distinction is the entire point now. Since per-item attribution landed, a
+   * document is EVIDENCE whether or not a parser can read it — a mortgage schedule
+   * nobody can parse still proves the mortgage. Presenting import as the thing to do,
+   * and hard-failing it, told the owner his filing had failed when it had not.
+   *
+   * So the UI asks first and offers the form only where it can succeed. One query for
+   * the whole list rather than one per row.
+   */
+  importableIds: protectedProcedure.query(async ({ ctx }) => {
+    const householdId = await requireHouseholdId(ctx.db);
+    const docs = await ctx.db.document.findMany({
+      where: { householdId },
+      select: { id: true, filename: true, mimeType: true, docType: true, sha256: true },
+    });
+    return docs
+      .filter((d) =>
+        findAdapter({
+          filename: d.filename,
+          mimeType: d.mimeType,
+          docType: d.docType ?? undefined,
+          sha256: d.sha256,
+        }) !== undefined,
+      )
+      .map((d) => d.id);
+  }),
 
   run: protectedProcedure
     .input(
