@@ -96,12 +96,33 @@ export default async function DocumentsPage({
           <ul className="flex flex-col gap-3">
             {documents.map((doc) => (
               <li key={doc.id} className="rounded-lg border border-neutral-100 p-3">
+                {/*
+                  THE STORED TYPE, STATED. The row used to print the saved docType as
+                  small grey text and NOTHING AT ALL when it was null — while the dropdown
+                  below defaulted to "OTHER" whether or not anything had been saved.
+
+                  So a document with no type looked identical to one typed OTHER, and a
+                  dropdown you had changed but not SUBMITTED looked identical to one that
+                  had been saved. Owner reported his documents were "all there and
+                  correctly typed" while the report found none of those types — this is
+                  how both statements can be true at once.
+
+                  An unset type now says so, in red, next to the filename.
+                */}
                 <div className="flex items-center justify-between text-sm">
                   <div>
                     <span className="font-medium">{doc.filename}</span>
+                    {doc.docType ? (
+                      <span className="ms-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700">
+                        {t(`types.${doc.docType}`)}
+                      </span>
+                    ) : (
+                      <span className="ms-2 rounded bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                        {t("typeNotSet")}
+                      </span>
+                    )}
                     <span className="ms-2 text-xs text-neutral-400">
-                      {doc.docType ? t(`types.${doc.docType}`) : ""} · {t("status")}: {doc.parseStatus} ·{" "}
-                      {formatDate(doc.uploadedAt, locale as Locale)}
+                      {t("status")}: {doc.parseStatus} · {formatDate(doc.uploadedAt, locale as Locale)}
                     </span>
                   </div>
                 </div>
@@ -109,11 +130,21 @@ export default async function DocumentsPage({
                   <input type="hidden" name="locale" value={locale} />
                   <input type="hidden" name="documentId" value={doc.id} />
                   <Field label={t("docType")}>
-                    <Select name="docType" defaultValue={doc.docType ?? "OTHER"}>
+                    {/*
+                      Defaulting an UNSET type to "OTHER" made the dropdown assert a
+                      value the database did not hold, and "OTHER" satisfies no
+                      expectation rule — so a document that looked correctly typed
+                      counted for nothing. An unset document now shows an explicit
+                      placeholder that cannot be mistaken for a saved value.
+                    */}
+                    <Select name="docType" defaultValue={doc.docType ?? ""}>
+                      {doc.docType ? null : <option value="">{t("chooseType")}</option>}
                       {DOC_TYPES.map((d) => <option key={d} value={d}>{t(`types.${d}`)}</option>)}
                     </Select>
                   </Field>
                   <button type="submit" className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm">{t("updateDocType")}</button>
+                  {/* The change is not saved until this is pressed — and nothing said so. */}
+                  <span className="text-xs text-neutral-400">{t("updateDocTypeHint")}</span>
                 </form>
                 {/*
                   Only offer the import form where an adapter can actually parse the file.

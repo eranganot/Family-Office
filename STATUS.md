@@ -345,6 +345,35 @@ Order (each its own gate):
 (`MORTGAGE_SCHEDULE`, `TAX_106`) **and** the parse must refuse a file whose headers say
 otherwise. A boundary in a comment is not a boundary.
 
+### 🔴 "ALL MY DOCS ARE THERE AND CORRECTLY TYPED" vs "חסר" — both were true
+Owner, 2026-08-02, losing trust: the documents page listed his files with the right types
+selected, and the verification card said every retirement row was **MISSING**.
+
+**The report was right and so was he.** The page had two independent ways to show a type
+that was not actually stored:
+1. The row printed the saved `docType` as small grey text — and **nothing at all** when
+   it was `null`. An untyped document looked identical to a typed one.
+2. The selector did `defaultValue={doc.docType ?? "OTHER"}` — it **asserted a value the
+   database did not hold**, and `OTHER` satisfies no expectation rule. A dropdown he had
+   changed but not SUBMITTED looked exactly like a saved one, because nothing indicated
+   the change was unsaved.
+
+So a document could look correctly typed from three different angles and count for
+nothing. Now: the **stored** type renders as a chip, an unset one says *"לא נקבע סוג — לא
+נספר לשום דבר"* in red, the dropdown offers an explicit *"— בחרו סוג —"* placeholder
+instead of defaulting, and the save button says it is the save button.
+
+**Diagnostic worth keeping:** `חסר` means *no document of that type exists*;
+`לא משויך` means *one exists but is not linked to this item*. A row showing `חסר` while
+the owner insists the file is uploaded is a **typing** problem, never a linking one.
+
+### ⚠️ The document checklist gates NOTHING — verified, 2026-08-02
+`missingDocs` has exactly **one** consumer: the verification page display. Not strategy,
+not allocation, not operations, not the health score, not `evaluateTransition`. Red rows
+there block nothing. What actually gates: item verification + `suspenseEmpty` (into
+ALLOCATION), `allocationPlanApproved` (into STRATEGY), and `surplusIsProvisional` for the
+deployment hand-off. **Say this before letting an owner re-upload anything.**
+
 ### Working rules that cost a gate run each when forgotten
 - Deploy scripts: **ASCII only**, comments are `#` not `//`, `-LiteralPath` for any path
   containing `[locale]` or `(app)`.
