@@ -13,12 +13,14 @@
     "dev": "turbo run dev",
     "lint": "eslint --max-warnings 0 .",
     "test": "turbo run test",
+    "e2e": "playwright test",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
     "start": "npm run start --workspace=apps/web",
     "postinstall": "npm run generate --workspace=@wealthos/db --if-present && node scripts/ensure-platform-binaries.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "eslint": "^10.6.0",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-boundaries": "^6.0.0",

@@ -68,6 +68,9 @@ export default async function OperationsPage({
     .queue({ limit: SUSPENSE_PROBE })
     .catch(() => null);
   const driftAlerts = await trpc.operations.review.driftAlerts().catch(() => null);
+  // M42 — the health score. A refusal (`ok:false`) is rendered AS a refusal, not as a
+  // low number: too little measured is not the same as doing badly.
+  const health = await trpc.operations.health.score().catch(() => null);
   const baseCurrency = "ILS";
 
   const errorMsg = sp.error
@@ -90,6 +93,8 @@ export default async function OperationsPage({
 
       <TodaySummarySection
         locale={locale}
+        healthScore={health && health.ok ? health.score : null}
+        healthCoveragePct={health ? health.weightCoveredPct : null}
         suspenseCount={suspense === null ? null : suspense.rows.length}
         suspenseAtLimit={suspense !== null && suspense.rows.length >= SUSPENSE_PROBE}
         driftCount={driftAlerts === null ? null : driftAlerts.length}

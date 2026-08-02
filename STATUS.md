@@ -2,6 +2,23 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+## 📌 CONVENTION — deploy script naming (owner, 2026-07-29)
+
+**`deploy-<yyyy-mm-dd>-<subject>.ps1`**, not `deploy-m<N><letter>.ps1`.
+
+The M42b script began as *"step 1: extract the Action Center"* and ended up carrying the
+whole four-gate IA rebuild, the health score, nine QA fixes and the nav grouping. The
+name went stale while the content grew — and in a repo where these scripts are the record
+of what shipped, a misleading filename is worse than a verbose one. A date cannot go
+stale; the subject describes the deploy rather than the milestone it started inside.
+Milestone numbers belong in the commit message and here, where they can be corrected.
+
+Rename in place when a script outgrows its name — they are gitignored scaffolding, so a
+rename costs nothing:
+```powershell
+Rename-Item deploy-m42b.ps1 deploy-2026-07-29-ops-rebuild.ps1
+```
+
 ## ✅ DONE — top navigation grouped (M42, was a backlog item)
 
 Fourteen flat links → **Dashboard + four groups**, ordered by what the owner is doing and
@@ -350,6 +367,48 @@ banner is gone.** Note what sign-off does NOT change: **bituach-leumi employee r
 `null` in the payload** — they were never wrong, they were absent because sources
 conflicted. `ownerReviewed=true` removes the "unverified figures" banner while a missing
 input stays missing; anything depending on those rates is still unavailable, not verified.
+
+### ✅ Health score is now VISIBLE (Tier 2 #4)
+A fourth compact row on Today: `{score}/100 · from {coverage}% of the household`, linking
+to `/operations/month`. **The coverage figure is part of the value, not a footnote** — 72
+and "72, from 60% of the household" are different claims, and only one is honest while
+goals are unwired. A refusal renders as *"not enough measured to score"*, never as a low
+number: too little measured is not the same as doing badly.
+
+### 🎨 POLISH BACKLOG — the grouped nav looks rough
+Owner, 2026-07-29: *"not the best UI and doesn't look that good but for now it's ok"*.
+Functional and accessible; visually unresolved. Native `<details>` gives open/closed
+disclosure with no hover affordance and inconsistent spacing when several groups are
+open at once. Worth a proper menu component when the dashboard work lands — not before,
+since that is when the nav gets exercised hardest.
+
+### ✅ Playwright smoke BUILT (Tier 2 #5) — ⚠️ FIRST LOCKFILE CHANGE IN A WHILE
+`@playwright/test` added as a root devDependency, plus `playwright.config.ts`,
+`e2e/operations-routing.spec.ts` and an `npm run e2e` script. **Dependency and suite ship
+together** — a lockfile carrying a runner with no tests, or specs with no runner, is a
+half-change either way.
+
+**Scope is routing and redirects ONLY**, not business logic. Every assertion maps to a
+defect a human found by clicking, and none of which tsc, vitest or eslint could catch:
+duplicate cards, doubled drift alerts, the calendar scroll jump, month actions landing on
+the wrong month, the filter clearing on edit, a suspense link pointing at a page with no
+transaction list. All are wiring faults *between* correct units.
+
+**Runs against a DEPLOYED instance**, not a dev server — the faults only exist once the
+app is served, and a suite needing seeded fixtures drifts out of date faster than the code
+it guards:
+```powershell
+npx playwright install chromium          # once per machine
+$env:E2E_BASE_URL='https://wealthos-web-production-c1f7.up.railway.app'
+npm run e2e
+```
+**Not wired into CI yet** — it needs a post-deploy job, since pre-deploy CI has nothing to
+point at. That is the next piece.
+
+### 🛡️ The unstaged-files guard earned its place immediately
+Added after a commit silently dropped the duplicate-card fix; on its very first run it
+caught `package.json` + `package-lock.json` left out of `$Files` after the Playwright
+install. Keep it in every future deploy script.
 
 ### Next: M42 proper
 Health score (`health_score_weights` is seeded and consumed by nothing), telemetry

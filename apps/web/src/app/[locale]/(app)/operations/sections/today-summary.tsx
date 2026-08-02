@@ -20,6 +20,14 @@ import { getTranslations } from "next-intl/server";
 
 export interface TodaySummaryProps {
   locale: string;
+  /**
+   * M42 health score. `null` = the engine refused (too little of the household is
+   * measurable) — shown as a refusal, never as a low score. A composite that quietly
+   * degrades to a number when half its inputs are missing is the one output here most
+   * likely to be mistaken for a verdict.
+   */
+  healthScore: number | null;
+  healthCoveragePct: number | null;
   /** `null` when the fetch failed — NOT collapsed into zero. */
   suspenseCount: number | null;
   /** True when the count hit the query limit, so it is a floor rather than a total. */
@@ -31,6 +39,8 @@ export interface TodaySummaryProps {
 
 export async function TodaySummarySection({
   locale,
+  healthScore,
+  healthCoveragePct,
   suspenseCount,
   suspenseAtLimit,
   driftCount,
@@ -40,6 +50,22 @@ export async function TodaySummarySection({
   const t = await getTranslations("operations");
 
   const rows = [
+    {
+      key: "health",
+      href: `/${locale}/operations/month`,
+      label: t("rowHealth"),
+      /*
+         The coverage figure is part of the value, not a footnote. "72" and "72, from 60%
+         of the household" are different claims, and only one of them is honest when
+         goals are unwired and half the ledger is unmapped.
+      */
+      value:
+        healthScore === null
+          ? t("rowHealthRefused")
+          : t("rowHealthValue", { score: healthScore, coverage: healthCoveragePct ?? 0 }),
+      urgent: healthScore !== null && healthScore < 50,
+      failed: false,
+    },
     {
       key: "suspense",
       href: `/${locale}/transactions`,
