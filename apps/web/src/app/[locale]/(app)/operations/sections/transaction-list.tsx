@@ -173,7 +173,14 @@ export async function TransactionListSection({
       })()}
 
       {(showVoided ? txns : txns.filter((tx) => tx.status !== "VOID")).length === 0 ? (
-        <p className="text-sm text-neutral-500">{t("noTransactions")}</p>
+        /*
+          QA: a filter matching nothing showed "no transactions yet — add one above",
+          which reads as "this household has no data". Distinguish the two: an empty
+          FILTER is a filter result, and the way out is to clear it, not to start typing.
+        */
+        <p className="text-sm text-neutral-500">
+          {filterCat || filterBeh ? t("noTransactionsForFilter") : t("noTransactions")}
+        </p>
       ) : (
         <div className="flex flex-col gap-3">
           {(showVoided ? txns : txns.filter((tx) => tx.status !== "VOID")).map((tx) => {

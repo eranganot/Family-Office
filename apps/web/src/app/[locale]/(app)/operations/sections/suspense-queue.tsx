@@ -139,8 +139,13 @@ export async function SuspenseQueueSection({
                   ) : (
                     <span className="flex items-center gap-2 whitespace-nowrap text-xs text-neutral-500">
                       {t("noMerchantKey")}
+                      {/*
+                        M42 QA: this pointed at /operations?edit=, which since the split
+                        has no transaction list at all — the link went nowhere useful.
+                        The row it wants to edit lives on this page, further down.
+                      */}
                       <a
-                        href={`/${locale}/operations?edit=${tx.id}`}
+                        href={`/${locale}/transactions?edit=${tx.id}#tx-${tx.id}`}
                         className="text-blue-600 underline"
                       >
                         {t("editInstead")}

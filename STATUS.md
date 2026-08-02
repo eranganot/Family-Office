@@ -264,11 +264,23 @@ dropped from a commit.
 | 8.x | Clicking edit cleared the active filter | Filters carried through edit/cancel; anchors to the row |
 | 5.8 | Drift alert stated a fact, no action | Renders `recommendedAction` — it was in the record and never displayed |
 
-**STILL OPEN — needs data to diagnose:**
-- **8.2 — preview shows the same file whichever pending statement is clicked.** Three
-  distinct documents, one preview. Could be an `externalRef`/sha collision, a stale
-  `sp.preview`, or genuinely identical content. Next step: confirm the three rows have
-  distinct `Document.id` and `sha256`, then compare the preview link hrefs in the DOM.
+**8.2 — NOT A BUG.** Owner confirmed distinct `sha256` per document and distinct
+`?preview=` ids in the URL. The three FIBI statements are different files whose parsed
+content looks alike. Closed.
+
+### QA round 3 — remaining
+- **Duplicate transaction rows are REAL DATA, not a display bug.** The pair in the
+  screenshot are both BOOKED (neither tagged "הוסרה"), so the VOID-hiding fix does not
+  touch them. This is the **M38l key-format change**: rows imported before and after it
+  carry different `externalRef` shapes and cannot deduplicate against each other. The
+  cure already exists — press **הסרת כפילויות** in the transactions card, which VOIDs the
+  later copies and keeps the earliest. Action for the owner, not a code change.
+- **Suspense "edit instead" pointed at `/operations?edit=`** — a route that has had no
+  transaction list since the split. Now `/transactions?edit=…#tx-…`. **This is the most
+  likely explanation for "edit still clears the filter"**: that link never carried one.
+  The list's own edit link does carry `cat`/`beh` (verified in source).
+- **Empty-filter state** said "no transactions yet — add one above", which reads as "this
+  household has no data". Filtered-empty is now distinct from genuinely-empty.
 
 ### ✅ Tax figures signed off (owner, 2026-07-29)
 Owner approved IL 2025/2026. **Validate with the query below before assuming the amber
