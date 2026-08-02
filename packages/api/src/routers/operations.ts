@@ -11,6 +11,7 @@ import { regenerateCalendar, upcomingEvents } from "../services/calendar-service
 import { listOpportunities, runOpportunities } from "../services/opportunity-service";
 import { DISMISSAL_REASONS, listActions, setActionStatus } from "../services/action-service";
 import { eoyProjection } from "../services/projection-service";
+import { householdHealthScore } from "../services/health-service";
 import {
   allocationHandoffReadiness,
   listSurplusDriftAlerts,
@@ -800,6 +801,18 @@ export const operationsRouter = router({
       .query(async ({ ctx, input }) =>
         allocationHandoffReadiness(ctx.db, ctx.householdId, input.year, input.month),
       ),
+  }),
+
+  /**
+   * M42 — the Household Financial Health Score.
+   *
+   * A query, and one that returns a discriminated union: "not enough of the household is
+   * measurable to summarise it" is a first-class result, not a zero. Nothing downstream
+   * may branch on the composite — it summarises findings that each carry their own
+   * rationale, and a number out of 100 is not one of them.
+   */
+  health: router({
+    score: operationsProcedure.query(async ({ ctx }) => householdHealthScore(ctx.db, ctx.householdId)),
   }),
 
   /** M41 — open surplus-drift alerts raised by a monthly close. */

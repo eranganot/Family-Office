@@ -66,6 +66,8 @@ export interface TransactionListSectionProps {
   filterCat?: string | undefined;
   filterBeh?: string | undefined;
   editingId?: string | undefined;
+  /** Voided rows are hidden by default — a resolved duplicate should not look unresolved. */
+  showVoided?: boolean | undefined;
 }
 
 export async function TransactionListSection({
@@ -80,9 +82,25 @@ export async function TransactionListSection({
   filterCat,
   filterBeh,
   editingId,
+  showVoided = false,
 }: TransactionListSectionProps) {
   const t = await getTranslations("operations");
   const base = `/${locale}/transactions`;
+
+  /*
+   * QA: clicking "edit" cleared the active filter, so the owner lost his place and had
+   * to re-filter after every correction — on a list where correcting rows IS the task.
+   * Every self-link now carries the filter forward; only `edit` changes.
+   */
+  const keep = new URLSearchParams();
+  if (filterCat) keep.set("cat", filterCat);
+  if (filterBeh) keep.set("beh", filterBeh);
+  const withFilters = (extra?: Record<string, string>): string => {
+    const p = new URLSearchParams(keep);
+    for (const [k, v] of Object.entries(extra ?? {})) p.set(k, v);
+    const q = p.toString();
+    return q ? `${base}?${q}` : base;
+  };
 
   return (
     <Card title={t("transactions")}>
@@ -126,19 +144,39 @@ export async function TransactionListSection({
             ))}
           </Select>
         </Field>
+        {/*
+          QA: the list showed the same mortgage row twice — an active copy and the VOID
+          copy that `removeDuplicates` created. Voided rows are excluded from every
+          calculation already, so showing them by default made a resolved duplicate look
+          like an unresolved one. They are hidden unless asked for, never deleted: a
+          voided row is recoverable, which is the whole reason dedupe voids rather than
+          deletes.
+        */}
+        <label className="flex items-center gap-2 text-xs text-neutral-600">
+          <input type="checkbox" name="void" value="1" defaultChecked={showVoided} />
+          {t("filterShowVoided")}
+        </label>
         <SubmitButton label={t("filterApply")} />
-        {filterCat || filterBeh ? (
+        {filterCat || filterBeh || showVoided ? (
           <a href={base} className="text-xs text-blue-600 underline">
             {t("filterClear")}
           </a>
         ) : null}
       </form>
 
-      {txns.length === 0 ? (
+      {(() => {
+        const visible = showVoided ? txns : txns.filter((tx) => tx.status !== "VOID");
+        const hidden = txns.length - visible.length;
+        return hidden > 0 ? (
+          <p className="mb-3 text-xs text-neutral-500">{t("voidedHidden", { n: hidden })}</p>
+        ) : null;
+      })()}
+
+      {(showVoided ? txns : txns.filter((tx) => tx.status !== "VOID")).length === 0 ? (
         <p className="text-sm text-neutral-500">{t("noTransactions")}</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {txns.map((tx) => {
+          {(showVoided ? txns : txns.filter((tx) => tx.status !== "VOID")).map((tx) => {
             const cat = tx.categoryId ? byId.get(tx.categoryId) : undefined;
             const amount = Number(tx.amount);
             const cls = tx.classifications[0];
@@ -191,9 +229,14 @@ export async function TransactionListSection({
                       {formatMoney(Math.abs(amount), tx.currency, loc)}
                     </span>
                     {isEditing ? (
-                      <a href={base} className="text-xs text-neutral-500 underline">{t("cancel")}</a>
+                      <a href={withFilters()} className="text-xs text-neutral-500 underline">{t("cancel")}</a>
                     ) : (
-                      <a href={`${base}?edit=${tx.id}`} className="text-xs text-blue-600 underline">{t("edit")}</a>
+                      <a
+                        href={`${withFilters({ edit: tx.id })}#tx-${tx.id}`}
+                        className="text-xs text-blue-600 underline"
+                      >
+                        {t("edit")}
+                      </a>
                     )}
                     <form action={setTransactionStatusAction}>
                       <input type="hidden" name="locale" value={locale} />

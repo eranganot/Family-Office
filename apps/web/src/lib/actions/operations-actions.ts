@@ -158,38 +158,46 @@ export async function recomputePeriodAction(fd: FormData): Promise<void> {
   } catch {
     redirect(`/${locale}/operations/month?error=recompute`);
   }
-  // M42b: the month lives at its own route, so these land where the result is shown.
-  redirect(`/${locale}/operations/month?recomputed=1`);
+  /*
+   * Carry y/m back. Every month form already posts them, but the redirect dropped them —
+   * so recomputing March landed the owner on the CURRENT month and looked like the
+   * action had silently targeted the wrong period. Same fault as the calendar losing its
+   * window: the redirect must reconstruct the view the action was performed in, not just
+   * the route.
+   */
+  redirect(`/${locale}/operations/month?recomputed=1&y=${str(fd, "year")}&m=${str(fd, "month")}`);
 }
 
 export async function closePeriodAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
   const note = str(fd, "reviewNote");
+  const y = str(fd, "year");
+  const m = str(fd, "month");
   const trpc = await serverCaller();
   try {
     await trpc.operations.period.close({
-      year: Number(str(fd, "year")),
-      month: Number(str(fd, "month")),
+      year: Number(y),
+      month: Number(m),
       ...(note ? { reviewNote: note } : {}),
     });
   } catch {
-    redirect(`/${locale}/operations/month?error=close`);
+    redirect(`/${locale}/operations/month?error=close&y=${y}&m=${m}`);
   }
-  redirect(`/${locale}/operations/month?closed=1`);
+  redirect(`/${locale}/operations/month?closed=1&y=${y}&m=${m}`);
 }
 
 export async function reopenPeriodAction(fd: FormData): Promise<void> {
   const locale = str(fd, "locale");
+  const y = str(fd, "year");
+  const m = str(fd, "month");
   const trpc = await serverCaller();
   try {
-    await trpc.operations.period.reopen({
-      year: Number(str(fd, "year")),
-      month: Number(str(fd, "month")),
-    });
+    await trpc.operations.period.reopen({ year: Number(y), month: Number(m) });
   } catch {
-    redirect(`/${locale}/operations/month?error=reopen`);
+    redirect(`/${locale}/operations/month?error=reopen&y=${y}&m=${m}`);
   }
-  redirect(`/${locale}/operations/month?reopened=1`);
+  // Reopening January must leave you looking at January, not at today.
+  redirect(`/${locale}/operations/month?reopened=1&y=${y}&m=${m}`);
 }
 
 /**

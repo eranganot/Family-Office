@@ -86,6 +86,7 @@ export type EoyProjection =
       ok: true;
       monthlyRunRateBase: number;
       monthsObserved: number;
+      /** Months in the run-rate that still contain unverified rows. Reported, not excluded. */
       monthsProvisionalExcluded: number;
       /** Cumulative surplus at 31 Dec on each line. */
       currentEoyBase: number;
@@ -105,9 +106,28 @@ export function projectEndOfYear(input: EoyProjectionInput): EoyProjection {
   const year = input.asOf.getUTCFullYear();
   const thisMonth = input.asOf.getUTCMonth() + 1; // 1–12
 
+  /*
+   * PROVISIONAL MONTHS ARE INCLUDED — and excluding them was the same defect M41c had
+   * to fix in the drift baseline.
+   *
+   * This originally required `!isProvisional`. EVERY closed month in the owner's
+   * household is provisional, because closing with unverified rows is explicitly
+   * ALLOWED — the non-blocking rule is a deliberate design decision of this whole
+   * module. So the run-rate had no months to work with, the projection refused
+   * permanently, and QA closed FIVE months (Jan–May) and still saw "0 of 3".
+   *
+   * The rule is the same one drift settled on: THE STANDARD DEPENDS ON THE CONSEQUENCE.
+   * A projection informs; it moves no money. A provisional surplus is an observed
+   * figure whose composition is incomplete, not a fabricated one — and a run-rate
+   * averaged over several such months is a reasonable trajectory as long as it says so.
+   * `monthsProvisional` travels with the result for exactly that reason.
+   *
+   * Deploying cash against a provisional figure remains refused, in
+   * `allocationHandoffReadiness`. That is where being wrong actually costs something.
+   */
   const inYear = input.closedMonths.filter((m) => m.year === year);
-  const verified = inYear.filter((m) => !m.isProvisional);
-  const provisionalExcluded = inYear.length - verified.length;
+  const verified = inYear;
+  const provisionalExcluded = inYear.filter((m) => m.isProvisional).length;
 
   if (verified.length < input.minMonths) {
     return {

@@ -81,6 +81,14 @@ export async function MonthlyReviewSection({
                   months: d.monthsInBaseline ?? 0,
                 })}
               </p>
+              {/*
+                QA: the alert stated a fact and stopped — "I don't know how this affects
+                me or what to do". The recommended action was already in the record
+                (`recommendedAction: RERUN_STRATEGY`) and simply never rendered. An alert
+                that names a deviation without naming the response is an observation, not
+                an alert.
+              */}
+              <p className="mt-1 font-medium">{t("driftAction")}</p>
               {/* The caveat travels WITH the number, not in a footnote nobody reads. */}
               {d.isProvisional ? <p className="mt-1">{t("driftProvisional")}</p> : null}
             </li>

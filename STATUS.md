@@ -243,6 +243,40 @@ because a composite out of 100 names nothing and reads as a verdict:
 - **No UI yet** — it is API-only, and belongs with the dashboard, which should come
   *after* the top-nav grouping.
 
+### QA round 2 (2026-07-29) — nine defects found, eight fixed
+
+**⚠️ The M42b commit `95a5d66` FAILED CI and three files never shipped** —
+`engine-operations/src/index.ts`, `api/routers/operations.ts` and
+`api/services/opportunity-service.ts` were missing from `$Files`. The local gate passed
+because **turbo replayed a cached typecheck**. Two structural fixes: `typecheck --force`,
+and a guard that refuses to commit when any tracked file has unstaged modifications —
+nothing previously checked that `$Files` COVERED what changed, and a bug fix was silently
+dropped from a commit.
+
+| QA | Defect | Fix |
+|---|---|---|
+| 6.2 | **EOY refused with 5 closed months.** `!isProvisional` excluded every month the household has — **the M41c bug, third occurrence** | Provisional months INCLUDED and reported. Deploying cash still refuses them; a projection informs and moves no money. |
+| 5.3 / 5.5 | Recompute/close/reopen jumped to the CURRENT month | `y`/`m` carried through every month redirect |
+| 4.2 | "Mark done" made the action vanish — undo vanished with it | Closed items shown by default, open sorted first. Same one-way door M40c's un-accept removed, reintroduced a layer up. |
+| 3.3 | Duplicate opportunity cards (ACCEPTED + IMPLEMENTED) | `listOpportunities` shows **newest per type** — it is a view of the current position, not a ledger of every row |
+| 7.3 | Calendar window switch jumped to top | Links carried `#calendar`, an id that no longer exists on that route |
+| 8.6 | Same mortgage row twice in filtered list | VOID rows hidden by default with a count + toggle. Voided ≠ deleted, so they stay recoverable. |
+| 8.x | Clicking edit cleared the active filter | Filters carried through edit/cancel; anchors to the row |
+| 5.8 | Drift alert stated a fact, no action | Renders `recommendedAction` — it was in the record and never displayed |
+
+**STILL OPEN — needs data to diagnose:**
+- **8.2 — preview shows the same file whichever pending statement is clicked.** Three
+  distinct documents, one preview. Could be an `externalRef`/sha collision, a stale
+  `sp.preview`, or genuinely identical content. Next step: confirm the three rows have
+  distinct `Document.id` and `sha256`, then compare the preview link hrefs in the DOM.
+
+### ✅ Tax figures signed off (owner, 2026-07-29)
+Owner approved IL 2025/2026. **Validate with the query below before assuming the amber
+banner is gone.** Note what sign-off does NOT change: **bituach-leumi employee rates are
+`null` in the payload** — they were never wrong, they were absent because sources
+conflicted. `ownerReviewed=true` removes the "unverified figures" banner while a missing
+input stays missing; anything depending on those rates is still unavailable, not verified.
+
 ### Next: M42 proper
 Health score (`health_score_weights` is seeded and consumed by nothing), telemetry
 projection, dashboard extensions, full bilingual pass, Playwright smoke. **Do the top-nav

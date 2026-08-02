@@ -89,9 +89,11 @@ export async function CalendarSection({
         </form>
         <span className="text-xs text-neutral-500">{t("windowLabel")}</span>
         {[60, 120, 400].map((d) => (
+          // QA: these carried `#calendar`, an id that no longer exists on this route —
+          // so every window switch jumped to the top of the page. No fragment now.
           <a
             key={d}
-            href={`?cw=${d}#calendar`}
+            href={`?cw=${d}`}
             className={`text-xs underline ${d === calWindow ? "font-semibold text-neutral-900" : "text-blue-700"}`}
           >
             {t("windowDays", { n: d })}

@@ -51,18 +51,32 @@ describe("EOY projection", () => {
     }
   });
 
-  it("excludes provisional months from the run-rate and reports how many", () => {
-    // A month containing unverified rows is not yet a fact.
+  /**
+   * M41c's lesson, applied here after QA closed FIVE provisional months and still got
+   * "0 of 3". Excluding provisional months excluded every month this household has.
+   */
+  it("INCLUDES provisional months in the run-rate, and reports how many", () => {
     const r = projectEndOfYear(
       input({
-        closedMonths: [closed(1, 1000), closed(2, 1000), closed(3, 1000), closed(4, 9999, true)],
+        closedMonths: [closed(1, 1000), closed(2, 1000), closed(3, 1000), closed(4, 1000, true)],
       }),
     );
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.monthlyRunRateBase).toBe(1000);
+      expect(r.monthsObserved).toBe(4);
       expect(r.monthsProvisionalExcluded).toBe(1);
     }
+  });
+
+  it("projects when EVERY closed month is provisional — the owner's actual case", () => {
+    const r = projectEndOfYear(
+      input({
+        closedMonths: [closed(1, 1000, true), closed(2, 1000, true), closed(3, 1000, true)],
+      }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.monthlyRunRateBase).toBe(1000);
   });
 
   it("projects the rest of the year at the observed run-rate", () => {

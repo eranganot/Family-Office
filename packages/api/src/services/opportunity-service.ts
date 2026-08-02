@@ -282,9 +282,37 @@ export async function runOpportunities(
       ).map((r) => r.type),
     );
 
+    /*
+     * M42 — ONE open card per type, enforced twice.
+     *
+     * QA found the same "5 scheduled reviews within 60 days" card rendered twice. Two
+     * ways that can happen, and the supersede above closes neither:
+     *
+     *  1. Two drafts in one run sharing a type. `idByType` already assumed one-per-type
+     *     (it keeps the last id), but the loop happily inserted both rows — so the map
+     *     was silently lying about what had been written.
+     *  2. Two runs racing — a double-click on recompute. Both supersede the same set,
+     *     both then insert. Re-reading PROPOSED types INSIDE this transaction, after the
+     *     supersede, closes that: the loser sees the winner's row and skips.
+     *
+     * Same rule the Opportunity Center already applies to ACCEPTED types, and the same
+     * one M41d had to add for drift alerts. An inbox showing one finding twice trains
+     * the owner to ignore both.
+     */
+    const openTypes = new Set(
+      (
+        await tx.recommendation.findMany({
+          where: { householdId, origin: "OPERATIONAL", status: "PROPOSED" },
+          select: { type: true },
+        })
+      ).map((r) => r.type),
+    );
+
     const idByType = new Map<string, string>();
     for (const draft of drafts) {
       if (acceptedTypes.has(draft.type)) continue;
+      if (openTypes.has(draft.type)) continue;
+      openTypes.add(draft.type);
       const id = await persistOperationalDraft(tx, {
         householdId,
         snapshotId,
@@ -448,7 +476,28 @@ export async function listOpportunities(
     blockers.set(e.dependentId, list);
   }
 
-  const items = rows.map((r) => {
+  /*
+   * M42 QA — ONE card per type, newest wins.
+   *
+   * QA saw the same "5 scheduled reviews" finding twice: one ACCEPTED, one IMPLEMENTED.
+   * The generation-side guard cannot help here — these are historical rows in terminal
+   * states, created before that guard existed and legitimately kept for the audit trail.
+   * What was wrong is showing them all: the Opportunity Center is a view of the CURRENT
+   * position, not a ledger of every row ever written.
+   *
+   * The dependency and status queries above run against the full set, so nothing is lost
+   * from the graph — only the rendering collapses.
+   */
+  const newestByType = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) {
+    const seen = newestByType.get(r.type);
+    if (!seen || r.generatedAt > seen.generatedAt) newestByType.set(r.type, r);
+  }
+  const visible = [...newestByType.values()].sort(
+    (a, b) => num(b.priorityScore) - num(a.priorityScore),
+  );
+
+  const items = visible.map((r) => {
     const expiresAt = r.expiresAt ? r.expiresAt.toISOString().slice(0, 10) : null;
     const blocking = blockers.get(r.id) ?? [];
     return {

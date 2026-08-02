@@ -26,6 +26,15 @@ export type {
   FutureInstalment,
 } from "./settlement";
 
+// --- M42: household financial health score ---
+export { computeHealthScore } from "./health-score";
+export type {
+  HealthScore,
+  HealthScoreInput,
+  HealthComponent,
+  HealthComponentKey,
+} from "./health-score";
+
 // --- M41: end-of-year projection (current vs optimised) ---
 export { projectEndOfYear } from "./eoy-projection";
 export type {

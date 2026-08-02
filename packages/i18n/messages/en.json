@@ -1442,6 +1442,9 @@
       "REVERT": "Undo this decision"
     },
     "oppsRevertHint": "Returns it to open items and to the total.",
+    "filterShowVoided": "Show removed rows",
+    "voidedHidden": "{n} removed row(s) hidden. Tick \"show removed rows\" to see them.",
+    "driftAction": "What to do: rerun Strategy. The plan was built on a different surplus, so its allocation is now sized for a household you no longer are.",
     "rowSuspense": "Transactions waiting to be classified",
     "rowDrift": "Open surplus drift alerts",
     "rowActions": "Committed work",

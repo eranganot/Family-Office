@@ -38,6 +38,7 @@ export default async function TransactionsPage({
     cat?: string;
     beh?: string;
     edit?: string;
+    void?: string;
     created?: string;
     classified?: string;
     categorySaved?: string;
@@ -168,6 +169,7 @@ export default async function TransactionsPage({
         filterCat={sp.cat}
         filterBeh={sp.beh}
         editingId={sp.edit}
+        showVoided={sp.void === "1"}
       />
 
       <ManualAddSection pickerCats={pickerCats} locale={locale} today={today} />

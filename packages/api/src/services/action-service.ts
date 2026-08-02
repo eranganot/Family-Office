@@ -79,12 +79,23 @@ function deriveActionStatus(status: string, actionStartedAt: Date | null): Actio
 /** Statuses that belong in a worklist. PROPOSED is a decision, not a task. */
 const ACTIONABLE = ["ACCEPTED", "IMPLEMENTED", "REJECTED"] as const;
 
+/**
+ * M42 QA: closed items are now shown BY DEFAULT.
+ *
+ * They were hidden, so marking an action done made it vanish — and the undo control
+ * vanished with it. "Mark done" became irreversible from the screen, which is the exact
+ * one-way-door the M40c un-accept control was added to remove, reintroduced one layer
+ * up. A worklist that silently swallows completed work also gives the owner no way to
+ * see what he actually got through.
+ *
+ * Open items sort first (below), so the list still leads with what needs doing.
+ */
 export async function listActions(
   db: PrismaClient,
   householdId: string,
   opts: { includeClosed?: boolean } = {},
 ): Promise<{ items: ActionCardView[]; openCount: number; blockedCount: number }> {
-  const statuses = opts.includeClosed ? [...ACTIONABLE] : ["ACCEPTED"];
+  const statuses = opts.includeClosed === false ? ["ACCEPTED"] : [...ACTIONABLE];
   const rows = await db.recommendation.findMany({
     where: { householdId, status: { in: statuses as never } },
     orderBy: [{ priorityScore: "desc" }, { generatedAt: "desc" }],
@@ -135,6 +146,16 @@ export async function listActions(
       blockedByHe: blocking.map((b) => b.titleHe ?? b.title),
     };
   });
+
+  // Open work first, then completed, then dismissed — the list leads with what still
+  // needs doing while keeping finished items reachable for undo.
+  const rank: Record<ActionStatus, number> = {
+    IN_PROGRESS: 0,
+    PENDING: 1,
+    COMPLETED: 2,
+    DISMISSED: 3,
+  };
+  items.sort((a, b) => rank[a.actionStatus] - rank[b.actionStatus]);
 
   return {
     items,
