@@ -32,6 +32,12 @@
     "allocation": "Allocation",
     "operations": "Operations"
   },
+  "navGroup": {
+    "picture": "The picture",
+    "decide": "Decide",
+    "run": "Run",
+    "reference": "Reference"
+  },
   "phase": {
     "label": "Current phase",
     "MAPPING": "Mapping",
@@ -1442,6 +1448,8 @@
       "REVERT": "Undo this decision"
     },
     "oppsRevertHint": "Returns it to open items and to the total.",
+    "previewOf": "Previewing: {filename} (id {id}…). Two exports of the same statement saved moments apart are different files with identical rows — check the id if two previews look the same.",
+    "previewUnknownFile": "an uploaded file",
     "noTransactionsForFilter": "No transactions match this filter. Clear it to see everything.",
     "filterShowVoided": "Show removed rows",
     "voidedHidden": "{n} removed row(s) hidden. Tick \"show removed rows\" to see them.",

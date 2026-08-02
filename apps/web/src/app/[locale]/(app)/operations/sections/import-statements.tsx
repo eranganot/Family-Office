@@ -211,7 +211,26 @@ export async function ImportSection({
           </div>
         ) : (
           <div className="mt-6 border-t border-neutral-100 pt-6">
+            {/*
+              QA: the preview never named the file it came from. With three statements
+              pending, an owner clicking each in turn saw three identical-looking tables
+              and could not tell whether the page had updated, whether he had clicked the
+              right link, or whether two files genuinely hold the same rows. A preview you
+              cannot attribute is not a check — it is a wall of numbers.
+
+              The filename comes from the pending list rather than a new fetch, and the
+              document id is shown too: two exports of the same statement saved seconds
+              apart have different bytes and identical contents, and the id is the only
+              thing that distinguishes them on screen.
+            */}
             <h3 className="mb-1 text-sm font-semibold">{t("previewTitle")}</h3>
+            <p className="mb-3 rounded bg-blue-50 px-3 py-2 text-xs text-blue-900">
+              {t("previewOf", {
+                filename:
+                  pending.find((d) => d.id === previewingId)?.filename ?? t("previewUnknownFile"),
+                id: (previewingId ?? "").slice(0, 8),
+              })}
+            </p>
             <p className="mb-4 text-xs text-neutral-500">
               {t("previewSummary", {
                 rows: preview.totalRows,

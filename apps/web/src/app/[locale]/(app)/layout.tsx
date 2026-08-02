@@ -39,26 +39,56 @@ export default async function AppLayout({
           </form>
         </div>
       </header>
+      {/*
+        M42 — fourteen flat links grouped into four, by what the owner is DOING. The
+        order follows the phase model the app already teaches (map → verify → decide →
+        run), so the nav reinforces the workflow rather than offering fourteen
+        equal-weight destinations.
+
+        Transactions is deliberately absent: it lives in the Operations sub-nav beside
+        Today / Month / Calendar (owner decision), and adding it here would have made
+        fifteen.
+      */}
       <NavLinks
-        items={[
-          { href: "/", label: t("nav.dashboard") },
-          { href: "/mapping", label: t("nav.mapping") },
-          { href: "/documents", label: t("nav.documents") },
-          { href: "/verification", label: t("nav.verification") },
-          { href: "/allocation", label: t("nav.allocation") },
-          { href: "/operations", label: t("nav.operations") },
-          // M42b — Transactions is deliberately NOT here. It lives in the Operations
-          // sub-nav alongside Today / Month / Calendar (owner decision), which keeps the
-          // main nav at 14 rather than adding a 15th entry to a nav already flagged for
-          // grouping.
-          { href: "/goals", label: t("nav.goals") },
-          { href: "/strategy", label: t("nav.strategy") },
-          { href: "/scenarios", label: t("nav.scenarios") },
-          { href: "/journal", label: t("nav.journal") },
-          { href: "/monitoring", label: t("nav.monitoring") },
-          { href: "/household", label: t("nav.household") },
-          { href: "/fx", label: t("nav.fx") },
-          { href: "/registry", label: t("nav.registry") },
+        groups={[
+          { label: t("nav.dashboard"), items: [{ href: "/", label: t("nav.dashboard") }] },
+          {
+            // Build the picture: what the household HAS, and whether it is trustworthy.
+            label: t("navGroup.picture"),
+            items: [
+              { href: "/mapping", label: t("nav.mapping") },
+              { href: "/documents", label: t("nav.documents") },
+              { href: "/verification", label: t("nav.verification") },
+              { href: "/household", label: t("nav.household") },
+            ],
+          },
+          {
+            // Decide: where money should go, and what it is for.
+            label: t("navGroup.decide"),
+            items: [
+              { href: "/strategy", label: t("nav.strategy") },
+              { href: "/goals", label: t("nav.goals") },
+              { href: "/allocation", label: t("nav.allocation") },
+              { href: "/scenarios", label: t("nav.scenarios") },
+            ],
+          },
+          {
+            // Run: the month-to-month loop and its record.
+            label: t("navGroup.run"),
+            items: [
+              { href: "/operations", label: t("nav.operations") },
+              { href: "/journal", label: t("nav.journal") },
+              { href: "/monitoring", label: t("nav.monitoring") },
+            ],
+          },
+          {
+            // Reference data the engines read but the owner rarely edits.
+            label: t("navGroup.reference"),
+            items: [
+              { href: "/registry", label: t("nav.registry") },
+              { href: "/fx", label: t("nav.fx") },
+            ],
+          },
         ]}
       />
       {household ? (

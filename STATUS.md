@@ -2,7 +2,30 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
-## 🔖 BACKLOG — top navigation has 14 entries (15 with Transactions)
+## ✅ DONE — top navigation grouped (M42, was a backlog item)
+
+Fourteen flat links → **Dashboard + four groups**, ordered by what the owner is doing and
+mirroring the phase model the app already teaches:
+
+| Group | Contains |
+|---|---|
+| **The picture** | mapping, documents, verification, household |
+| **Decide** | strategy, goals, allocation, scenarios |
+| **Run** | operations, journal, monitoring |
+| **Reference** | registry, fx |
+
+Native `<details>`, not a JS dropdown — works without client state, keyboard accessible
+for free, and correct in RTL, three things a hand-rolled menu gets wrong first. The group
+containing the current page opens on arrival. Transactions stays in the Operations
+sub-nav, so this is still 14 destinations, not 15.
+
+### 🔴 P0 CLOSED — identical previews across three cards
+**Owner found and fixed it himself (2026-07-29).** ⚠️ **The cause was never recorded** —
+if it was a parser/table-selection issue, add a fixture per card so it cannot regress
+silently. My ruled-out list (distinct ids/sha/storageKey, `loadFile` correct) is above and
+was accurate; the fault was downstream of it.
+
+## (historical) BACKLOG — top navigation had 14 entries
 
 **Owner, 2026-07-29:** the top nav has grown to 14 items and M42b adds a 15th. It needs
 grouping, not another entry. **Explicitly deferred — finish M42 end-to-end first.**
@@ -264,9 +287,48 @@ dropped from a commit.
 | 8.x | Clicking edit cleared the active filter | Filters carried through edit/cancel; anchors to the row |
 | 5.8 | Drift alert stated a fact, no action | Renders `recommendedAction` — it was in the record and never displayed |
 
-**8.2 — NOT A BUG.** Owner confirmed distinct `sha256` per document and distinct
-`?preview=` ids in the URL. The three FIBI statements are different files whose parsed
-content looks alike. Closed.
+### 🔴 OPEN P0 — three DIFFERENT card statements produce an IDENTICAL preview
+
+**Owner correction, and it overturns my first read:** the three FIBI files are **three
+different credit cards**, not one page saved three times. Identical previews are
+therefore a **real defect**, not correct behaviour.
+
+What is already ruled out:
+- Distinct `Document.id`, distinct `sha256`, distinct `?preview=` in the URL ✅
+- `storageKey = fileStore().put(sha256, …)` — keyed by content hash, so **no file
+  collision** ✅
+- `loadFile()` reads `document.storageKey` by id — **no id mix-up in the service** ✅
+
+So the bytes reaching the parser are almost certainly different, and the PARSER is
+collapsing them. Leading hypothesis: **`parseHtmlGrid` picks the wrong table.** A
+saved FIBI page contains more than one — an account-level summary that is identical
+across all three cards, plus the card-specific detail. If the parser takes the first
+table, or the largest, every card yields the same 72 rows.
+
+**Decisive next step (needs the files, cannot be done from a session without them):**
+1. Open two of the three HTML files directly in a browser. If they show *different* card
+   transactions, the files are fine and the parser is at fault.
+2. Count `<table>` elements in each: `grep -c "<table" FibiSave*.html`.
+3. If >1, make the adapter select the table by header signature (date / description /
+   amount columns) rather than by position, and pin it with a fixture per card.
+
+⚠️ **Do not import these three until this is resolved** — committing them would write one
+card's rows three times, and the duplicate finder matches on (date, amount, description),
+so it would then "helpfully" void two thirds of a legitimate import.
+
+**The UI half is fixed regardless:** the preview now names the file and shows a short
+document id, so a repeated preview is at least *visible* as repeated.
+
+But the owner's objection stands and was the real defect: **the preview never named the
+file it came from.** Three identical-looking tables with no attribution meant he could
+not tell whether the page had updated, whether he had clicked the right link, or whether
+two files genuinely hold the same rows. *A preview you cannot attribute is not a check.*
+It now shows the filename and a short document id, and says outright that two exports
+saved moments apart are different files with identical rows.
+
+Worth keeping as a general lesson: **"correct but unverifiable" is a defect.** The same
+shape as the review-pinned chip and the drift load-failure — the system was right and had
+no way to show it.
 
 ### QA round 3 — remaining
 - **Duplicate transaction rows are REAL DATA, not a display bug.** The pair in the
