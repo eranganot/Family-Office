@@ -241,6 +241,20 @@ active goals have both fields, and whether `goal_projection_real_return_pct` is 
 **4. Bilingual audit.** ~60 keys added in session 31; parity holds, phrasing unaudited.
    Safe, low-risk, good for a short session.
 
+### ⚠️ ONE GATE PER SESSION-BATCH — a lesson from session 32
+Four deploy scripts were written back-to-back, **each assuming the previous had been
+committed. None was.** `missing-docs.ts`, `verification.ts`, `verification/page.tsx` and
+both locale files ended up carrying changes from two or three scripts at once. Since
+`git add <file>` stages a WHOLE file, whichever ran first would have swept in the others'
+work — and would then have been refused by its own unstaged-files guard, because sibling
+changes sat in files outside its `$Files`. One assertion had also gone stale between
+scripts (`d.docType !== null` → `doc.docType === null`).
+
+**Rule: do not write deploy script N+1 until script N has actually been run.** If more
+work happens first, fold it into the pending script rather than stacking a new one.
+Consolidated into `deploy-2026-08-02-session32.ps1`; the five superseded scripts are
+deleted by step 7 of that script.
+
 ### Working rules that cost a gate run each when forgotten
 - Deploy scripts: **ASCII only**, comments are `#` not `//`, `-LiteralPath` for any path
   containing `[locale]` or `(app)`.
