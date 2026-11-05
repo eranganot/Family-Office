@@ -14,7 +14,7 @@
     "@trpc/server": "^11.18.0",
     "@wealthos/domain": "*",
     "superjson": "^2.2.0",
-    "zod": "^4.4.0",
+    "zod": "^4.6.7",
     "@wealthos/db": "*",
     "@wealthos/ingestion": "*",
     "@wealthos/engine-verification": "*",
@@ -26,6 +26,7 @@
     "@wealthos/engine-operations": "*"
   },
   "devDependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
     "@wealthos/config": "*",
     "vitest": "^4.1.0"
   }

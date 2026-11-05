@@ -1,6 +1,6 @@
 import { formatMoney, type Locale } from "@wealthos/i18n";
 import { getTranslations } from "next-intl/server";
-import type { WorkflowState } from "@prisma/client";
+import type { WorkflowState } from "@wealthos/domain";
 import { serverCaller } from "../../../lib/trpc-server";
 import { Card } from "../../../components/fields";
 import { Link } from "../../../i18n/navigation";
