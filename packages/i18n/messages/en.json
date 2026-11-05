@@ -753,7 +753,8 @@
       "advicePriority_2": "Tax — capture benefits first",
       "advicePriority_3": "Growth — progress toward goals first",
       "advicePriority_4": "Balanced (default)"
-    }
+    },
+    "taxYearFallback": "Tax rules for {current} are not in the registry yet. Calculations use the {effective} rules until the {current} rules are seeded and reviewed."
   },
   "goals": {
     "emptyTitle": "No goals yet",

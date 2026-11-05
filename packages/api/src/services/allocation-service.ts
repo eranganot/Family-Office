@@ -72,9 +72,9 @@ export async function runAllocation(db: PrismaClient, householdId: string): Prom
   const allAssumptions = await reg.all(householdId);
   const assumptions = Object.fromEntries(allAssumptions.map((row) => [row.key, row.value]));
 
-  const taxReg = taxRegistry(db).forYear(new Date().getFullYear());
-  const hishtalmut = await taxReg.get("HISHTALMUT_CEILINGS");
-  const pension = await taxReg.get("PENSION_CEILINGS");
+  const taxReg = taxRegistry(db).forCurrentYear();
+  const hishtalmut = await taxReg.getEffective("HISHTALMUT_CEILINGS");
+  const pension = await taxReg.getEffective("PENSION_CEILINGS");
   const boi = await latestBoiRate(db);
   const handoff = await surplusHandoff(db, householdId);
 

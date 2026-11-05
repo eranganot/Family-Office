@@ -43,10 +43,9 @@ export async function runStrategy(db: PrismaClient, householdId: string): Promis
   });
   if (!gate.pass) return { ran: false, snapshotId, dataGap: gate.report };
 
-  const taxYear = new Date().getFullYear();
-  const taxReg = taxRegistry(db).forYear(taxYear);
-  const hishtalmut = await taxReg.get("HISHTALMUT_CEILINGS");
-  const pension = await taxReg.get("PENSION_CEILINGS");
+  const taxReg = taxRegistry(db).forCurrentYear();
+  const hishtalmut = await taxReg.getEffective("HISHTALMUT_CEILINGS");
+  const pension = await taxReg.getEffective("PENSION_CEILINGS");
   const boi = await latestBoiRate(db);
 
   // M30 — align strategy with the household's APPROVED allocation plan: strategy won't

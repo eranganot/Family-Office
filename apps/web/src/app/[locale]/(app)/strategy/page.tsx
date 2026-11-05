@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { TaxYearNotice } from "../../../../components/tax-year-notice";
 import { PhaseGate } from "../phase-gate";
 import { deriveTargetGrowthPct } from "@wealthos/api";
 import { decideAction, dismissRecommendationAction, markImplementedAction, runStrategyAction, saveRiskAction, updateGoalPlanAction } from "../../../../lib/actions/strategy-actions";
@@ -114,6 +115,7 @@ export default async function StrategyPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <TaxYearNotice />
       <Explainer title={t("explainerTitle")} paragraphs={[t("explainer1"), t("explainer2"), t("explainer3")]} />
 
       {plan && narrative && metrics ? (

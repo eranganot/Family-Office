@@ -753,7 +753,8 @@
       "advicePriority_2": "מס — קודם למצות הטבות",
       "advicePriority_3": "צמיחה — קודם התקדמות ליעדים",
       "advicePriority_4": "מאוזן (ברירת המחדל)"
-    }
+    },
+    "taxYearFallback": "כללי המס לשנת {current} עדיין לא הוזנו למערכת. החישובים משתמשים בכללי {effective} עד שכללי {current} יוזנו וייבדקו."
   },
   "goals": {
     "emptyTitle": "עדיין אין יעדים",

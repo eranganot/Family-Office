@@ -52,6 +52,9 @@ export const registryRouter = router({
 
   taxYears: protectedProcedure.query(({ ctx }) => taxRegistry(ctx.db).availableYears()),
 
+  /** WO-1: drives the "using last year's tax rules" notice on allocation, strategy, scenarios. */
+  taxYearStatus: protectedProcedure.query(({ ctx }) => taxRegistry(ctx.db).currentYearStatus()),
+
   taxRules: protectedProcedure
     .input(z.object({ taxYear: z.number().int().min(2000).max(2100) }))
     .query(({ ctx, input }) => taxRegistry(ctx.db).forYear(input.taxYear).list()),
