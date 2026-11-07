@@ -32,3 +32,6 @@ _to_delete/
 e2e/.auth/
 playwright-report/
 test-results/
+
+# Milestone patch exports (m23..m33 were committed by mistake; WO-7). They are in git history.
+/m[0-9]*.patch
