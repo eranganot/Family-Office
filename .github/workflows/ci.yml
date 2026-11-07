@@ -26,6 +26,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # npm 10's arborist crashes ("reading 'edgesOut'", #loadPeerSet) when it
+      # has to resolve this workspace's peer set without a lock; npm 11 does not.
+      # Same version as package.json "packageManager".
+      - run: npm install -g npm@11.21.2
       - run: npm ci
       - run: npx prisma validate
         working-directory: packages/db
