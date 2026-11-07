@@ -4,6 +4,7 @@ import { seedRegistries } from "@wealthos/registry";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Context } from "../src/context";
 import { appRouter } from "../src/index";
+import { throughAllocation } from "./_workflow";
 
 const TEST_URL = process.env["TEST_DATABASE_URL"];
 const d = describe.skipIf(!TEST_URL);
@@ -55,7 +56,7 @@ d("strategy pipeline — full flow against real PostgreSQL", () => {
     // verify the ENGINE gate by checking after partial verification is impossible — so first verify
     // everything, transition, run, then check the refusal path separately via direct service call).
     for (const id of [cashId, cfId, mortId]) await c.verification.verify({ itemId: id });
-    await c.workflow.transition({ to: "STRATEGY", reason: "verified" });
+    await throughAllocation(c, db);
 
     const run = await c.strategy.run();
     expect(run.ran).toBe(true);

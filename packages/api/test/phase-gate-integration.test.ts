@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@wealthos/db";
+import { seedRegistries } from "@wealthos/registry";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { appRouter } from "../src/index";
 import type { Context } from "../src/context";
@@ -18,13 +19,16 @@ async function wipe(): Promise<void> {
       "AccountDetail","LedgerItem","Document","Institution","AuditEvent","WorkflowTransition",
       "FamilyMember","Household" CASCADE
   `);
+  // Generating the allocation plan (the gate into STRATEGY since M26) reads the
+  // tax and assumption registries. Idempotent.
+  await seedRegistries(db);
 }
 
 d("phase gate — full flow against real PostgreSQL", () => {
   beforeEach(wipe);
   afterAll(async () => { if (TEST_URL) await db.$disconnect(); });
 
-  it("blocks VERIFICATION→STRATEGY until every item is verified and suspense is empty; audits transitions", async () => {
+  it("blocks VERIFICATION→ALLOCATION until every item is verified and suspense is empty, ALLOCATION→STRATEGY until the plan is approved; audits transitions", async () => {
     const c = caller();
     const h = await db.household.create({ data: { name: "בית", baseCurrency: "ILS" } });
     const m = await db.familyMember.create({ data: { householdId: h.id, name: "ערן", role: "ADULT" } });
@@ -38,7 +42,11 @@ d("phase gate — full flow against real PostgreSQL", () => {
       ownership: [{ familyMemberId: m.id, sharePct: "100" }],
       initialValuation: { asOf: new Date(), value: "100", currency: "ILS", confidence: 60 },
     });
+    // Since M26 the only way on from VERIFICATION is ALLOCATION.
     await expect(c.workflow.transition({ to: "STRATEGY", reason: "try" })).rejects.toMatchObject({
+      message: "ILLEGAL_TRANSITION",
+    });
+    await expect(c.workflow.transition({ to: "ALLOCATION", reason: "try" })).rejects.toMatchObject({
       message: "VERIFICATION_INCOMPLETE",
     });
 
@@ -51,19 +59,31 @@ d("phase gate — full flow against real PostgreSQL", () => {
       data: { documentId: doc.id, adapterId: "t", adapterVersion: "1", status: "COMPLETED", rawPayload: {} },
     });
     const suspense = await db.suspenseItem.create({ data: { batchId: batch.id, rawData: {}, reason: "X" } });
-    await expect(c.workflow.transition({ to: "STRATEGY", reason: "try" })).rejects.toMatchObject({
+    await expect(c.workflow.transition({ to: "ALLOCATION", reason: "try" })).rejects.toMatchObject({
       message: "SUSPENSE_NOT_EMPTY",
     });
 
     // Resolve suspense → gate opens
     await c.suspense.discard({ id: suspense.id, note: "junk" });
-    const updated = await c.workflow.transition({ to: "STRATEGY", reason: "verified all" });
+    const inAllocation = await c.workflow.transition({ to: "ALLOCATION", reason: "verified all" });
+    expect(inAllocation.workflowState).toBe("ALLOCATION");
+
+    // No approved deployment plan yet: STRATEGY stays shut.
+    await expect(c.workflow.transition({ to: "STRATEGY", reason: "try" })).rejects.toMatchObject({
+      message: "ALLOCATION_PLAN_NOT_APPROVED",
+    });
+    const run = await c.allocation.generate();
+    if (run.status !== "APPROVED") {
+      await db.allocationPlan.update({ where: { id: run.planId }, data: { status: "APPROVED" } });
+    }
+    const updated = await c.workflow.transition({ to: "STRATEGY", reason: "plan decided" });
     expect(updated.workflowState).toBe("STRATEGY");
 
     const transitions = await db.workflowTransition.findMany({ orderBy: { at: "asc" } });
     expect(transitions.map((t) => `${t.fromState}->${t.toState}`)).toEqual([
       "MAPPING->VERIFICATION",
-      "VERIFICATION->STRATEGY",
+      "VERIFICATION->ALLOCATION",
+      "ALLOCATION->STRATEGY",
     ]);
 
     // Verify/reject round trip is reflected in the assessment
