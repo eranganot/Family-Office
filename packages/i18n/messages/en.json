@@ -51,7 +51,8 @@
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",
-    "error": "Incorrect email or password"
+    "error": "Incorrect email or password",
+    "locked": "Too many failed sign-ins. Try again in 15 minutes."
   },
   "dashboard": {
     "next": {

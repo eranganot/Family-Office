@@ -3,10 +3,10 @@
 import { useActionState } from "react";
 import { login } from "../../../lib/auth-actions";
 
-type Labels = { email: string; password: string; submit: string; error: string };
+type Labels = { email: string; password: string; submit: string; error: string; locked: string };
 
 export function LoginForm({ locale, labels }: { locale: string; labels: Labels }) {
-  const [state, action, pending] = useActionState(login, { error: false });
+  const [state, action, pending] = useActionState(login, { error: false } as { error: boolean; locked?: boolean });
   return (
     <form action={action} className="flex flex-col gap-4">
       <input type="hidden" name="locale" value={locale} />
@@ -30,7 +30,7 @@ export function LoginForm({ locale, labels }: { locale: string; labels: Labels }
           className="rounded-lg border border-neutral-300 px-3 py-2"
         />
       </label>
-      {state.error ? <p className="text-sm text-red-600">{labels.error}</p> : null}
+      {state.error ? <p className="text-sm text-red-600">{state.locked ? labels.locked : labels.error}</p> : null}
       <button
         type="submit"
         disabled={pending}
