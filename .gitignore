@@ -18,3 +18,17 @@ coverage/
 deploy-*.ps1
 finish-*.ps1
 _deploy-archive/
+
+# Local agent/session state -- noise on every git status, and noise is where a
+# real modified file hides. Portable copies live in the account skill library.
+.claude/
+
+# Staging for files the device bridge cannot delete; remove by hand.
+_to_delete/
+
+.claude/settings.local.json
+
+# Playwright session saved by e2e/global-setup.ts (a live login cookie)
+e2e/.auth/
+playwright-report/
+test-results/

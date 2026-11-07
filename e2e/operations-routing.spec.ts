@@ -19,8 +19,13 @@ test.describe("operations IA", () => {
     await page.goto(`${HE}/operations`);
 
     // The four sub-nav tabs exist and Today is current.
-    for (const tab of ["היום", "החודש הזה", "יומן", "תנועות"]) {
-      await expect(page.getByRole("link", { name: tab })).toBeVisible();
+    // Matched by name AND destination: the main nav also has a "יומן" (journal) and a
+    // "היום — מה דורש טיפול" link, so a name-only locator matched two elements.
+    for (const [tab, href] of [
+      ["היום", "/operations"], ["החודש הזה", "/operations/month"],
+      ["יומן", "/operations/calendar"], ["תנועות", "/transactions"],
+    ] as const) {
+      await expect(page.locator(`a[href="${HE}${href}"]`).getByText(tab, { exact: true })).toBeVisible();
     }
 
     // Regression: these sections MOVED off Today. Their reappearance means a section was
