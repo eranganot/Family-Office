@@ -6,11 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@wealthos/domain": "*",
-    "next": "^16.2.0",
+    "next": "^16.4.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "recharts": "^2.15.0",
@@ -18,7 +19,7 @@
     "@wealthos/i18n": "*",
     "jose": "^6.0.0",
     "@node-rs/argon2": "^2.0.0",
-    "zod": "^4.4.0",
+    "zod": "^4.6.7",
     "@wealthos/api": "*",
     "@trpc/server": "^11.18.0",
     "superjson": "^2.2.0",

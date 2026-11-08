@@ -13,8 +13,8 @@
   "dependencies": {
     "@wealthos/domain": "*",
     "papaparse": "^5.5.0",
-    "zod": "^4.4.0",
-    "pdfjs-dist": "^5.4.0"
+    "zod": "^4.6.7",
+    "pdfjs-dist": "^6.5.438"
   },
   "devDependencies": {
     "@types/papaparse": "^5.3.0",

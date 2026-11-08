@@ -1,16 +1,21 @@
 "use server";
 
 import { verify } from "@node-rs/argon2";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getEnv } from "./env";
+import { clientAddress, isLocked, recordFailure, recordSuccess } from "./login-limit";
 import { createSessionToken, SESSION_COOKIE } from "./session";
 
 export async function login(
   _prev: { error: boolean },
   formData: FormData,
-): Promise<{ error: boolean }> {
+): Promise<{ error: boolean; locked?: boolean }> {
   const env = getEnv();
+  // WO-4: refuse before verifying once the address (or everyone) is over the limit.
+  const h = await headers();
+  const address = clientAddress(h.get("x-forwarded-for"), h.get("x-real-ip"));
+  if (isLocked(address)) return { error: true, locked: true };
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const locale = String(formData.get("locale") ?? "he");
@@ -18,7 +23,11 @@ export async function login(
   const emailOk = email === env.AUTH_EMAIL.toLowerCase();
   // Always run the hash verification to keep timing uniform.
   const passwordOk = await verify(env.AUTH_PASSWORD_HASH, password).catch(() => false);
-  if (!emailOk || !passwordOk) return { error: true };
+  if (!emailOk || !passwordOk) {
+    recordFailure(address);
+    return { error: true };
+  }
+  recordSuccess(address);
 
   const token = await createSessionToken(email, env.AUTH_SECRET);
   const jar = await cookies();

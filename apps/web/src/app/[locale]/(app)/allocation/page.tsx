@@ -1,4 +1,5 @@
 import { formatMoney, type Locale } from "@wealthos/i18n";
+import { TaxYearNotice } from "../../../../components/tax-year-notice";
 import { getTranslations } from "next-intl/server";
 import { applyPresetAction, editAllocationAction, generatePlanAction } from "../../../../lib/actions/allocation-actions";
 import { transitionAction } from "../../../../lib/actions/workflow-actions";
@@ -129,6 +130,7 @@ export default async function AllocationPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <TaxYearNotice />
       <Card title={t("title")}>
         <p className="mb-2 text-sm text-neutral-600">{t("introCart")}</p>
         <p className="mb-3 rounded-lg bg-blue-50/60 px-3 py-2 text-xs text-blue-800">{t("basisNote")}</p>

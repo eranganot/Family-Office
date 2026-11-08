@@ -2,15 +2,100 @@
 
 > Read this first in any new session. Update after every meaningful change.
 
+> _Weekly status review **2026-10-12**: **no commits since `8b93845` (2026-08-02) — 71 days / ten weeks quiet** ("Current state" date not bumped). ✅ The `.git/index.lock` the 10-05 run left is **gone** (checked 10-12; this run used only `--no-optional-locks`). Ops table aged +1 week; nothing closed. e2e.yml + SMOKE-M37/38a/38b/38c.md still untracked. Same finding: sessions 32-33 are "unverified and kept" by default._
+>
+> _(2026-10-05 review:) Weekly status review **2026-10-05**: **no commits since `8b93845` (2026-08-02) — 64 days / nine weeks quiet** ("Current state" date not bumped). `git diff --ignore-all-space --shortstat` = 2 files (`.gitignore` + `STATUS.md`): the 146 modified files are still CRLF noise (ninth review). Untracked unchanged: `e2e.yml` + 4 `docs/SMOKE-*.md`. Ops ages +1 week, nothing closed. ⚠️ This run created `.git/index.lock` again (plain `git status` first) — see Ops table. Same finding: QA M41 #6 (expected: a REFUSAL), revert, or write here that it ships unverified._
+>
+> _(2026-09-28 review:) Weekly status review **2026-09-28** (sandbox DOWN — git read from `.git/logs/HEAD` only; working
+> tree NOT checked, so the CRLF-noise / untracked-file findings below are carried from 09-21, not
+> re-verified): **no commits since `8b93845` (2026-08-02) — 57 days / eight weeks quiet.** "Current
+> state" date not bumped. ✅ The `.git/index.lock` the 09-21 run left here is **gone** — Eran cleared
+> it. Ops table aged +1 week; nothing closed. Same finding as the last eight reviews: sessions
+> 32-33 are "unverified and kept" by default. **QA M41 #6 (expected: a REFUSAL), revert, or write
+> here that it ships unverified.**_
+>
+> _(2026-09-21 review, collapsed below:)_ _**no commits since `8b93845` (2026-08-02) — the repo
+> has been quiet for 50 days / seven weeks.** The "Current state" date is therefore **NOT bumped**
+> (no commits that day); this is a staleness review only. Working tree still carries **146 modified
+> files whose real diff is EMPTY** — `git diff --ignore-all-space --shortstat` reduces to **2 files**
+> (`.gitignore` + `STATUS.md`), i.e. unchanged CRLF noise, not work in progress, for the **seventh**
+> review running. Untracked and unchanged for seven weeks: `.github/workflows/e2e.yml` +
+> `docs/SMOKE-M37/38a/38b/38c.md`. **~40 commits of sessions 32-33 have now been awaiting owner QA
+> for seven weeks.** The state is unchanged and so is the sentence, which is itself the finding:
+> **the repo's actual state is "unverified and kept" — a choice nobody has made out loud, and seven
+> weeks is long enough that it is now the default rather than the delay.** The M41 #6 result whose
+> correct answer is a **REFUSAL** remains the single likeliest thing to be misread as success, and
+> every reader of it is long since a cold reader. **QA it, revert it, or write in this file that it
+> ships unverified and why.**_
+>
+> _⚠️ 2026-09-21: **the 09-14 rule was broken by this run and the lock is back.** The review's first
+> git call used plain `git status` before switching to `--no-optional-locks`. An empty
+> `.git/index.lock` sits here again and the sandbox cannot delete it: **Eran must remove
+> `C:\dev\Family Office Replacement\.git\index.lock` before his next commit** (same in AdaptiveFit,
+> InvestWise Pro and Bidspirit; Job Hunter escaped). The rule was correct; applying it from the
+> second call onward was not enough. It belongs at step 0 of the review procedure._
+>
+> _(2026-09-14 review, collapsed: same finding; its sandbox `git status` left an undeletable
+> `.git/index.lock` here, which Eran cleared the same day — that is what produced the
+> `--no-optional-locks` rule above.)_
+>
+> _(2026-08-03 → 08-31 reviews, collapsed: gate-not-run markers from sessions 32-33 corrected
+> against git, Tier 3 #4 marked done, the aged OPS ACTIONS table introduced, the same CRLF-noise
+> finding on each of four passes.)_
+
+## 🔴 OPS ACTIONS (Eran only) — with age
+
+_Dates are when the item was FIRST flagged, carried forward, never reset._
+
+| first flagged | age | item |
+|---|---|---|
+| 2026-08-02 | **10 weeks — BLOCKING** | 🔴 **Owner QA on sessions 32–33 has not happened.** ~40 commits — M41 #6 surplus→deployment, phase-gate alignment, verification honesty, per-item document attribution, goals in the health score, the M43 Hebrew audit — are all built, gated, committed and **unverified on live for seven weeks**. This is the single item blocking the repo; nothing else can be sequenced behind an unvalidated batch this size. Start with the M41 #6 check below, because **its expected answer is a REFUSAL** and a "success" reading of it is the likeliest way this QA goes wrong. |
+| 2026-08-02 | **10 weeks — BLOCKING** | 🔴 **`runAllocation`'s month-selection and ready gate are still uncovered by tests** — named in STATUS as "the single biggest test gap in the session-32 work" and untouched since. It is DB-bound, the engine half is covered, and the service half is guarded only by a deploy script's source assertions. Seven weeks on, it is a deliberate gap, not a pending one — close it, or write down here that it stays open and why. A test gap you have declined to close twice is a decision; record it as one. |
+| 2026-08-03 | **10 weeks — BLOCKING** _(still untracked 10-12)_ | ⚠️ **`.github/workflows/e2e.yml` is still UNTRACKED.** An e2e workflow that is not committed is not running — CI has no e2e coverage and the file's presence in the tree makes it look like it does. Commit it or delete it. Same for the four untracked `docs/SMOKE-M37/38a/38b/38c.md`. |
+| 2026-08-03 | **10 weeks — BLOCKING** | ⚠️ Four commits (`ce40f8e` → `5c0741a`) still carry the **identical message** *"fix: phase locks, document honesty, goals in the health score, per-item attribution"* — almost certainly one gate script re-run four times. Harmless to the tree; a history where four commits claim the same work cannot be read later. (InvestWise shipped 48 commits this week with **no** duplicate-message pair — the first clean week for that artefact in five reviews, which suggests its ship script was fixed and WealthOS's was not. Since WealthOS has not committed since 08-02 the bug here is untested rather than absent; it will reappear on the next gated batch unless the script is checked first.) |
+| 2026-07-28 | **11 weeks — BLOCKING** | ⚠️ **An owner action is buried at the very bottom of this file, outside this table** — *"verify the IL 2025/2026 tax matrices at `/registry` and flip `ownerReviewed`"* — the closing line of the M39 entry (~2026-07-28), matching the `ownerReviewed=false` seeds noted higher up. It has never appeared in a review digest because nothing scans the tail, and every tax matrix in production is still unsigned-off. Either do it, or lift it into this table where it will be aged like everything else. |
+| 2026-10-05 | **CLOSED 2026-10-12** | ✅ `.git/index.lock` is gone (verified 10-12). |
+
 ---
 
-# 🚀 START HERE — Tier 3 #1 is BUILT, GATE NOT YET RUN
+# 🚀 START HERE — sessions 32–33 ALL GATED AND ON MAIN. NEXT = OWNER QA.
 
-**Run `session-kickoff` first.** Then run `.\deploy-2026-08-02-surplus-deployment.ps1`
-(session 32 built it with **no sandbox** — the Linux VM would not start, so nothing was
-typechecked, tested or linted here. The script is the first real gate this code has met).
+**Run `session-kickoff` first.** Everything the block below describes as "BUILT, gate not
+run" **has since been gated and committed** — ~40 commits landed 2026-08-02, ending at
+`8b93845` (M43 Hebrew phrasing audit). Nothing on 2026-08-03. The narrative below is kept
+because it records the reasoning, but the *state* is: **built, gated, committed, awaiting
+the owner's QA on live.**
 
-### ⚠️ M41 #6 — surplus → deployment engine. BUILT 2026-08-02, UNVERIFIED.
+| Section below | Landed as |
+|---|---|
+| M41 #6 surplus → deployment | `c90298a` |
+| Phase-gate misalignment | `d78d59d`, `826ebad` |
+| Verification honesty + operations loop | `826ebad` |
+| Per-item document attribution | `789e06e` |
+| Tier 3 #2 — goals in the health score | `b72b35e` |
+| Tier 3 #4 — Hebrew phrasing audit | `8b93845` |
+| Combined re-runs of the four above | `ce40f8e`, `180d159`, `4f48a9f`, `5c0741a` |
+
+⚠️ **Four commits carry the identical message** *"fix: phase locks, document honesty,
+goals in the health score, per-item attribution"* (`ce40f8e` → `5c0741a`). Almost
+certainly a gate script re-run four times rather than four distinct changes — but a
+history where four commits claim the same work cannot be read later. Worth a look;
+harmless to the tree either way.
+
+### ⚠️ THE QA THAT MATTERS MOST — M41 #6's expected answer is a REFUSAL
+Re-stated here because it is the one result that is easy to misread as success: on this
+household every closed month is provisional, so `allocationHandoffReadiness` returns
+`SURPLUS_PROVISIONAL` and **zero surplus is deployed.** If "Free to deploy" GROWS on the
+first regenerate, **the ready gate leaked** — `verifiedSurplusBase` is populated on
+refusals too, so the number's presence must never be the gate.
+
+### ⚠️ STILL UNCOVERED BY TESTS (unchanged by the commits)
+No test covers `runAllocation`'s month-selection or the ready gate — it is DB-bound and
+those suites need the shared test DB. The engine half is covered; the service half is
+guarded only by the deploy script's source assertions. **This is the single biggest test
+gap in the session-32 work.**
+
+### ✅ M41 #6 — surplus → deployment engine. Committed `c90298a`; owner QA pending.
 The last genuinely unfinished M41 item, and the only one that changes how much money the
 app proposes deploying. Nine files, no migration, no lockfile change, **no new assumption
 key** (pins stay valid, no recompute).
@@ -44,7 +129,7 @@ Decisions encoded (do not silently undo any of these):
 DB-bound; those suites need the shared test DB). The engine half is covered; the
 service half is currently guarded only by the deploy script's source assertions.
 
-### 🔴 PHASE-GATE MISALIGNMENT — found in QA 2026-08-02, FIXED, gate not yet run
+### ✅ PHASE-GATE MISALIGNMENT — found in QA 2026-08-02, fixed, gated, committed
 `deploy-2026-08-02-phase-gate-alignment.ps1`. No migration, no lockfile, no assumption key.
 
 **Owner report:** allocation plan approved, page says *"מוכן להמשך → המשך לאסטרטגיה"*, but
@@ -102,7 +187,7 @@ A negative check for the old "four-phase" wording is fragile the moment the file
 mistake. And deploy scripts are ASCII-only, so the arrows in that line can never be
 matched; the bolded phase name can.
 
-### 🔴 VERIFICATION HONESTY + OPERATIONS VISIBILITY — QA 2026-08-02, FIXED, gate not run
+### ✅ VERIFICATION HONESTY + OPERATIONS VISIBILITY — QA 2026-08-02, fixed, gated, committed
 `deploy-2026-08-02-verification-honesty.ps1`. No migration, no lockfile, no assumption key.
 Run AFTER the phase-gate script.
 
@@ -141,7 +226,7 @@ answers *"what does this household need from me this week"*.
 **Also fixed:** `journey.VERIFICATION` said verification opens "the gate to strategy" —
 it opens the gate to **allocation**. Same pre-M25 stale-copy family as the phase locks.
 
-### ✅ PER-ITEM DOCUMENT ATTRIBUTION — BUILT 2026-08-02, gate not run
+### ✅ PER-ITEM DOCUMENT ATTRIBUTION — BUILT 2026-08-02, gated, committed `789e06e`
 `deploy-2026-08-02-doc-attribution.ps1`. No migration, no lockfile, no assumption key.
 
 Matching was by TYPE across the household, so **one bank statement marked every bank
@@ -192,7 +277,7 @@ reach it *"once recommendations are in place"*, and nothing enforces that; a hou
 enter monitoring with zero recommendations and nothing to monitor. Copy now matches the
 behaviour. **Whether the behaviour should change is an owner decision, not taken here.**
 
-### ✅ TIER 3 #2 — goals wired into the health score. BUILT 2026-08-02, gate not run
+### ✅ TIER 3 #2 — goals wired into the health score. Committed `b72b35e`
 `deploy-2026-08-02-goals-health.ps1`. No migration, no lockfile, **no new assumption key**.
 
 **⚠️ THE RECORDED BLOCKER WAS FALSE.** M42 left goals unmeasured and wrote down the
@@ -232,7 +317,7 @@ difference is the point, not duplication to tidy away.
 required amounts. If it stays at 85%, the goals component is refusing — check whether the
 active goals have both fields, and whether `goal_projection_real_return_pct` is positive.
 
-### ✅ TIER 3 #4 — Hebrew phrasing audit. BUILT 2026-08-02.
+### ✅ TIER 3 #4 — Hebrew phrasing audit. Committed `8b93845` — Tier 3 #4 is DONE.
 `deploy-2026-08-02-bilingual-audit.ps1`. Key parity always held; the phrasing had never
 been read *as Hebrew*, which catches a different class of fault.
 
@@ -265,14 +350,19 @@ Recorded so the next session doesn't inherit them:
 **Process note:** five rounds went into the expected-documents card *after* proving it
 gates nothing. When a surface is confirmed non-blocking, stop working on it and say so.
 
-### Tier 3 — remaining, in this order
+### Tier 3 — remaining
 
-**3. Telemetry projection (M42).** Acceptance %, completion %, time-to-complete,
-   dismissal histogram — `ActionEvent` already records every transition, so the data
-   exists. **Owner deferred the dashboard**, so build the endpoint, not the charts.
+**3. Telemetry projection (M42) — the ONLY Tier 3 item left.** Acceptance %,
+   completion %, time-to-complete, dismissal histogram — `ActionEvent` already records
+   every transition, so the data exists. **Owner deferred the dashboard**, so build the
+   endpoint, not the charts.
 
-**4. Bilingual audit.** ~60 keys added in session 31; parity holds, phrasing unaudited.
-   Safe, low-risk, good for a short session.
+~~4. Bilingual audit~~ — ✅ **done**, shipped as `8b93845` (2026-08-02). See the Tier 3 #4
+section above; it also added a **placeholder-parity** gate check, since key parity alone
+never caught a dropped `{placeholder}`.
+
+**Then: the form-106 + mortgage-schedule parsers**, which are blocked on the ledger
+factory (see the 🔵 NEXT section below) — not on anything Tier 3.
 
 ### ⚠️ ONE GATE PER SESSION-BATCH — a lesson from session 32
 Four deploy scripts were written back-to-back, **each assuming the previous had been
@@ -953,7 +1043,7 @@ remaining sections: `setOpportunityStatusAction` / `runOpportunitiesAction`
 `upsertCategoryAction` / `CategoryPicker` (categories), `BehavioralBars` /
 `SurplusWaterfall` / `CategoryTable` (month).
 
-## Current state (2026-07-29, session 31) — M41d ⚠️ BUILT, GATE NOT YET RUN
+## Current state (2026-07-29, session 31) — M41d ✅ GATED AND ON MAIN (`86f141f`)
 
 - **M41d — two defects from M41c QA. `deploy-m41d.ps1`. NO MIGRATION, NO NEW KEY.**
 - **M41c's drift fix WORKS** — production shows two HIGH `SURPLUS_DRIFT` alerts at
@@ -977,7 +1067,7 @@ shown for a failed load). **Every one was a defensible-looking silence.** Before
 any exclusion or fallback, ask what it looks like when it fires on THIS household's real
 data — and whether the owner could tell that outcome apart from a working feature.
 
-## Current state (2026-07-29, session 31) — M41c ⚠️ BUILT, GATE NOT YET RUN
+## Current state (2026-07-29, session 31) — M41c ✅ GATED AND ON MAIN (`5ac2b0d`)
 
 - **M41c — drift baseline fix + the review/projection UI. `deploy-m41c.ps1`.
   NO MIGRATION, NO LOCKFILE CHANGE, NO NEW ASSUMPTION KEY** (pins intact, no recompute).
@@ -1016,7 +1106,7 @@ OPEN yet retains its snapshot id — that is the intended behaviour, not a leak)
 3. `projection_min_closed_months` is 3 and only 2 months are closed, so the EOY
    trajectory legitimately refuses until a third month closes.
 
-## Current state (2026-07-29, session 31) — M41b ⚠️ BUILT, GATE NOT YET RUN
+## Current state (2026-07-29, session 31) — M41b ✅ GATED AND ON MAIN (`bec41d2`)
 
 - **M41b — monthly review snapshot, surplus drift alerts, allocation hand-off.
   `deploy-m41b.ps1`. ⚠️ CONTAINS A MIGRATION
@@ -1055,7 +1145,7 @@ OPEN yet retains its snapshot id — that is the intended behaviour, not a leak)
 3. **No tests for `review-service`** — it is DB-bound, and those suites run with
    `fileParallelism` disabled against a shared test DB.
 
-## Current state (2026-07-29, session 31) — M41a ⚠️ BUILT, GATE NOT YET RUN
+## Current state (2026-07-29, session 31) — M41a ✅ GATED AND ON MAIN (`a6b9854`)
 
 - **M41a — EOY projection (current vs optimised) + the Action Center RTL fix.
   `deploy-m41a.ps1`. NO MIGRATION. NO LOCKFILE CHANGE.** Apply after M40c part 2.

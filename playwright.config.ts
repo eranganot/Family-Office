@@ -17,6 +17,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
+  // WO-2: one sign-in, reused by every test (e2e/global-setup.ts).
+  globalSetup: "./e2e/global-setup.ts",
   // A smoke suite that takes minutes is a smoke suite that gets skipped.
   timeout: 30_000,
   expect: { timeout: 5_000 },
@@ -30,6 +32,8 @@ export default defineConfig({
     // Traces only on a retry: full traces on every run bloat CI artifacts for no gain.
     trace: "on-first-retry",
     locale: "he-IL",
+    storageState: "e2e/.auth/state.json",
+    ...(process.env["E2E_CHROMIUM"] ? { launchOptions: { executablePath: process.env["E2E_CHROMIUM"] } } : {}),
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   /*

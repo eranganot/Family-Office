@@ -1,4 +1,5 @@
 import { formatDate, formatMoney, type Locale } from "@wealthos/i18n";
+import { TaxYearNotice } from "../../../../components/tax-year-notice";
 import { getTranslations } from "next-intl/server";
 import { runMonteCarloAction, runScenarioAction } from "../../../../lib/actions/scenario-actions";
 import { Card, Field, Select, SubmitButton, TextInput } from "../../../../components/fields";
@@ -83,6 +84,7 @@ export default async function ScenariosPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <TaxYearNotice />
       <Card title={t("title")}>
         {error ? <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{decodeURIComponent(error)}</p> : null}
         <p className="mb-4 text-xs text-neutral-500">{t("hint")}</p>

@@ -28,7 +28,7 @@ const OverridesSchema = z.object({
  *  hishtalmut exempt after vesting, pension income-taxed at a conservative effective rate. */
 async function computeTaxDrawdown(db: Parameters<typeof assumptionRegistry>[0], householdId: string) {
   const reg = assumptionRegistry(db);
-  const cgt = await taxRegistry(db).forYear(new Date().getFullYear()).get("CAPITAL_GAINS");
+  const cgt = await taxRegistry(db).forCurrentYear().getEffective("CAPITAL_GAINS");
   const gainFraction = Number((await reg.current("taxable_gain_fraction", householdId)).value);
   const pensionPct = Number((await reg.current("pension_withdrawal_effective_tax_pct", householdId)).value);
   const cgtPct = Number((cgt.payload as { realGainIndividualPct: number }).realGainIndividualPct);

@@ -1,0 +1,88 @@
+name: E2E smoke
+
+# Runs against the DEPLOYED app, so it cannot live in ci.yml — that job runs before
+# anything is deployed and would have nothing to point at.
+#
+# Triggers, in order of usefulness:
+#  - workflow_run: fires after CI succeeds on main, by which time Railway's GitHub
+#    auto-deploy is building. The wait below covers the build; it is a smoke test, so a
+#    few minutes of latency costs nothing.
+#  - schedule: catches breakage that arrives WITHOUT a deploy — an expired session, a
+#    migration applied out of band, a Railway restart that lost an env var.
+#  - workflow_dispatch: for running it by hand after a manual deploy.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  schedule:
+    # 06:15 Asia/Jerusalem-ish. Before the owner's morning, after any overnight cron.
+    - cron: "15 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  # WO-2: secrets are not readable in a job-level `if`, so a tiny job reports
+  # whether the login secrets exist; without them the smoke is skipped, not red.
+  secrets-present:
+    runs-on: ubuntu-latest
+    outputs:
+      ok: ${{ steps.check.outputs.ok }}
+    steps:
+      - id: check
+        env:
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then echo "ok=true" >> "$GITHUB_OUTPUT";
+          else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "::notice::Set E2E_EMAIL and E2E_PASSWORD (Settings > Secrets and variables > Actions) to enable the e2e smoke."; fi
+
+  smoke:
+    needs: secrets-present
+    # Never smoke-test a build that failed its own gate: the failure would be reported
+    # against routing when the cause was upstream, which is worse than not running.
+    if: >-
+      needs.secrets-present.outputs.ok == 'true' && (
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      E2E_BASE_URL: https://wealthos-web-production-c1f7.up.railway.app
+      # WO-2: every page under test is behind login (e2e/global-setup.ts signs in).
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Chromium only. The app is used in one browser by one household; installing three
+      # engines would triple the runtime to test a matrix nobody is on.
+      - run: npx playwright install --with-deps chromium
+
+      # Railway builds after the push that triggered CI. Wait for the app to answer its
+      # own health check rather than guessing at a sleep duration — a fixed sleep is
+      # either too short on a slow build or wasted time on a fast one.
+      - name: Wait for the deployment to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "$E2E_BASE_URL/api/health" > /dev/null; then
+              echo "healthy after ${i} attempt(s)"; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::$E2E_BASE_URL/api/health did not respond within 5 minutes"
+          exit 1
+
+      - run: npm run e2e
+
+      # Traces are configured on-first-retry, so this only has content when something
+      # actually failed and the retry also failed.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

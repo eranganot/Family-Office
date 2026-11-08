@@ -36,7 +36,9 @@ d("registries against real PostgreSQL", () => {
   it("hishtalmut + purchase-tax matrices carry sources and review status", async () => {
     const h = await taxRegistry(db).forYear(2026).get("HISHTALMUT_CEILINGS");
     expect(h.payload.selfEmployedExemptDepositAnnualILS).toBe(20_566);
-    expect(h.payload.meta.ownerReviewed).toBe(false); // pending Eran's sign-off
+    // Signed off by Eran on 2026-07-29 (il-2026.ts); the test still expected the
+    // pre-review state and failed on every DB run since.
+    expect(h.payload.meta.ownerReviewed).toBe(true);
     const p = await taxRegistry(db).forYear(2026).get("PURCHASE_TAX");
     expect(p.payload.singleHome[0]).toEqual({ upToAnnualILS: 1_978_745, ratePct: 0 });
   });

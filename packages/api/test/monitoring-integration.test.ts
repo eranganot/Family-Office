@@ -4,6 +4,7 @@ import { seedRegistries } from "@wealthos/registry";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Context } from "../src/context";
 import { appRouter } from "../src/index";
+import { throughAllocation } from "./_workflow";
 
 const TEST_URL = process.env["TEST_DATABASE_URL"];
 const d = describe.skipIf(!TEST_URL);
@@ -47,7 +48,7 @@ d("M9 monitoring loop — cycle, drift, staleness, re-evaluation (real PostgreSQ
     await c.workflow.transition({ to: "VERIFICATION", reason: "map done" });
     const items = await db.ledgerItem.findMany({ where: { householdId: h.id } });
     for (const it of items) await c.verification.verify({ itemId: it.id });
-    await c.workflow.transition({ to: "STRATEGY", reason: "verified" });
+    await throughAllocation(c, db);
 
     const run = await c.strategy.run();
     expect(run.ran).toBe(true); // establishes the PRE_STRATEGY baseline

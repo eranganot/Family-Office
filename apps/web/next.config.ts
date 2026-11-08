@@ -4,10 +4,25 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
-  // Type errors are gated by `npm run typecheck` (turbo + CI), not duplicated in the build.
-  typescript: { ignoreBuildErrors: true },
+  // WO-3 (2026-11-05): no ignoreBuildErrors. Railway builds on every push to
+  // main without waiting for CI, so the build itself is the last type gate.
   transpilePackages: ["@wealthos/domain", "@wealthos/i18n", "@wealthos/api", "@wealthos/db", "@wealthos/ingestion", "@wealthos/engine-verification", "@wealthos/registry", "@wealthos/engine-goals", "@wealthos/engine-strategy", "@wealthos/engine-scenario", "@wealthos/engine-monitoring", "@wealthos/engine-operations"],
   poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
   // pdfjs-dist must NOT be bundled. `@wealthos/ingestion` is transpiled (above), so
   // Next follows its dynamic `import("pdfjs-dist/legacy/build/pdf.mjs")` into the
   // server bundle, where pdfjs's worker/optional-canvas resolution breaks at runtime.

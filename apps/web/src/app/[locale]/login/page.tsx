@@ -14,6 +14,7 @@ export default async function LoginPage({ params }: { params: Promise<{ locale: 
           password: t("password"),
           submit: t("submit"),
           error: t("error"),
+          locked: t("locked"),
         }}
       />
     </main>
