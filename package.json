@@ -23,7 +23,7 @@
     "@playwright/test": "^1.62.1",
     "eslint": "^10.6.0",
     "eslint-import-resolver-typescript": "^4.4.5",
-    "eslint-plugin-boundaries": "^6.0.0",
+    "eslint-plugin-boundaries": "^7.4.2",
     "prettier": "^3.6.0",
     "turbo": "^2.10.3",
     "typescript": "^5.9.0",
