@@ -14,7 +14,7 @@
     "next": "^16.4.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "recharts": "^2.15.0",
+    "recharts": "^3.10.1",
     "next-intl": "^4.13.0",
     "@wealthos/i18n": "*",
     "jose": "^6.0.0",
