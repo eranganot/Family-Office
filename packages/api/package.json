@@ -28,6 +28,6 @@
   "devDependencies": {
     "@prisma/adapter-pg": "^7.10.1",
     "@wealthos/config": "*",
-    "vitest": "^4.1.0"
+    "vitest": "^5.1.0"
   }
 }
