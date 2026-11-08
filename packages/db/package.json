@@ -23,7 +23,7 @@
   "devDependencies": {
     "@wealthos/config": "*",
     "prisma": "^7.10.1",
-    "@types/node": "^22",
+    "@types/node": "^26",
     "vitest": "^4.1.0"
   }
 }
