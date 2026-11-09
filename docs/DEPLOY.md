@@ -41,13 +41,12 @@ DATABASE_URL=... npm run monitor --workspace=@wealthos/worker
 
 ### How the `wealthos-worker` service is actually configured
 
-The worker service uses **`apps/worker/railway.json`** (start command `npm run monitor …`,
-`cronSchedule` `0 6 * * *` UTC, `restartPolicyType: NEVER`) rather than the root config. It was
-created with `railway up --service wealthos-worker` (deploying with that config as the root
-`railway.json`) and its only variable is `DATABASE_URL=${{Postgres.DATABASE_URL}}`. To redeploy it,
-deploy with `apps/worker/railway.json` in place of the root `railway.json`, or set the worker
-service's Config-file path to `apps/worker/railway.json` in the dashboard. `0 6 * * *` UTC ≈ 09:00
-Asia/Jerusalem.
+Both services are defined in **`.railway/railway.ts`** (infrastructure as code; the old
+`railway.json` files are gone because Config as Code stopped on 2026-12-01). The worker runs
+`npm run monitor --workspace=@wealthos/worker` on cron `0 6 * * *` UTC (about 09:00
+Asia/Jerusalem) with restart policy `NEVER`. Its only variable is `DATABASE_URL`. It has no GitHub
+source; redeploy it with `railway up --service wealthos-worker`. Settings change only through
+`railway config plan` and then `railway config apply`.
 
 ## Database backups (D4) � the ledger is the family's financial memory
 
