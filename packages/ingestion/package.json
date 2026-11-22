@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@wealthos/domain": "*",
-    "papaparse": "^5.5.0",
+    "papaparse": "^5.7.1",
     "zod": "^4.6.7",
     "pdfjs-dist": "^6.5.438"
   },
