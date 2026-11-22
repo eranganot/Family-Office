@@ -20,14 +20,14 @@
     "postinstall": "npm run generate --workspace=@wealthos/db --if-present && node scripts/ensure-platform-binaries.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
-    "eslint": "^10.6.0",
+    "@playwright/test": "^1.65.1",
+    "eslint": "^10.15.0",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-boundaries": "^6.0.0",
-    "prettier": "^3.6.0",
-    "turbo": "^2.10.3",
+    "prettier": "^3.10.1",
+    "turbo": "^2.11.13",
     "typescript": "^5.9.0",
-    "typescript-eslint": "^8.62.0"
+    "typescript-eslint": "^8.73.0"
   },
   "packageManager": "npm@11.21.2",
   "overrides": {
